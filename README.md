@@ -1,4 +1,4 @@
-# Moto Tracker 🏍️
+# Moto Tracker 
 
 A mobile application for motorcycle maintenance tracking.
 
