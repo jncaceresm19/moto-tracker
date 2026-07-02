@@ -133,3 +133,18 @@ export const idxDocumentsExpiry = index('idx_documents_expiry').on(documents.exp
 export const idxMaintenanceNextService = index('idx_maintenance_next_service').on(maintenanceRecords.nextServiceDate, maintenanceRecords.nextServiceKilometers);
 export const idxUsersEmail = uniqueIndex('idx_users_email').on(users.email);
 export const idxUsersGoogleId = uniqueIndex('idx_users_google_id').on(users.googleId);
+
+// Refresh tokens table
+export const refreshTokens = sqliteTable('refresh_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  token: text('token').notNull().unique(),
+  family: text('family').notNull(), // token family for breach detection
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  revokedAt: integer('revoked_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const idxRefreshTokensUserId = index('idx_refresh_tokens_user_id').on(refreshTokens.userId);
+export const idxRefreshTokensToken = uniqueIndex('idx_refresh_tokens_token').on(refreshTokens.token);
+export const idxRefreshTokensFamily = index('idx_refresh_tokens_family').on(refreshTokens.family);
