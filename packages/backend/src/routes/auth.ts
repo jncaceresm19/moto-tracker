@@ -14,6 +14,7 @@ import {
 } from '../validation/auth';
 import { createErrorResponse } from '@moto-tracker/shared';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type * as schema from '../db/schema';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
@@ -42,7 +43,7 @@ function generateRefreshToken(
   return { token, expiresAt, family: tokenFamily };
 }
 
-export function createAuthRouter(db: BetterSQLite3Database, jwtSecret: string) {
+export function createAuthRouter(db: BetterSQLite3Database<typeof schema>, jwtSecret: string) {
   const refreshSecret = process.env.JWT_REFRESH_SECRET || jwtSecret;
   const router = Router();
 
@@ -321,15 +322,15 @@ export function createAuthRouter(db: BetterSQLite3Database, jwtSecret: string) {
 
       if (!user) {
         // Check by email
-        user = db.select().from(users).where(eq(users.email, email)).get();
+        const existingByEmail = db.select().from(users).where(eq(users.email, email)).get();
 
-        if (user) {
+        if (existingByEmail) {
           // Link Google account to existing email user
           db.update(users)
-            .set({ googleId, avatarUrl: picture || user.avatarUrl, updatedAt: new Date() })
-            .where(eq(users.id, user.id))
+            .set({ googleId, avatarUrl: picture || existingByEmail.avatarUrl, updatedAt: new Date() })
+            .where(eq(users.id, existingByEmail.id))
             .run();
-          user = { ...user, googleId, avatarUrl: picture || user.avatarUrl };
+          user = { ...existingByEmail, googleId, avatarUrl: picture || existingByEmail.avatarUrl } as typeof existingByEmail;
         } else {
           // Create new user
           const now = new Date();
@@ -341,7 +342,7 @@ export function createAuthRouter(db: BetterSQLite3Database, jwtSecret: string) {
               passwordHash: '', // No password for OAuth users
               name: name || email.split('@')[0],
               googleId,
-              avatarUrl: picture || undefined,
+              avatarUrl: picture || null,
               createdAt: now,
               updatedAt: now,
             })
@@ -352,7 +353,7 @@ export function createAuthRouter(db: BetterSQLite3Database, jwtSecret: string) {
             passwordHash: '',
             name: name || email.split('@')[0],
             googleId,
-            avatarUrl: picture || undefined,
+            avatarUrl: picture || null,
             createdAt: now,
             updatedAt: now,
           };
