@@ -9,6 +9,9 @@ import motorcycleRoutes from './routes/motorcycles';
 import kilometerRoutes from './routes/kilometers';
 import maintenanceRoutes from './routes/maintenance';
 import documentRoutes from './routes/documents';
+import notificationRoutes from './routes/notifications';
+import { ReminderEngine } from './services/reminder';
+import { db } from './db';
 
 dotenv.config();
 
@@ -35,9 +38,16 @@ app.use('/api/motorcycles', maintenanceRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/motorcycles', documentRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/notifications', notificationRoutes);
+
+// Start reminder engine
+const reminderCheckInterval = parseInt(process.env.REMINDER_CHECK_INTERVAL_MS || '3600000', 10);
+const reminderEngine = new ReminderEngine(db, { checkIntervalMs: reminderCheckInterval });
+reminderEngine.start();
 
 app.listen(PORT, () => {
   console.log(`🏍️  Moto Tracker API running on port ${PORT}`);
+  console.log(`⏰ Reminder engine started (interval: ${reminderCheckInterval}ms)`);
 });
 
 export default app;
