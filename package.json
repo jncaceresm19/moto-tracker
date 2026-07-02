@@ -1,0 +1,21 @@
+{
+  "name": "moto-tracker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Motorcycle maintenance tracking app",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "cd packages/mobile && npm start",
+    "dev:backend": "cd packages/backend && npm run dev",
+    "test": "npm run test --workspaces",
+    "test:mobile": "cd packages/mobile && npm test",
+    "test:backend": "cd packages/backend && npm test",
+    "lint": "npm run lint --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "keywords": ["motorcycle", "maintenance", "tracking", "mobile"],
+  "author": "",
+  "license": "MIT"
+}
