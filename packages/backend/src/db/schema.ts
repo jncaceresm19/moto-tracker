@@ -49,12 +49,13 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
 export const documents = sqliteTable('documents', {
   id: text('id').primaryKey(),
   motorcycleId: text('motorcycle_id').notNull().references(() => motorcycles.id),
-  type: text('type').notNull(), // 'circulation_permit', 'technical_review', 'insurance', 'registration', 'other'
+  type: text('type').notNull(), // 'permiso_circulacion', 'revision_tecnica', 'seguro', 'libre_deuda'
   title: text('title').notNull(),
   fileUrl: text('file_url').notNull(),
   expiryDate: integer('expiry_date', { mode: 'timestamp' }),
   notes: text('notes'),
   imagePath: text('image_path'),
+  ocrRawText: text('ocr_raw_text'),
   ocrConfidence: real('ocr_confidence'),
   status: text('status').default('valid'), // 'valid', 'expiring', 'expired'
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -148,3 +149,6 @@ export const refreshTokens = sqliteTable('refresh_tokens', {
 export const idxRefreshTokensUserId = index('idx_refresh_tokens_user_id').on(refreshTokens.userId);
 export const idxRefreshTokensToken = uniqueIndex('idx_refresh_tokens_token').on(refreshTokens.token);
 export const idxRefreshTokensFamily = index('idx_refresh_tokens_family').on(refreshTokens.family);
+
+// Unique constraint: one document type per motorcycle
+export const idxDocumentsMotorcycleType = uniqueIndex('idx_documents_motorcycle_type').on(documents.motorcycleId, documents.type);

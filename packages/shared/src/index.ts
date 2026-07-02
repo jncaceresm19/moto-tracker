@@ -97,11 +97,10 @@ export interface CreateMaintenanceRequest {
 
 // Document types
 export type DocumentType = 
-  | 'circulation_permit'
-  | 'technical_review'
-  | 'insurance'
-  | 'registration'
-  | 'other';
+  | 'permiso_circulacion'
+  | 'revision_tecnica'
+  | 'seguro'
+  | 'libre_deuda';
 
 export type DocumentStatus = 'valid' | 'expiring' | 'expired';
 
@@ -114,6 +113,7 @@ export interface Document {
   expiryDate?: Date;
   notes?: string;
   imagePath?: string;
+  ocrRawText?: string;
   ocrConfidence?: number;
   status: DocumentStatus;
   createdAt: Date;
