@@ -58,3 +58,7 @@ ios/*.xcworkspace/xcuserdata/
 *.env
 .env.local
 .env.*.local
+
+# Database
+*.db
+*.db-journal
