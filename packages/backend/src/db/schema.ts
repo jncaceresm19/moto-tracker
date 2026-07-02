@@ -120,8 +120,16 @@ export const notifications = sqliteTable('notifications', {
   type: text('type').notNull(),
   title: text('title').notNull(),
   message: text('message').notNull(),
+  sourceType: text('source_type'), // 'document', 'maintenance', etc.
+  sourceId: text('source_id'),     // ID of the source entity for deep-linking
   isRead: integer('is_read', { mode: 'boolean' }).default(false),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+// Last reminder check timestamp
+export const reminderState = sqliteTable('reminder_state', {
+  id: text('id').primaryKey(),
+  lastCheckedAt: integer('last_checked_at', { mode: 'timestamp' }).notNull(),
 });
 
 // Indexes
@@ -152,3 +160,6 @@ export const idxRefreshTokensFamily = index('idx_refresh_tokens_family').on(refr
 
 // Unique constraint: one document type per motorcycle
 export const idxDocumentsMotorcycleType = uniqueIndex('idx_documents_motorcycle_type').on(documents.motorcycleId, documents.type);
+
+// Unique constraint: prevent duplicate notifications for same source
+export const idxNotificationsSource = uniqueIndex('idx_notifications_source').on(notifications.userId, notifications.type, notifications.sourceId);

@@ -185,13 +185,17 @@ export interface MaintenanceTypeCatalog {
 }
 
 // Notification types
+export type NotificationType = 'document_expiry' | 'document_expiring' | 'maintenance_due' | 'maintenance_km_due';
+
 export interface Notification {
   id: string;
   userId: string;
   motorcycleId?: string;
-  type: string;
+  type: NotificationType;
   title: string;
   message: string;
+  sourceType?: string;
+  sourceId?: string;
   isRead: boolean;
   createdAt: Date;
 }
