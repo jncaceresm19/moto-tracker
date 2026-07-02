@@ -5,6 +5,9 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import catalogRoutes from './routes/catalog';
 import maintenanceTypesRoutes from './routes/maintenance-types';
+import motorcycleRoutes from './routes/motorcycles';
+import kilometerRoutes from './routes/kilometers';
+import maintenanceRoutes from './routes/maintenance';
 
 dotenv.config();
 
@@ -25,8 +28,10 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/maintenance-types', maintenanceTypesRoutes);
-// app.use('/api/motorcycles', motorcycleRoutes);
-// app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/motorcycles', motorcycleRoutes);
+app.use('/api/motorcycles', kilometerRoutes);
+app.use('/api/motorcycles', maintenanceRoutes);
+app.use('/api/maintenance', maintenanceRoutes);
 
 app.listen(PORT, () => {
   console.log(`🏍️  Moto Tracker API running on port ${PORT}`);
