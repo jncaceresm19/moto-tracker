@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
+import motorcycleRoutes from './routes/motorcycles';
 
 dotenv.config();
 
@@ -21,7 +22,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
-// app.use('/api/motorcycles', motorcycleRoutes);
+app.use('/api/motorcycles', motorcycleRoutes);
 // app.use('/api/maintenance', maintenanceRoutes);
 
 app.listen(PORT, () => {
