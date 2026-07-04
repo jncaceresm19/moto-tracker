@@ -94,3 +94,68 @@ export async function createMotorcycle(data: {
 export async function deleteMotorcycle(id: string): Promise<void> {
   await api(`/api/motorcycles/${id}`, { method: 'DELETE' });
 }
+
+// Maintenance Records
+export interface MaintenanceRecord {
+  id: string;
+  motorcycleId: string;
+  type: string;
+  description: string;
+  kilometersAtService: number;
+  serviceDate: string;
+  cost?: number;
+  notes?: string;
+}
+
+export async function listMaintenance(motorcycleId: string): Promise<MaintenanceRecord[]> {
+  return api<MaintenanceRecord[]>(`/api/motorcycles/${motorcycleId}/maintenance`);
+}
+
+export async function createMaintenance(
+  motorcycleId: string,
+  data: { type: string; description: string; kilometersAtService: number; serviceDate: string; cost?: number; notes?: string }
+): Promise<MaintenanceRecord> {
+  return api<MaintenanceRecord>(`/api/motorcycles/${motorcycleId}/maintenance`, { method: 'POST', body: data });
+}
+
+// Documents
+export interface Document {
+  id: string;
+  motorcycleId: string;
+  type: string;
+  title: string;
+  fileUrl: string;
+  expiryDate?: string;
+  status: string;
+}
+
+export async function listDocuments(motorcycleId: string): Promise<Document[]> {
+  return api<Document[]>(`/api/motorcycles/${motorcycleId}/documents`);
+}
+
+export async function createDocument(
+  motorcycleId: string,
+  data: { type: string; title: string; fileUrl: string; expiryDate?: string }
+): Promise<Document> {
+  return api<Document>(`/api/motorcycles/${motorcycleId}/documents`, { method: 'POST', body: data });
+}
+
+// Kilometer History
+export interface KilometerEntry {
+  id: string;
+  motorcycleId: string;
+  readingKm: number;
+  recordedAt: string;
+  notes?: string;
+}
+
+export async function listKilometers(motorcycleId: string): Promise<KilometerEntry[]> {
+  return api<KilometerEntry[]>(`/api/motorcycles/${motorcycleId}/kilometers`);
+}
+
+export async function createKilometer(
+  motorcycleId: string,
+  data: { readingKm: number; recordedAt: string; notes?: string }
+): Promise<KilometerEntry> {
+  return api<KilometerEntry>(`/api/motorcycles/${motorcycleId}/kilometers`, { method: 'POST', body: data });
+}

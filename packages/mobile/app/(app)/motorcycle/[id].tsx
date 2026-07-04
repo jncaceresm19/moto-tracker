@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { useLocalSearchParams, router } from 'expo-router';
 import { getMotorcycle, Motorcycle } from '../../../src/api';
 
 export default function MotorcycleDetailScreen() {
@@ -11,32 +11,20 @@ export default function MotorcycleDetailScreen() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      try {
-        const data = await getMotorcycle(id);
-        setMotorcycle(data);
-      } catch {
-        Alert.alert('Error', 'Failed to load motorcycle');
-      } finally {
-        setLoading(false);
-      }
+      try { setMotorcycle(await getMotorcycle(id)); }
+      catch { Alert.alert('Error', 'Failed to load motorcycle'); }
+      finally { setLoading(false); }
     })();
   }, [id]);
 
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
+  if (!motorcycle) return <View style={styles.center}><Text>Motorcycle not found</Text></View>;
 
-  if (!motorcycle) {
-    return (
-      <View style={styles.center}>
-        <Text>Motorcycle not found</Text>
-      </View>
-    );
-  }
+  const sections = [
+    { title: 'Maintenance Records', route: `/(app)/motorcycle/${id}/maintenance`, icon: '🔧' },
+    { title: 'Documents', route: `/(app)/motorcycle/${id}/documents`, icon: '📄' },
+    { title: 'Kilometer History', route: `/(app)/motorcycle/${id}/kilometers`, icon: '📏' },
+  ];
 
   return (
     <ScrollView style={styles.container}>
@@ -57,8 +45,14 @@ export default function MotorcycleDetailScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <Text style={styles.placeholder}>Maintenance · Documents · Kilometer History — PR #3</Text>
+        <Text style={styles.sectionTitle}>Sections</Text>
+        {sections.map((s) => (
+          <TouchableOpacity key={s.route} style={styles.sectionBtn} onPress={() => router.push(s.route as any)}>
+            <Text style={styles.sectionIcon}>{s.icon}</Text>
+            <Text style={styles.sectionText}>{s.title}</Text>
+            <Text style={styles.arrow}>›</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </ScrollView>
   );
@@ -71,16 +65,13 @@ const styles = StyleSheet.create({
   brand: { fontSize: 28, fontWeight: 'bold' },
   model: { fontSize: 20, color: '#333', marginTop: 4 },
   year: { fontSize: 16, color: '#666', marginTop: 2 },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#f0f0f0' },
   label: { fontSize: 16, color: '#666' },
   value: { fontSize: 16, fontWeight: '500' },
   section: { padding: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
-  placeholder: { fontSize: 14, color: '#999', fontStyle: 'italic' },
+  sectionTitle: { fontSize: 18, fontWeight: '600', marginBottom: 12 },
+  sectionBtn: { flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: '#f8f8f8', borderRadius: 8, marginBottom: 8 },
+  sectionIcon: { fontSize: 20, marginRight: 12 },
+  sectionText: { fontSize: 16, flex: 1 },
+  arrow: { fontSize: 22, color: '#999' },
 });
