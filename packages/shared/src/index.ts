@@ -95,6 +95,18 @@ export interface CreateMaintenanceRequest {
   oilTypeId?: string;
 }
 
+export interface UpdateMaintenanceRequest {
+  type?: MaintenanceType;
+  description?: string;
+  kilometersAtService?: number;
+  serviceDate?: Date;
+  cost?: number | null;
+  notes?: string | null;
+  nextServiceKilometers?: number | null;
+  nextServiceDate?: Date | null;
+  oilTypeId?: string | null;
+}
+
 // Document types
 export type DocumentType = 
   | 'circulation_permit'

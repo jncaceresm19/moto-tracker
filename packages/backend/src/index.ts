@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import motorcycleRoutes from './routes/motorcycles';
+import maintenanceRoutes from './routes/maintenance';
 
 dotenv.config();
 
@@ -23,7 +24,7 @@ app.get('/health', (req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/motorcycles', motorcycleRoutes);
-// app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/motorcycles/:id/maintenance', maintenanceRoutes);
 
 app.listen(PORT, () => {
   console.log(`🏍️  Moto Tracker API running on port ${PORT}`);
