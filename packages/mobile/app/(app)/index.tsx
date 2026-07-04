@@ -1,28 +1,48 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, TextInput } from 'react-native';
 import { router } from 'expo-router';
-import { listMotorcycles, deleteMotorcycle, Motorcycle } from '../../src/api';
+import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
 
 export default function MotorcycleListScreen() {
   const { signOut } = useAuth();
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
 
   const loadMotorcycles = async () => {
     try {
-      const data = await listMotorcycles();
-      setMotorcycles(data);
-    } catch (err) {
+      setMotorcycles(await listMotorcycles());
+    } catch {
       Alert.alert('Error', 'Failed to load motorcycles');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadMotorcycles();
-  }, []);
+  useEffect(() => { loadMotorcycles(); }, []);
+
+  const handleCreate = async () => {
+    if (!form.brand || !form.model || !form.year || !form.licensePlate) {
+      Alert.alert('Error', 'Fill required fields');
+      return;
+    }
+    try {
+      const created = await createMotorcycle({
+        brand: form.brand,
+        model: form.model,
+        year: Number(form.year),
+        licensePlate: form.licensePlate,
+        currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
+      });
+      setMotorcycles((prev) => [created, ...prev]);
+      setShowCreate(false);
+      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+    } catch {
+      Alert.alert('Error', 'Failed to create motorcycle');
+    }
+  };
 
   const handleDelete = (id: string, name: string) => {
     Alert.alert('Delete', `Delete ${name}?`, [
@@ -43,26 +63,27 @@ export default function MotorcycleListScreen() {
   };
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
+    return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
   }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Motorcycles</Text>
-        <TouchableOpacity onPress={signOut}>
-          <Text style={styles.logout}>Sign Out</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
+            <Text style={styles.addBtnText}>+ Add</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={signOut}>
+            <Text style={styles.logout}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {motorcycles.length === 0 ? (
         <View style={styles.center}>
           <Text style={styles.empty}>No motorcycles yet</Text>
-          <Text style={styles.emptySub}>Tap + to add one</Text>
+          <Text style={styles.emptySub}>Tap + Add to add one</Text>
         </View>
       ) : (
         <FlatList
@@ -81,6 +102,21 @@ export default function MotorcycleListScreen() {
           )}
         />
       )}
+
+      <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>New Motorcycle</Text>
+            <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+          </View>
+          <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(t) => setForm((p) => ({ ...p, brand: t }))} />
+          <TextInput style={styles.input} placeholder="Model *" value={form.model} onChangeText={(t) => setForm((p) => ({ ...p, model: t }))} />
+          <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(t) => setForm((p) => ({ ...p, year: t }))} />
+          <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => setForm((p) => ({ ...p, licensePlate: t }))} />
+          <TextInput style={styles.input} placeholder="Current km (optional)" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
+          <TouchableOpacity style={styles.saveBtn} onPress={handleCreate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -96,7 +132,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { fontSize: 22, fontWeight: 'bold' },
+  addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  addBtnText: { color: '#fff', fontWeight: '600' },
   logout: { color: '#FF3B30', fontSize: 14 },
   empty: { fontSize: 18, color: '#999', marginBottom: 4 },
   emptySub: { fontSize: 14, color: '#ccc' },
@@ -110,4 +149,11 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 18, fontWeight: '600' },
   cardSub: { fontSize: 14, color: '#666', marginTop: 4 },
   cardKm: { fontSize: 14, color: '#007AFF', marginTop: 4 },
+  modal: { flex: 1, padding: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold' },
+  cancel: { color: '#007AFF', fontSize: 16 },
+  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
