@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getToken } from './api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { login as apiLogin, register as apiRegister, logout as apiLogout } from './api';
 
 interface User {
   id: string;
@@ -22,7 +23,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const token = await getToken();
+      const token = await AsyncStorage.getItem('accessToken');
       if (token) {
         // TODO: validate token and fetch user profile
         setUser({ id: 'cached', email: 'cached' });
