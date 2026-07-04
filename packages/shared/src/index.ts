@@ -143,6 +143,17 @@ export interface CreateDocumentRequest {
   status?: DocumentStatus;
 }
 
+export interface UpdateDocumentRequest {
+  type?: DocumentType;
+  title?: string;
+  fileUrl?: string;
+  expiryDate?: Date | null;
+  notes?: string | null;
+  imagePath?: string | null;
+  ocrConfidence?: number | null;
+  status?: DocumentStatus | null;
+}
+
 // Kilometer history types
 export interface KilometerEntry {
   id: string;
