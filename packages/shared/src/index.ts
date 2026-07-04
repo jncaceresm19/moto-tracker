@@ -170,6 +170,12 @@ export interface CreateKilometerEntryRequest {
   notes?: string;
 }
 
+export interface UpdateKilometerEntryRequest {
+  readingKm?: number;
+  recordedAt?: Date;
+  notes?: string | null;
+}
+
 // Catalog types
 export interface MotorcycleCatalogBrand {
   id: string;

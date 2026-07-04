@@ -6,6 +6,7 @@ import authRoutes from './routes/auth';
 import motorcycleRoutes from './routes/motorcycles';
 import maintenanceRoutes from './routes/maintenance';
 import documentRoutes from './routes/documents';
+import kilometerRoutes from './routes/kilometers';
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/motorcycles', motorcycleRoutes);
 app.use('/api/motorcycles/:id/maintenance', maintenanceRoutes);
 app.use('/api/motorcycles/:id/documents', documentRoutes);
+app.use('/api/motorcycles/:id/kilometers', kilometerRoutes);
 
 app.listen(PORT, () => {
   console.log(`🏍️  Moto Tracker API running on port ${PORT}`);
