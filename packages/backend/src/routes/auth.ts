@@ -36,8 +36,9 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
       return;
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 12);
+    // Hash password — lower rounds in test for speed
+    const saltRounds = process.env.NODE_ENV === 'test' ? 4 : 12;
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
     // Create user
     const now = new Date();

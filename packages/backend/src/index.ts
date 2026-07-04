@@ -30,8 +30,11 @@ app.use('/api/motorcycles/:id/maintenance', maintenanceRoutes);
 app.use('/api/motorcycles/:id/documents', documentRoutes);
 app.use('/api/motorcycles/:id/kilometers', kilometerRoutes);
 
-app.listen(PORT, () => {
-  console.log(`🏍️  Moto Tracker API running on port ${PORT}`);
-});
+// Only listen when not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`Moto Tracker API running on port ${PORT}`);
+  });
+}
 
 export default app;
