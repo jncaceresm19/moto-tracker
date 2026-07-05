@@ -169,7 +169,8 @@ export default function DocumentsScreen() {
       for (const doc of photos) {
         const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
         const fileUri = FileSystem.documentDirectory + filename;
-        await FileSystem.writeAsStringAsync(fileUri, doc.fileUrl, { encoding: FileSystem.EncodingType.Base64 });
+        const base64 = doc.fileUrl.includes('base64,') ? doc.fileUrl.split('base64,')[1] : doc.fileUrl;
+        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
         saved++;
       }
       Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app storage.`);
@@ -215,7 +216,8 @@ export default function DocumentsScreen() {
       }
       const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
       const fileUri = FileSystem.documentDirectory + filename;
-      await FileSystem.writeAsStringAsync(fileUri, doc.fileUrl, { encoding: FileSystem.EncodingType.Base64 });
+      const base64 = doc.fileUrl.includes('base64,') ? doc.fileUrl.split('base64,')[1] : doc.fileUrl;
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
       Alert.alert('Saved', `Document saved to app storage as ${filename}`);
     } catch {
       Alert.alert('Error', 'Failed to save document');
