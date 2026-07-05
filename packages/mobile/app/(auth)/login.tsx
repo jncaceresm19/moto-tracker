@@ -28,6 +28,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
+      <Image source={require('../../assets/logo.jpeg')} style={styles.icon} resizeMode="contain" />
       <Image source={require('../../assets/nombre.jpeg')} style={styles.logo} resizeMode="contain" />
       <Text style={styles.subtitle}>Sign in to your account</Text>
 
@@ -86,6 +87,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     backgroundColor: '#fff',
+  },
+  icon: {
+    width: 120,
+    height: 120,
+    alignSelf: 'center',
+    marginBottom: 12,
   },
   logo: {
     width: 280,
