@@ -1,12 +1,17 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../../src/theme-context';
+import { useLanguage } from '../../src/language-context';
 
 export default function HomeScreen() {
+  const { colors } = useTheme();
+  const { t } = useLanguage();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Text style={styles.icon}>🏠</Text>
-      <Text style={styles.title}>Welcome to Moto Tracker</Text>
-      <Text style={styles.subtitle}>Track your motorcycle maintenance and documents</Text>
+      <Text style={[styles.title, { color: colors.text }]}>{t('homeTitle')}</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{t('homeSubtitle')}</Text>
     </View>
   );
 }
@@ -16,7 +21,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
     padding: 24,
   },
   icon: {
@@ -31,7 +35,6 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
   },
 });

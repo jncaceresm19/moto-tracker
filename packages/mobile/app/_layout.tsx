@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/auth-context';
+import { ThemeProvider } from '../src/theme-context';
+import { LanguageProvider } from '../src/language-context';
 import * as SplashScreen from 'expo-splash-screen';
 
 SplashScreen.preventAutoHideAsync();
@@ -34,9 +36,13 @@ function AuthGuard() {
 
 export default function RootLayout() {
   return (
-    <AuthProvider>
-      <AuthGuard />
-      <Stack screenOptions={{ headerShown: false }} />
-    </AuthProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <AuthGuard />
+          <Stack screenOptions={{ headerShown: false }} />
+        </AuthProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }

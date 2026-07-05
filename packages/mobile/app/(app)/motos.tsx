@@ -5,9 +5,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
 import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
+import { useTheme } from '../../src/theme-context';
+import { useLanguage } from '../../src/language-context';
 
 export default function MotorcycleListScreen() {
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const { t } = useLanguage();
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -125,32 +129,32 @@ export default function MotorcycleListScreen() {
   };
 
   if (loading) {
-    return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
+    return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Motorcycles</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
-          <Text style={styles.addBtnText}>+ Add</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Text style={[styles.title, { color: colors.text }]}>{t('myMotorcycles')}</Text>
+        <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.primary }]} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
+          <Text style={[styles.addBtnText, { color: colors.primaryText }]}>+ Add</Text>
         </TouchableOpacity>
       </View>
 
       {motorcycles.length === 0 ? (
-        <View style={styles.center}>
+        <View style={[styles.center, { backgroundColor: colors.background }]}>
           <Text style={styles.emptyIcon}>🏍️</Text>
-          <Text style={styles.empty}>No motorcycles yet</Text>
-          <Text style={styles.emptySub}>Tap + to add your first motorcycle</Text>
+          <Text style={[styles.empty, { color: colors.text }]}>{t('noMotorcycles')}</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noMotorcyclesSub')}</Text>
         </View>
       ) : (
         <FlatList
           data={motorcycles}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.card}
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => router.push(`/(app)/motorcycle/${item.id}`)}
               onLongPress={() => handleDelete(item.id, `${item.brand} ${item.model}`)}
             >

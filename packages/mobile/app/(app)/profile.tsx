@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/auth-context';
+import { useTheme } from '../../src/theme-context';
+import { useLanguage } from '../../src/language-context';
 import { changePassword } from '../../src/api';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
+  const { mode, colors, toggleTheme } = useTheme();
+  const { language, t, setLanguage } = useLanguage();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -13,8 +17,8 @@ export default function ProfileScreen() {
 
   const handleChangePassword = async () => {
     const newErrors: Record<string, string> = {};
-    if (!passwords.current) newErrors.current = 'Current password is required';
-    if (!passwords.newPass) newErrors.newPass = 'New password is required';
+    if (!passwords.current) newErrors.current = t('currentPassword') + ' required';
+    if (!passwords.newPass) newErrors.newPass = t('newPassword') + ' required';
     if (passwords.newPass.length < 6) newErrors.newPass = 'Must be at least 6 characters';
     if (passwords.newPass !== passwords.confirm) newErrors.confirm = 'Passwords do not match';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
@@ -23,161 +27,202 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       await changePassword(passwords.current, passwords.newPass);
-      Alert.alert('Success', 'Password changed successfully');
+      Alert.alert(t('success'), t('passwordChanged'));
       setShowChangePassword(false);
       setPasswords({ current: '', newPass: '', confirm: '' });
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to change password');
+      Alert.alert(t('error'), e?.message || 'Failed to change password');
     } finally {
       setSaving(false);
     }
   };
 
   const handleSignOut = () => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: signOut },
+    Alert.alert(t('signOut'), t('signOutConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
+      { text: t('signOut'), style: 'destructive', onPress: signOut },
     ]);
   };
 
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?';
 
+  const dynamicStyles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: { alignItems: 'center', paddingVertical: 32, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+    name: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
+    email: { fontSize: 14, color: colors.textSecondary },
+    sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', marginTop: 24, marginBottom: 8, marginHorizontal: 16 },
+    section: { backgroundColor: colors.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
+    rowText: { fontSize: 16, color: colors.text },
+    logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 32, marginHorizontal: 16, paddingVertical: 14, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.danger },
+    logoutBtnText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
+    version: { textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: 16, marginBottom: 32 },
+    modal: { flex: 1, padding: 20, backgroundColor: colors.background },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    cancel: { color: colors.primary, fontSize: 16 },
+    input: { borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10, backgroundColor: colors.inputBg, color: colors.text },
+    errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
+    saveBtn: { backgroundColor: colors.primary, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+    saveBtnText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
+  });
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={dynamicStyles.container}>
       {/* Profile Header */}
-      <View style={styles.header}>
-        <View style={styles.avatar}>
+      <View style={dynamicStyles.header}>
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <Text style={styles.avatarText}>{userInitial}</Text>
         </View>
-        <Text style={styles.name}>{user?.email?.split('@')[0] || 'User'}</Text>
-        <Text style={styles.email}>{user?.email || 'Not logged in'}</Text>
+        <Text style={dynamicStyles.name}>{user?.email?.split('@')[0] || 'User'}</Text>
+        <Text style={dynamicStyles.email}>{user?.email || 'Not logged in'}</Text>
       </View>
 
       {/* Account Section */}
-      <Text style={styles.sectionTitle}>Account</Text>
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Coming Soon', 'Edit profile will be available soon.')}>
+      <Text style={dynamicStyles.sectionTitle}>{t('account')}</Text>
+      <View style={dynamicStyles.section}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert('Coming Soon', 'Edit profile will be available soon.')}>
           <View style={styles.rowLeft}>
-            <Ionicons name="person-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>Edit Profile</Text>
+            <Ionicons name="person-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('editProfile')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.row} onPress={() => setShowChangePassword(true)}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => setShowChangePassword(true)}>
           <View style={styles.rowLeft}>
-            <Ionicons name="lock-closed-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>Change Password</Text>
+            <Ionicons name="lock-closed-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('changePassword')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Google Account', user?.email || 'Not connected')}>
+        <View style={dynamicStyles.row}>
           <View style={styles.rowLeft}>
-            <Ionicons name="logo-google" size={20} color="#333" />
-            <Text style={styles.rowText}>Google Account</Text>
+            <Ionicons name="logo-google" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('googleAccount')}</Text>
           </View>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>Connected</Text>
+          <View style={[styles.badge, { backgroundColor: colors.success }]}>
+            <Text style={styles.badgeText}>{t('connected')}</Text>
           </View>
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* App Settings Section */}
-      <Text style={styles.sectionTitle}>App Settings</Text>
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Coming Soon', 'Notifications settings coming soon.')}>
+      <Text style={dynamicStyles.sectionTitle}>{t('appSettings')}</Text>
+      <View style={dynamicStyles.section}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert('Coming Soon', 'Notifications settings coming soon.')}>
           <View style={styles.rowLeft}>
-            <Ionicons name="notifications-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>Notifications</Text>
+            <Ionicons name="notifications-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('notifications')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Coming Soon', 'Theme settings coming soon.')}>
+        <View style={dynamicStyles.row}>
           <View style={styles.rowLeft}>
-            <Ionicons name="color-palette-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>Theme</Text>
+            <Ionicons name="color-palette-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('theme')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
-        </TouchableOpacity>
+          <Switch
+            value={mode === 'dark'}
+            onValueChange={toggleTheme}
+            trackColor={{ false: '#ccc', true: colors.primary }}
+          />
+        </View>
 
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Coming Soon', 'Language settings coming soon.')}>
+        <View style={dynamicStyles.row}>
           <View style={styles.rowLeft}>
-            <Ionicons name="language-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>Language</Text>
+            <Ionicons name="language-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('language')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
-        </TouchableOpacity>
+          <View style={styles.langButtons}>
+            <TouchableOpacity
+              style={[styles.langBtn, language === 'en' && { backgroundColor: colors.primary }]}
+              onPress={() => setLanguage('en')}
+            >
+              <Text style={[styles.langBtnText, language === 'en' && { color: colors.primaryText }]}>EN</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langBtn, language === 'es' && { backgroundColor: colors.primary }]}
+              onPress={() => setLanguage('es')}
+            >
+              <Text style={[styles.langBtnText, language === 'es' && { color: colors.primaryText }]}>ES</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       {/* Support Section */}
-      <Text style={styles.sectionTitle}>Support</Text>
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('Help', 'For support, contact us at support@mototracker.app')}>
+      <Text style={dynamicStyles.sectionTitle}>{t('support')}</Text>
+      <View style={dynamicStyles.section}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert(t('helpTitle'), t('helpMessage'))}>
           <View style={styles.rowLeft}>
-            <Ionicons name="help-circle-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>Help & Support</Text>
+            <Ionicons name="help-circle-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('helpSupport')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.row} onPress={() => Alert.alert('About', 'Moto Tracker v1.0.0\nTrack your motorcycle maintenance and documents.')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`)}>
           <View style={styles.rowLeft}>
-            <Ionicons name="information-circle-outline" size={20} color="#333" />
-            <Text style={styles.rowText}>About</Text>
+            <Ionicons name="information-circle-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('about')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
 
       {/* Sign Out */}
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
-        <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
-        <Text style={styles.logoutBtnText}>Sign Out</Text>
+      <TouchableOpacity style={dynamicStyles.logoutBtn} onPress={handleSignOut}>
+        <Ionicons name="log-out-outline" size={20} color={colors.danger} />
+        <Text style={dynamicStyles.logoutBtnText}>{t('signOut')}</Text>
       </TouchableOpacity>
 
-      <Text style={styles.version}>Moto Tracker v1.0.0</Text>
+      <Text style={dynamicStyles.version}>{t('aboutVersion')}</Text>
 
       {/* Change Password Modal */}
       <Modal visible={showChangePassword} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
+        <View style={dynamicStyles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Change Password</Text>
+            <Text style={dynamicStyles.modalTitle}>{t('changePassword')}</Text>
             <TouchableOpacity onPress={() => { setShowChangePassword(false); setErrors({}); setPasswords({ current: '', newPass: '', confirm: '' }); }}>
-              <Text style={styles.cancel}>Cancel</Text>
+              <Text style={dynamicStyles.cancel}>{t('cancel')}</Text>
             </TouchableOpacity>
           </View>
 
           <TextInput
-            style={styles.input}
-            placeholder="Current Password"
+            style={dynamicStyles.input}
+            placeholder={t('currentPassword')}
+            placeholderTextColor={colors.textMuted}
             value={passwords.current}
-            onChangeText={(t) => { setPasswords((p) => ({ ...p, current: t })); setErrors((p) => ({ ...p, current: '' })); }}
+            onChangeText={(t2) => { setPasswords((p) => ({ ...p, current: t2 })); setErrors((p) => ({ ...p, current: '' })); }}
             secureTextEntry
           />
-          {errors.current ? <Text style={styles.errorText}>{errors.current}</Text> : null}
+          {errors.current ? <Text style={dynamicStyles.errorText}>{errors.current}</Text> : null}
 
           <TextInput
-            style={styles.input}
-            placeholder="New Password"
+            style={dynamicStyles.input}
+            placeholder={t('newPassword')}
+            placeholderTextColor={colors.textMuted}
             value={passwords.newPass}
-            onChangeText={(t) => { setPasswords((p) => ({ ...p, newPass: t })); setErrors((p) => ({ ...p, newPass: '' })); }}
+            onChangeText={(t2) => { setPasswords((p) => ({ ...p, newPass: t2 })); setErrors((p) => ({ ...p, newPass: '' })); }}
             secureTextEntry
           />
-          {errors.newPass ? <Text style={styles.errorText}>{errors.newPass}</Text> : null}
+          {errors.newPass ? <Text style={dynamicStyles.errorText}>{errors.newPass}</Text> : null}
 
           <TextInput
-            style={styles.input}
-            placeholder="Confirm New Password"
+            style={dynamicStyles.input}
+            placeholder={t('confirmPassword')}
+            placeholderTextColor={colors.textMuted}
             value={passwords.confirm}
-            onChangeText={(t) => { setPasswords((p) => ({ ...p, confirm: t })); setErrors((p) => ({ ...p, confirm: '' })); }}
+            onChangeText={(t2) => { setPasswords((p) => ({ ...p, confirm: t2 })); setErrors((p) => ({ ...p, confirm: '' })); }}
             secureTextEntry
           />
-          {errors.confirm ? <Text style={styles.errorText}>{errors.confirm}</Text> : null}
+          {errors.confirm ? <Text style={dynamicStyles.errorText}>{errors.confirm}</Text> : null}
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleChangePassword} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleChangePassword} disabled={saving}>
+            {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
         </View>
       </Modal>
@@ -186,22 +231,10 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: 32,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
   avatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -211,50 +244,12 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
   },
-  name: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  email: {
-    fontSize: 14,
-    color: '#666',
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#999',
-    textTransform: 'uppercase',
-    marginTop: 24,
-    marginBottom: 8,
-    marginHorizontal: 16,
-  },
-  section: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#eee',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  rowText: {
-    fontSize: 16,
-    color: '#333',
-  },
   badge: {
-    backgroundColor: '#34C759',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 10,
@@ -264,38 +259,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
-  logoutBtn: {
+  langButtons: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 32,
-    marginHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FF3B30',
+    gap: 6,
   },
-  logoutBtnText: {
-    color: '#FF3B30',
-    fontSize: 16,
+  langBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#f0f0f0',
+  },
+  langBtnText: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#666',
   },
-  version: {
-    textAlign: 'center',
-    color: '#ccc',
-    fontSize: 12,
-    marginTop: 16,
-    marginBottom: 32,
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
-  // Modal
-  modal: { flex: 1, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  cancel: { color: '#007AFF', fontSize: 16 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
-  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
-  saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
