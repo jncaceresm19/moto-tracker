@@ -134,9 +134,9 @@ const styles = StyleSheet.create({
   },
 
   icon: {
-    width: 160,
-    height: 160,
-    marginBottom: -110,
+    width: 80,
+    height: 80,
+    marginBottom: -60,
   },
 
   logo: {
