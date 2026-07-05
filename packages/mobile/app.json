@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/logo.jpeg",
       "resizeMode": "contain",
-      "backgroundColor": "#1a1a2e"
+      "backgroundColor": "#2a2a3a"
     },
     "ios": {
       "supportsTablet": true
@@ -18,7 +18,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/logo.jpeg",
-        "backgroundColor": "#1a1a2e"
+        "backgroundColor": "#2a2a3a"
       },
       "package": "com.anonymous.mototracker"
     },
