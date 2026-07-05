@@ -58,7 +58,7 @@ export default function MotorcycleListScreen() {
       if (result.assets[0].base64) {
         uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
       } else {
-        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.Base64 });
+        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: 'base64' });
         uri = `data:image/jpeg;base64,${b64}`;
       }
       setImageUri(uri);

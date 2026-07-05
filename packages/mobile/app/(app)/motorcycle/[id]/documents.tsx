@@ -75,7 +75,7 @@ export default function DocumentsScreen() {
         uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
       } else {
         // Fallback: read file as base64 if ImagePicker didn't return it
-        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.Base64 });
+        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: 'base64' });
         uri = `data:image/jpeg;base64,${b64}`;
       }
       setForm((p) => ({ ...p, fileUrl: uri }));
@@ -177,7 +177,7 @@ export default function DocumentsScreen() {
         const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
         const fileUri = FileSystem.documentDirectory + filename;
         const base64 = doc.fileUrl.includes('base64,') ? doc.fileUrl.split('base64,')[1] : doc.fileUrl;
-        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
+        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: 'base64' });
         saved++;
       }
       Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app storage.`);
