@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { listKilometers, createKilometer, updateKilometer, deleteKilometer, KilometerEntry } from '../../../../src/api';
 
@@ -9,7 +9,9 @@ export default function KilometersScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<KilometerEntry | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ readingKm: '', recordedAt: '', notes: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!id) return;
@@ -20,11 +22,18 @@ export default function KilometersScreen() {
 
   useEffect(() => { load(); }, [id]);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
   const resetForm = () => setForm({ readingKm: '', recordedAt: '', notes: '' });
 
-  const openCreate = () => { resetForm(); setShowCreate(true); };
+  const openCreate = () => { resetForm(); setErrors({}); setShowCreate(true); };
 
   const openEdit = (entry: KilometerEntry) => {
+    setErrors({});
     setForm({
       readingKm: String(entry.readingKm),
       recordedAt: entry.recordedAt.split('T')[0],
@@ -34,10 +43,11 @@ export default function KilometersScreen() {
   };
 
   const handleCreate = async () => {
-    if (!id || !form.readingKm || !form.recordedAt) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.readingKm) newErrors.readingKm = 'Kilometers is required';
+    if (!form.recordedAt) newErrors.recordedAt = 'Date is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
     try {
       const created = await createKilometer(id, {
         readingKm: Number(form.readingKm),
@@ -51,10 +61,12 @@ export default function KilometersScreen() {
   };
 
   const handleUpdate = async () => {
-    if (!id || !editing || !form.readingKm || !form.recordedAt) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.readingKm) newErrors.readingKm = 'Kilometers is required';
+    if (!form.recordedAt) newErrors.recordedAt = 'Date is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+    if (!id || !editing) return;
     try {
       const updated = await updateKilometer(id, editing.id, {
         readingKm: Number(form.readingKm),
@@ -101,7 +113,14 @@ export default function KilometersScreen() {
       <FlatList
         data={entries}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={<Text style={styles.empty}>No readings yet</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📏</Text>
+            <Text style={styles.empty}>No readings yet</Text>
+            <Text style={styles.emptySub}>Tap + to record mileage</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
@@ -118,16 +137,20 @@ export default function KilometersScreen() {
       />
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
             <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
-          <TextInput style={styles.input} placeholder="Kilometers" keyboardType="numeric" value={form.readingKm} onChangeText={(t) => setForm((p) => ({ ...p, readingKm: t }))} />
-          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD)" value={form.recordedAt} onChangeText={(t) => setForm((p) => ({ ...p, recordedAt: t }))} />
+          <TextInput style={styles.input} placeholder="Kilometers *" keyboardType="numeric" value={form.readingKm} onChangeText={(t) => { setForm((p) => ({ ...p, readingKm: t })); setErrors((p) => ({ ...p, readingKm: '' })); }} />
+          {errors.readingKm ? <Text style={styles.errorText}>{errors.readingKm}</Text> : null}
+          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD) *" value={form.recordedAt} onChangeText={(t) => { setForm((p) => ({ ...p, recordedAt: t })); setErrors((p) => ({ ...p, recordedAt: '' })); }} />
+          {errors.recordedAt ? <Text style={styles.errorText}>{errors.recordedAt}</Text> : null}
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -141,6 +164,9 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyIcon: { fontSize: 48, marginBottom: 8 },
+  emptySub: { fontSize: 13, color: '#ccc', marginTop: 4 },
   card: { padding: 14, marginHorizontal: 16, marginTop: 8, backgroundColor: '#f8f8f8', borderRadius: 8 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between' },
   cardKm: { fontSize: 18, fontWeight: '600', color: '#007AFF' },
@@ -151,6 +177,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

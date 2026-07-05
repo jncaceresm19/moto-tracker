@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle } from '../../../src/api';
 
@@ -9,6 +9,7 @@ export default function MotorcycleDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!id) return;
@@ -21,6 +22,7 @@ export default function MotorcycleDetailScreen() {
 
   const openEdit = () => {
     if (!motorcycle) return;
+    setErrors({});
     setForm({
       brand: motorcycle.brand,
       model: motorcycle.model,
@@ -32,10 +34,13 @@ export default function MotorcycleDetailScreen() {
   };
 
   const handleUpdate = async () => {
-    if (!id || !form.brand || !form.model || !form.year || !form.licensePlate) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.brand) newErrors.brand = 'Brand is required';
+    if (!form.model) newErrors.model = 'Model is required';
+    if (!form.year) newErrors.year = 'Year is required';
+    if (!form.licensePlate) newErrors.licensePlate = 'License plate is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
     try {
       const updated = await updateMotorcycle(id, {
         brand: form.brand,
@@ -112,18 +117,24 @@ export default function MotorcycleDetailScreen() {
       </View>
 
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Motorcycle</Text>
             <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
-          <TextInput style={styles.input} placeholder="Brand" value={form.brand} onChangeText={(t) => setForm((p) => ({ ...p, brand: t }))} />
-          <TextInput style={styles.input} placeholder="Model" value={form.model} onChangeText={(t) => setForm((p) => ({ ...p, model: t }))} />
-          <TextInput style={styles.input} placeholder="Year" keyboardType="numeric" value={form.year} onChangeText={(t) => setForm((p) => ({ ...p, year: t }))} />
-          <TextInput style={styles.input} placeholder="License Plate" value={form.licensePlate} onChangeText={(t) => setForm((p) => ({ ...p, licensePlate: t }))} />
+          <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(t) => { setForm((p) => ({ ...p, brand: t })); setErrors((p) => ({ ...p, brand: '' })); }} />
+          {errors.brand ? <Text style={styles.errorText}>{errors.brand}</Text> : null}
+          <TextInput style={styles.input} placeholder="Model *" value={form.model} onChangeText={(t) => { setForm((p) => ({ ...p, model: t })); setErrors((p) => ({ ...p, model: '' })); }} />
+          {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
+          <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(t) => { setForm((p) => ({ ...p, year: t })); setErrors((p) => ({ ...p, year: '' })); }} />
+          {errors.year ? <Text style={styles.errorText}>{errors.year}</Text> : null}
+          <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => { setForm((p) => ({ ...p, licensePlate: t })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+          {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
           <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
@@ -156,6 +167,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

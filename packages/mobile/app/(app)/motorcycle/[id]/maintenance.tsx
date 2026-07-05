@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
 
@@ -11,7 +11,9 @@ export default function MaintenanceScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!id) return;
@@ -23,11 +25,18 @@ export default function MaintenanceScreen() {
 
   useEffect(() => { load(); }, [id]);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
   const resetForm = () => setForm({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
 
-  const openCreate = () => { resetForm(); setShowCreate(true); };
+  const openCreate = () => { resetForm(); setErrors({}); setShowCreate(true); };
 
   const openEdit = (record: MaintenanceRecord) => {
+    setErrors({});
     setForm({
       type: record.type,
       description: record.description,
@@ -40,10 +49,12 @@ export default function MaintenanceScreen() {
   };
 
   const handleCreate = async () => {
-    if (!id || !form.description || !form.kilometersAtService || !form.serviceDate) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.description) newErrors.description = 'Description is required';
+    if (!form.kilometersAtService) newErrors.kilometersAtService = 'Kilometers is required';
+    if (!form.serviceDate) newErrors.serviceDate = 'Date is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
     try {
       const created = await createMaintenance(id, {
         type: form.type,
@@ -60,10 +71,13 @@ export default function MaintenanceScreen() {
   };
 
   const handleUpdate = async () => {
-    if (!id || !editing || !form.description || !form.kilometersAtService || !form.serviceDate) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.description) newErrors.description = 'Description is required';
+    if (!form.kilometersAtService) newErrors.kilometersAtService = 'Kilometers is required';
+    if (!form.serviceDate) newErrors.serviceDate = 'Date is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+    if (!id || !editing) return;
     try {
       const updated = await updateMaintenance(id, editing.id, {
         type: form.type,
@@ -113,7 +127,14 @@ export default function MaintenanceScreen() {
       <FlatList
         data={records}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={<Text style={styles.empty}>No records yet</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>🔧</Text>
+            <Text style={styles.empty}>No records yet</Text>
+            <Text style={styles.emptySub}>Tap + to log maintenance</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
@@ -132,18 +153,23 @@ export default function MaintenanceScreen() {
       />
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
             <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
-          <TextInput style={styles.input} placeholder="Description" value={form.description} onChangeText={(t) => setForm((p) => ({ ...p, description: t }))} />
-          <TextInput style={styles.input} placeholder="Kilometers" keyboardType="numeric" value={form.kilometersAtService} onChangeText={(t) => setForm((p) => ({ ...p, kilometersAtService: t }))} />
-          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD)" value={form.serviceDate} onChangeText={(t) => setForm((p) => ({ ...p, serviceDate: t }))} />
+          <TextInput style={styles.input} placeholder="Description *" value={form.description} onChangeText={(t) => { setForm((p) => ({ ...p, description: t })); setErrors((p) => ({ ...p, description: '' })); }} />
+          {errors.description ? <Text style={styles.errorText}>{errors.description}</Text> : null}
+          <TextInput style={styles.input} placeholder="Kilometers *" keyboardType="numeric" value={form.kilometersAtService} onChangeText={(t) => { setForm((p) => ({ ...p, kilometersAtService: t })); setErrors((p) => ({ ...p, kilometersAtService: '' })); }} />
+          {errors.kilometersAtService ? <Text style={styles.errorText}>{errors.kilometersAtService}</Text> : null}
+          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD) *" value={form.serviceDate} onChangeText={(t) => { setForm((p) => ({ ...p, serviceDate: t })); setErrors((p) => ({ ...p, serviceDate: '' })); }} />
+          {errors.serviceDate ? <Text style={styles.errorText}>{errors.serviceDate}</Text> : null}
           <TextInput style={styles.input} placeholder="Cost (optional)" keyboardType="numeric" value={form.cost} onChangeText={(t) => setForm((p) => ({ ...p, cost: t }))} />
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -157,6 +183,9 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyIcon: { fontSize: 48, marginBottom: 8 },
+  emptySub: { fontSize: 13, color: '#ccc', marginTop: 4 },
   card: { padding: 14, marginHorizontal: 16, marginTop: 8, backgroundColor: '#f8f8f8', borderRadius: 8 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between' },
   cardType: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize' },
@@ -169,6 +198,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

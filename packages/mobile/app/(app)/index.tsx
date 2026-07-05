@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { router } from 'expo-router';
 import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
@@ -9,7 +9,9 @@ export default function MotorcycleListScreen() {
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const loadMotorcycles = async () => {
     try {
@@ -23,11 +25,20 @@ export default function MotorcycleListScreen() {
 
   useEffect(() => { loadMotorcycles(); }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadMotorcycles();
+    setRefreshing(false);
+  };
+
   const handleCreate = async () => {
-    if (!form.brand || !form.model || !form.year || !form.licensePlate) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.brand) newErrors.brand = 'Brand is required';
+    if (!form.model) newErrors.model = 'Model is required';
+    if (!form.year) newErrors.year = 'Year is required';
+    if (!form.licensePlate) newErrors.licensePlate = 'License plate is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
     try {
       const created = await createMotorcycle({
         brand: form.brand,
@@ -71,7 +82,7 @@ export default function MotorcycleListScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>My Motorcycles</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
+          <TouchableOpacity style={styles.addBtn} onPress={() => { setErrors({}); setShowCreate(true); }}>
             <Text style={styles.addBtnText}>+ Add</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={signOut}>
@@ -82,13 +93,15 @@ export default function MotorcycleListScreen() {
 
       {motorcycles.length === 0 ? (
         <View style={styles.center}>
+          <Text style={styles.emptyIcon}>🏍️</Text>
           <Text style={styles.empty}>No motorcycles yet</Text>
-          <Text style={styles.emptySub}>Tap + Add to add one</Text>
+          <Text style={styles.emptySub}>Tap + to add your first motorcycle</Text>
         </View>
       ) : (
         <FlatList
           data={motorcycles}
           keyExtractor={(item) => item.id}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
@@ -104,18 +117,24 @@ export default function MotorcycleListScreen() {
       )}
 
       <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>New Motorcycle</Text>
             <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
-          <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(t) => setForm((p) => ({ ...p, brand: t }))} />
-          <TextInput style={styles.input} placeholder="Model *" value={form.model} onChangeText={(t) => setForm((p) => ({ ...p, model: t }))} />
-          <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(t) => setForm((p) => ({ ...p, year: t }))} />
-          <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => setForm((p) => ({ ...p, licensePlate: t }))} />
+          <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(t) => { setForm((p) => ({ ...p, brand: t })); setErrors((p) => ({ ...p, brand: '' })); }} />
+          {errors.brand ? <Text style={styles.errorText}>{errors.brand}</Text> : null}
+          <TextInput style={styles.input} placeholder="Model *" value={form.model} onChangeText={(t) => { setForm((p) => ({ ...p, model: t })); setErrors((p) => ({ ...p, model: '' })); }} />
+          {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
+          <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(t) => { setForm((p) => ({ ...p, year: t })); setErrors((p) => ({ ...p, year: '' })); }} />
+          {errors.year ? <Text style={styles.errorText}>{errors.year}</Text> : null}
+          <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => { setForm((p) => ({ ...p, licensePlate: t })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+          {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
           <TextInput style={styles.input} placeholder="Current km (optional)" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={handleCreate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -138,6 +157,7 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '600' },
   logout: { color: '#FF3B30', fontSize: 14 },
   empty: { fontSize: 18, color: '#999', marginBottom: 4 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptySub: { fontSize: 14, color: '#ccc' },
   card: {
     padding: 16,
@@ -154,6 +174,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

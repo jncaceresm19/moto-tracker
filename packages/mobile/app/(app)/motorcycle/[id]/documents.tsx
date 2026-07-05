@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
@@ -11,7 +11,9 @@ export default function DocumentsScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Document | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ type: 'insurance', title: '', fileUrl: '', expiryDate: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const load = async () => {
     if (!id) return;
@@ -22,11 +24,18 @@ export default function DocumentsScreen() {
 
   useEffect(() => { load(); }, [id]);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
+
   const resetForm = () => setForm({ type: 'insurance', title: '', fileUrl: '', expiryDate: '' });
 
-  const openCreate = () => { resetForm(); setShowCreate(true); };
+  const openCreate = () => { resetForm(); setErrors({}); setShowCreate(true); };
 
   const openEdit = (doc: Document) => {
+    setErrors({});
     setForm({
       type: doc.type,
       title: doc.title,
@@ -37,10 +46,11 @@ export default function DocumentsScreen() {
   };
 
   const handleCreate = async () => {
-    if (!id || !form.title || !form.fileUrl) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.title) newErrors.title = 'Title is required';
+    if (!form.fileUrl) newErrors.fileUrl = 'File URL is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
     try {
       const created = await createDocument(id, {
         type: form.type,
@@ -55,10 +65,12 @@ export default function DocumentsScreen() {
   };
 
   const handleUpdate = async () => {
-    if (!id || !editing || !form.title || !form.fileUrl) {
-      Alert.alert('Error', 'Fill required fields');
-      return;
-    }
+    const newErrors: Record<string, string> = {};
+    if (!form.title) newErrors.title = 'Title is required';
+    if (!form.fileUrl) newErrors.fileUrl = 'File URL is required';
+    if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
+    setErrors({});
+    if (!id || !editing) return;
     try {
       const updated = await updateDocument(id, editing.id, {
         type: form.type,
@@ -106,7 +118,14 @@ export default function DocumentsScreen() {
       <FlatList
         data={docs}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={<Text style={styles.empty}>No documents yet</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyIcon}>📄</Text>
+            <Text style={styles.empty}>No documents yet</Text>
+            <Text style={styles.emptySub}>Tap + to add a document</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.card}
@@ -126,16 +145,20 @@ export default function DocumentsScreen() {
       />
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.modal}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
             <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
-          <TextInput style={styles.input} placeholder="Title" value={form.title} onChangeText={(t) => setForm((p) => ({ ...p, title: t }))} />
-          <TextInput style={styles.input} placeholder="File URL" value={form.fileUrl} onChangeText={(t) => setForm((p) => ({ ...p, fileUrl: t }))} />
+          <TextInput style={styles.input} placeholder="Title *" value={form.title} onChangeText={(t) => { setForm((p) => ({ ...p, title: t })); setErrors((p) => ({ ...p, title: '' })); }} />
+          {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
+          <TextInput style={styles.input} placeholder="File URL *" value={form.fileUrl} onChangeText={(t) => { setForm((p) => ({ ...p, fileUrl: t })); setErrors((p) => ({ ...p, fileUrl: '' })); }} />
+          {errors.fileUrl ? <Text style={styles.errorText}>{errors.fileUrl}</Text> : null}
           <TextInput style={styles.input} placeholder="Expiry date (YYYY-MM-DD, optional)" value={form.expiryDate} onChangeText={(t) => setForm((p) => ({ ...p, expiryDate: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -149,6 +172,9 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyIcon: { fontSize: 48, marginBottom: 8 },
+  emptySub: { fontSize: 13, color: '#ccc', marginTop: 4 },
   card: { padding: 14, marginHorizontal: 16, marginTop: 8, backgroundColor: '#f8f8f8', borderRadius: 8 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardType: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize' },
@@ -161,6 +187,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
