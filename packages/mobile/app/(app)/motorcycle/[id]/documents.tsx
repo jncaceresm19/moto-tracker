@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
@@ -174,7 +175,7 @@ export default function DocumentsScreen() {
       Alert.alert('No photos', 'No documents with photos to download.');
       return;
     }
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Please grant media library permission to save.');
       return;
@@ -183,10 +184,11 @@ export default function DocumentsScreen() {
       let saved = 0;
       for (const doc of photos) {
         const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
-        await writeBase64ToFile(doc.fileUrl, filename);
+        const file = await writeBase64ToFile(doc.fileUrl, filename);
+        await MediaLibrary.saveToLibraryAsync(file.uri);
         saved++;
       }
-      Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app cache.`);
+      Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to your gallery.`);
     } catch (e: any) {
       Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
@@ -223,14 +225,15 @@ export default function DocumentsScreen() {
   const handleDownload = async (doc: Document) => {
     if (!doc.fileUrl) return;
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please grant media library permission to save.');
         return;
       }
       const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
-      await writeBase64ToFile(doc.fileUrl, filename);
-      Alert.alert('Saved', `Document saved to app cache as ${filename}`);
+      const file = await writeBase64ToFile(doc.fileUrl, filename);
+      await MediaLibrary.saveToLibraryAsync(file.uri);
+      Alert.alert('Saved', `${doc.title} saved to your gallery`);
     } catch (e: any) {
       Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
