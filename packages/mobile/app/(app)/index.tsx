@@ -31,7 +31,7 @@ export default function MotorcycleListScreen() {
     }
   };
 
-  useEffect(() => { loadMotorcycles(); }, []);
+  useEffect(() => { loadMotorcycles(); }, [user]);
 
   const onRefresh = async () => {
     setRefreshing(true);
