@@ -56,6 +56,21 @@ export default function LoginScreen() {
         <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
       </TouchableOpacity>
 
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity
+        style={styles.googleButton}
+        onPress={() => Alert.alert('Coming Soon', 'Google Sign-In will be available in a future update.')}
+        disabled
+      >
+        <Text style={styles.googleButtonTextDisabled}>Continue with Google</Text>
+      </TouchableOpacity>
+      <Text style={styles.googleNote}>Coming soon — requires development build</Text>
+
       <Link href="/(auth)/register" asChild>
         <TouchableOpacity>
           <Text style={styles.link}>Don't have an account? Sign Up</Text>
@@ -103,6 +118,40 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#999',
+    fontSize: 14,
+  },
+  googleButton: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  googleButtonTextDisabled: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  googleNote: {
+    color: '#ccc',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 6,
   },
   link: {
     color: '#007AFF',

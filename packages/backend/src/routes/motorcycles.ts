@@ -22,7 +22,7 @@ const createMotorcycleSchema = z.object({
   brandId: z.string().uuid().optional(),
   modelId: z.string().uuid().optional(),
   currentKilometers: z.number().min(0).optional().default(0),
-  imageUrl: z.string().url().optional(),
+  imageUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').optional(),
 });
 
 const updateMotorcycleSchema = z.object({
@@ -33,7 +33,7 @@ const updateMotorcycleSchema = z.object({
   brandId: z.string().uuid().nullable().optional(),
   modelId: z.string().uuid().nullable().optional(),
   currentKilometers: z.number().min(0).optional(),
-  imageUrl: z.string().url().nullable().optional(),
+  imageUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').nullable().optional(),
 });
 
 const motorcycleIdParam = z.object({

@@ -23,6 +23,10 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+const googleAuthSchema = z.object({
+  idToken: z.string().min(1, 'ID token is required'),
+});
+
 // --- POST /api/auth/register ---
 router.post('/register', validateBody(registerSchema), async (req: Request, res: Response) => {
   try {
@@ -111,6 +115,75 @@ router.post('/login', validateBody(loginSchema), async (req: Request, res: Respo
   } catch (err) {
     console.error('Login error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to login');
+    res.status(500).json(error);
+  }
+});
+
+// --- POST /api/auth/google ---
+router.post('/google', validateBody(googleAuthSchema), async (req: Request, res: Response) => {
+  try {
+    const { idToken } = req.body;
+
+    // Verify Google ID token by calling Google's tokeninfo endpoint
+    const googleResponse = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${idToken}`
+    );
+
+    if (!googleResponse.ok) {
+      const error = createErrorResponse('UNAUTHORIZED', 'Invalid Google token');
+      res.status(401).json(error);
+      return;
+    }
+
+    const googleUser = await googleResponse.json();
+    const { email, name, sub: googleId } = googleUser;
+
+    if (!email) {
+      const error = createErrorResponse('UNAUTHORIZED', 'Email not available from Google');
+      res.status(401).json(error);
+      return;
+    }
+
+    // Check if user exists
+    let user = await db.select().from(users).where(eq(users.email, email)).get();
+
+    if (!user) {
+      // Create new user
+      const now = new Date();
+      const userId = crypto.randomUUID();
+
+      await db.insert(users).values({
+        id: userId,
+        email,
+        passwordHash: '', // No password for Google users
+        name: name || email.split('@')[0],
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      user = await db.select().from(users).where(eq(users.email, email)).get();
+    }
+
+    // Generate tokens
+    const tokens = signTokens({ userId: user!.id, email: user!.email });
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user!.id,
+          email: user!.email,
+          name: user!.name,
+          avatarUrl: user!.avatarUrl,
+          createdAt: new Date(user!.createdAt),
+          updatedAt: new Date(user!.updatedAt),
+        },
+        ...tokens,
+      },
+    });
+  } catch (err) {
+    console.error('Google auth error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to authenticate with Google');
     res.status(500).json(error);
   }
 });
