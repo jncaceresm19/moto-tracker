@@ -174,8 +174,8 @@ export default function DocumentsScreen() {
         saved++;
       }
       Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app storage.`);
-    } catch {
-      Alert.alert('Error', 'Failed to save documents');
+    } catch (e: any) {
+      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
   };
 
@@ -219,8 +219,8 @@ export default function DocumentsScreen() {
       const base64 = doc.fileUrl.includes('base64,') ? doc.fileUrl.split('base64,')[1] : doc.fileUrl;
       await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
       Alert.alert('Saved', `Document saved to app storage as ${filename}`);
-    } catch {
-      Alert.alert('Error', 'Failed to save document');
+    } catch (e: any) {
+      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
   };
 
