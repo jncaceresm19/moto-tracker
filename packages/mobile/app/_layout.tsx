@@ -9,27 +9,25 @@ function AuthGuard() {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [navReady, setNavReady] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inAppGroup = segments[0] === '(app)';
 
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
+    } else if (user && !inAppGroup) {
       router.replace('/(app)');
     }
 
-    // Delay splash hide to let navigation settle
-    setTimeout(() => {
-      SplashScreen.hideAsync();
-      setReady(true);
-    }, 500);
+    // Always hide splash after first nav decision
+    if (!navReady) {
+      SplashScreen.hideAsync().then(() => setNavReady(true));
+    }
   }, [user, isLoading, segments]);
-
-  if (!ready) return null;
 
   return null;
 }
