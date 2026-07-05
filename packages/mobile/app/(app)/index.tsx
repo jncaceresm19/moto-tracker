@@ -18,19 +18,23 @@ export default function MotorcycleListScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
 
   const loadMotorcycles = async () => {
-    if (!user) return;
-    setLoading(true);
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await listMotorcycles();
       setMotorcycles(data);
-    } catch {
-      // Silently ignore if not authenticated
+    } catch (e: any) {
+      console.log('[MOTOS] Error:', e?.message || e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadMotorcycles(); }, [user?.id]);
+  useEffect(() => {
+    loadMotorcycles();
+  }, [user]);
 
   const onRefresh = async () => {
     setRefreshing(true);
