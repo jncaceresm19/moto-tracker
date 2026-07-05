@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView, Share } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
@@ -75,7 +76,7 @@ export default function DocumentsScreen() {
         uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
       } else {
         // Fallback: read file as base64 if ImagePicker didn't return it
-        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: 'base64' });
+        const b64 = await new File(result.assets[0].uri).base64();
         uri = `data:image/jpeg;base64,${b64}`;
       }
       setForm((p) => ({ ...p, fileUrl: uri }));
@@ -160,6 +161,13 @@ export default function DocumentsScreen() {
     ]);
   };
 
+  const writeBase64ToFile = async (fileUrl: string, filename: string): Promise<File> => {
+    const base64 = fileUrl.includes('base64,') ? fileUrl.split('base64,')[1] : fileUrl;
+    const file = new File(Paths.cache, filename);
+    await file.write(base64, { encoding: 'base64' });
+    return file;
+  };
+
   const handleBulkDownload = async () => {
     const photos = docs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
@@ -175,12 +183,10 @@ export default function DocumentsScreen() {
       let saved = 0;
       for (const doc of photos) {
         const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
-        const fileUri = FileSystem.documentDirectory + filename;
-        const base64 = doc.fileUrl.includes('base64,') ? doc.fileUrl.split('base64,')[1] : doc.fileUrl;
-        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: 'base64' });
+        await writeBase64ToFile(doc.fileUrl, filename);
         saved++;
       }
-      Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app storage.`);
+      Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app cache.`);
     } catch (e: any) {
       Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
@@ -193,23 +199,24 @@ export default function DocumentsScreen() {
       return;
     }
     try {
-      await Share.share({
-        message: `Moto Tracker - ${photos.length} document photo${photos.length > 1 ? 's' : ''}`,
-      });
-    } catch {
-      Alert.alert('Error', 'Failed to share');
+      for (const doc of photos) {
+        const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
+        const file = await writeBase64ToFile(doc.fileUrl, filename);
+        await Sharing.shareAsync(file.uri);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
     }
   };
 
   const handleShare = async (doc: Document) => {
     if (!doc.fileUrl) return;
     try {
-      await Share.share({
-        message: `${doc.title} (${doc.type.replace('_', ' ')})`,
-        url: doc.fileUrl,
-      });
-    } catch {
-      Alert.alert('Error', 'Failed to share');
+      const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
+      const file = await writeBase64ToFile(doc.fileUrl, filename);
+      await Sharing.shareAsync(file.uri);
+    } catch (e: any) {
+      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
     }
   };
 
@@ -222,10 +229,8 @@ export default function DocumentsScreen() {
         return;
       }
       const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
-      const fileUri = FileSystem.documentDirectory + filename;
-      const base64 = doc.fileUrl.includes('base64,') ? doc.fileUrl.split('base64,')[1] : doc.fileUrl;
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-      Alert.alert('Saved', `Document saved to app storage as ${filename}`);
+      await writeBase64ToFile(doc.fileUrl, filename);
+      Alert.alert('Saved', `Document saved to app cache as ${filename}`);
     } catch (e: any) {
       Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }

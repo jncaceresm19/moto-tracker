@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system';
 import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
 
@@ -58,7 +58,7 @@ export default function MotorcycleListScreen() {
       if (result.assets[0].base64) {
         uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
       } else {
-        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: 'base64' });
+        const b64 = await new File(result.assets[0].uri).base64();
         uri = `data:image/jpeg;base64,${b64}`;
       }
       setImageUri(uri);
