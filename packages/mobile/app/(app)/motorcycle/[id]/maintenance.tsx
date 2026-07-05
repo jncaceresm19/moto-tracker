@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
 
 const TYPES = ['oil_change', 'tire_change', 'brake_check', 'spark_plugs', 'technical_review', 'circulation_permit', 'other'];
@@ -14,6 +15,8 @@ export default function MaintenanceScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -55,6 +58,7 @@ export default function MaintenanceScreen() {
     if (!form.serviceDate) newErrors.serviceDate = 'Date is required';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
+    setSaving(true);
     try {
       const created = await createMaintenance(id, {
         type: form.type,
@@ -67,7 +71,12 @@ export default function MaintenanceScreen() {
       setRecords((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-    } catch { Alert.alert('Error', 'Failed to create'); }
+      Alert.alert('Success', 'Record saved');
+    } catch {
+      Alert.alert('Error', 'Failed to create');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -78,6 +87,7 @@ export default function MaintenanceScreen() {
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
+    setSaving(true);
     try {
       const updated = await updateMaintenance(id, editing.id, {
         type: form.type,
@@ -89,7 +99,12 @@ export default function MaintenanceScreen() {
       });
       setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       setEditing(null);
-    } catch { Alert.alert('Error', 'Failed to update'); }
+      Alert.alert('Success', 'Record updated');
+    } catch {
+      Alert.alert('Error', 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = (record: MaintenanceRecord) => {
@@ -163,11 +178,32 @@ export default function MaintenanceScreen() {
           {errors.description ? <Text style={styles.errorText}>{errors.description}</Text> : null}
           <TextInput style={styles.input} placeholder="Kilometers *" keyboardType="numeric" value={form.kilometersAtService} onChangeText={(t) => { setForm((p) => ({ ...p, kilometersAtService: t })); setErrors((p) => ({ ...p, kilometersAtService: '' })); }} />
           {errors.kilometersAtService ? <Text style={styles.errorText}>{errors.kilometersAtService}</Text> : null}
-          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD) *" value={form.serviceDate} onChangeText={(t) => { setForm((p) => ({ ...p, serviceDate: t })); setErrors((p) => ({ ...p, serviceDate: '' })); }} />
+          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+            <Text style={form.serviceDate ? styles.dateText : styles.datePlaceholder}>
+              {form.serviceDate || 'Select date *'}
+            </Text>
+          </TouchableOpacity>
           {errors.serviceDate ? <Text style={styles.errorText}>{errors.serviceDate}</Text> : null}
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.serviceDate ? new Date(form.serviceDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  const iso = date.toISOString().split('T')[0];
+                  setForm((p) => ({ ...p, serviceDate: iso }));
+                  setErrors((p) => ({ ...p, serviceDate: '' }));
+                }
+              }}
+            />
+          )}
           <TextInput style={styles.input} placeholder="Cost (optional)" keyboardType="numeric" value={form.cost} onChangeText={(t) => setForm((p) => ({ ...p, cost: t }))} />
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -199,6 +235,8 @@ const styles = StyleSheet.create({
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
+  dateText: { fontSize: 15, color: '#333' },
+  datePlaceholder: { fontSize: 15, color: '#999' },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

@@ -10,6 +10,7 @@ export default function MotorcycleDetailScreen() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -41,6 +42,7 @@ export default function MotorcycleDetailScreen() {
     if (!form.licensePlate) newErrors.licensePlate = 'License plate is required';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
+    setSaving(true);
     try {
       const updated = await updateMotorcycle(id, {
         brand: form.brand,
@@ -51,7 +53,12 @@ export default function MotorcycleDetailScreen() {
       });
       setMotorcycle(updated);
       setEditing(false);
-    } catch { Alert.alert('Error', 'Failed to update'); }
+      Alert.alert('Success', 'Motorcycle updated');
+    } catch {
+      Alert.alert('Error', 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = () => {
@@ -132,7 +139,9 @@ export default function MotorcycleDetailScreen() {
           <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => { setForm((p) => ({ ...p, licensePlate: t })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
           {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
           <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>

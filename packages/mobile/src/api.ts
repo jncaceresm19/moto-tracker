@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = 'http://192.168.100.9:3001';
 
 interface ApiOptions {
   method?: string;

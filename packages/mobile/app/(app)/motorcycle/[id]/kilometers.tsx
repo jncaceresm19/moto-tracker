@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { listKilometers, createKilometer, updateKilometer, deleteKilometer, KilometerEntry } from '../../../../src/api';
 
 export default function KilometersScreen() {
@@ -12,6 +13,8 @@ export default function KilometersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ readingKm: '', recordedAt: '', notes: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -48,6 +51,7 @@ export default function KilometersScreen() {
     if (!form.recordedAt) newErrors.recordedAt = 'Date is required';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
+    setSaving(true);
     try {
       const created = await createKilometer(id, {
         readingKm: Number(form.readingKm),
@@ -57,7 +61,12 @@ export default function KilometersScreen() {
       setEntries((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-    } catch { Alert.alert('Error', 'Failed to create'); }
+      Alert.alert('Success', 'Reading saved');
+    } catch {
+      Alert.alert('Error', 'Failed to create');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -67,6 +76,7 @@ export default function KilometersScreen() {
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
+    setSaving(true);
     try {
       const updated = await updateKilometer(id, editing.id, {
         readingKm: Number(form.readingKm),
@@ -75,7 +85,12 @@ export default function KilometersScreen() {
       });
       setEntries((prev) => prev.map((e) => e.id === updated.id ? updated : e));
       setEditing(null);
-    } catch { Alert.alert('Error', 'Failed to update'); }
+      Alert.alert('Success', 'Reading updated');
+    } catch {
+      Alert.alert('Error', 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = (entry: KilometerEntry) => {
@@ -145,10 +160,31 @@ export default function KilometersScreen() {
           </View>
           <TextInput style={styles.input} placeholder="Kilometers *" keyboardType="numeric" value={form.readingKm} onChangeText={(t) => { setForm((p) => ({ ...p, readingKm: t })); setErrors((p) => ({ ...p, readingKm: '' })); }} />
           {errors.readingKm ? <Text style={styles.errorText}>{errors.readingKm}</Text> : null}
-          <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD) *" value={form.recordedAt} onChangeText={(t) => { setForm((p) => ({ ...p, recordedAt: t })); setErrors((p) => ({ ...p, recordedAt: '' })); }} />
+          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+            <Text style={form.recordedAt ? styles.dateText : styles.datePlaceholder}>
+              {form.recordedAt || 'Select date *'}
+            </Text>
+          </TouchableOpacity>
           {errors.recordedAt ? <Text style={styles.errorText}>{errors.recordedAt}</Text> : null}
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.recordedAt ? new Date(form.recordedAt) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  const iso = date.toISOString().split('T')[0];
+                  setForm((p) => ({ ...p, recordedAt: iso }));
+                  setErrors((p) => ({ ...p, recordedAt: '' }));
+                }
+              }}
+            />
+          )}
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -178,6 +214,8 @@ const styles = StyleSheet.create({
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
+  dateText: { fontSize: 15, color: '#333' },
+  datePlaceholder: { fontSize: 15, color: '#999' },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

@@ -15,6 +15,18 @@ interface AuthContextType {
   signOut: () => Promise<void>;
 }
 
+function decodeToken(token: string): User | null {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    if (payload.userId && payload.email) {
+      return { id: payload.userId, email: payload.email };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -25,8 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       const token = await AsyncStorage.getItem('accessToken');
       if (token) {
-        // TODO: validate token and fetch user profile
-        setUser({ id: 'cached', email: 'cached' });
+        const decoded = decodeToken(token);
+        if (decoded) {
+          setUser(decoded);
+        } else {
+          // Token is invalid or expired, remove it
+          await AsyncStorage.removeItem('accessToken');
+        }
       }
       setIsLoading(false);
     })();

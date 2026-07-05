@@ -12,6 +12,7 @@ export default function MotorcycleListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
 
   const loadMotorcycles = async () => {
     try {
@@ -39,6 +40,7 @@ export default function MotorcycleListScreen() {
     if (!form.licensePlate) newErrors.licensePlate = 'License plate is required';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
+    setSaving(true);
     try {
       const created = await createMotorcycle({
         brand: form.brand,
@@ -50,8 +52,11 @@ export default function MotorcycleListScreen() {
       setMotorcycles((prev) => [created, ...prev]);
       setShowCreate(false);
       setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+      Alert.alert('Success', 'Motorcycle added');
     } catch {
       Alert.alert('Error', 'Failed to create motorcycle');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -132,7 +137,9 @@ export default function MotorcycleListScreen() {
           <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => { setForm((p) => ({ ...p, licensePlate: t })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
           {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
           <TextInput style={styles.input} placeholder="Current km (optional)" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleCreate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={handleCreate} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>

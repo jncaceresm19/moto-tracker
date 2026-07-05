@@ -33,7 +33,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction) {
     const payload = jwt.verify(token, JWT_SECRET) as AuthPayload;
     req.user = payload;
     next();
-  } catch {
+  } catch (err) {
     const error = createErrorResponse('UNAUTHORIZED', 'Invalid or expired token');
     res.status(401).json(error);
   }

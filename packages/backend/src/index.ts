@@ -15,7 +15,10 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  exposedHeaders: ['Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json());
 
 // Health check
@@ -32,8 +35,8 @@ app.use('/api/motorcycles/:id/kilometers', kilometerRoutes);
 
 // Only listen when not in test environment
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`Moto Tracker API running on port ${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Moto Tracker API running on http://0.0.0.0:${PORT}`);
   });
 }
 

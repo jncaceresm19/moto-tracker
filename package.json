@@ -15,7 +15,15 @@
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces"
   },
-  "keywords": ["motorcycle", "maintenance", "tracking", "mobile"],
+  "keywords": [
+    "motorcycle",
+    "maintenance",
+    "tracking",
+    "mobile"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@react-native-community/datetimepicker": "^9.1.0"
+  }
 }

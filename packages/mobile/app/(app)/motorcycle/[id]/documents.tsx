@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
@@ -14,6 +15,8 @@ export default function DocumentsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [form, setForm] = useState({ type: 'insurance', title: '', fileUrl: '', expiryDate: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const load = async () => {
     if (!id) return;
@@ -51,6 +54,7 @@ export default function DocumentsScreen() {
     if (!form.fileUrl) newErrors.fileUrl = 'File URL is required';
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
+    setSaving(true);
     try {
       const created = await createDocument(id, {
         type: form.type,
@@ -61,7 +65,12 @@ export default function DocumentsScreen() {
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-    } catch { Alert.alert('Error', 'Failed to create'); }
+      Alert.alert('Success', 'Document saved');
+    } catch {
+      Alert.alert('Error', 'Failed to create');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdate = async () => {
@@ -71,6 +80,7 @@ export default function DocumentsScreen() {
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
+    setSaving(true);
     try {
       const updated = await updateDocument(id, editing.id, {
         type: form.type,
@@ -80,7 +90,12 @@ export default function DocumentsScreen() {
       });
       setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
       setEditing(null);
-    } catch { Alert.alert('Error', 'Failed to update'); }
+      Alert.alert('Success', 'Document updated');
+    } catch {
+      Alert.alert('Error', 'Failed to update');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = (doc: Document) => {
@@ -155,8 +170,28 @@ export default function DocumentsScreen() {
           {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
           <TextInput style={styles.input} placeholder="File URL *" value={form.fileUrl} onChangeText={(t) => { setForm((p) => ({ ...p, fileUrl: t })); setErrors((p) => ({ ...p, fileUrl: '' })); }} />
           {errors.fileUrl ? <Text style={styles.errorText}>{errors.fileUrl}</Text> : null}
-          <TextInput style={styles.input} placeholder="Expiry date (YYYY-MM-DD, optional)" value={form.expiryDate} onChangeText={(t) => setForm((p) => ({ ...p, expiryDate: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+            <Text style={form.expiryDate ? styles.dateText : styles.datePlaceholder}>
+              {form.expiryDate || 'Expiry date (optional)'}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.expiryDate ? new Date(form.expiryDate) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  const iso = date.toISOString().split('T')[0];
+                  setForm((p) => ({ ...p, expiryDate: iso }));
+                }
+              }}
+            />
+          )}
+          <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -188,6 +223,8 @@ const styles = StyleSheet.create({
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
+  dateText: { fontSize: 15, color: '#333' },
+  datePlaceholder: { fontSize: 15, color: '#999' },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
