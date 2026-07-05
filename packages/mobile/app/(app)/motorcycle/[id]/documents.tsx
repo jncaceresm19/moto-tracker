@@ -153,6 +153,46 @@ export default function DocumentsScreen() {
     ]);
   };
 
+  const handleBulkDownload = async () => {
+    const photos = docs.filter((d) => d.fileUrl);
+    if (photos.length === 0) {
+      Alert.alert('No photos', 'No documents with photos to download.');
+      return;
+    }
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant media library permission to save.');
+      return;
+    }
+    try {
+      let saved = 0;
+      for (const doc of photos) {
+        const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
+        const fileUri = FileSystem.documentDirectory + filename;
+        await FileSystem.writeAsStringAsync(fileUri, doc.fileUrl, { encoding: FileSystem.EncodingType.Base64 });
+        saved++;
+      }
+      Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to app storage.`);
+    } catch {
+      Alert.alert('Error', 'Failed to save documents');
+    }
+  };
+
+  const handleBulkShare = async () => {
+    const photos = docs.filter((d) => d.fileUrl);
+    if (photos.length === 0) {
+      Alert.alert('No photos', 'No documents with photos to share.');
+      return;
+    }
+    try {
+      await Share.share({
+        message: `Moto Tracker - ${photos.length} document photo${photos.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      Alert.alert('Error', 'Failed to share');
+    }
+  };
+
   const handleShare = async (doc: Document) => {
     if (!doc.fileUrl) return;
     try {
@@ -193,9 +233,21 @@ export default function DocumentsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Documents</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-          <Text style={styles.addBtnText}>+ Add</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {docs.some((d) => d.fileUrl) && (
+            <View style={styles.bulkActions}>
+              <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkDownload}>
+                <Text style={styles.bulkBtnText}>⬇ All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkShare}>
+                <Text style={styles.bulkBtnText}>↗ All</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
+            <Text style={styles.addBtnText}>+ Add</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -374,6 +426,10 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   title: { fontSize: 20, fontWeight: 'bold' },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bulkActions: { flexDirection: 'row', gap: 6 },
+  bulkBtn: { backgroundColor: '#34C759', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  bulkBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40 },
