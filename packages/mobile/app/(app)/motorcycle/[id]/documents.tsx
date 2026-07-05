@@ -70,7 +70,14 @@ export default function DocumentsScreen() {
       : await ImagePicker.launchImageLibraryAsync({ quality: 0.5, base64: true });
 
     if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].base64 ? `data:image/jpeg;base64,${result.assets[0].base64}` : result.assets[0].uri;
+      let uri: string;
+      if (result.assets[0].base64) {
+        uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      } else {
+        // Fallback: read file as base64 if ImagePicker didn't return it
+        const b64 = await FileSystem.readAsStringAsync(result.assets[0].uri, { encoding: FileSystem.EncodingType.Base64 });
+        uri = `data:image/jpeg;base64,${b64}`;
+      }
       setForm((p) => ({ ...p, fileUrl: uri }));
       setErrors((p) => ({ ...p, fileUrl: '' }));
     }
