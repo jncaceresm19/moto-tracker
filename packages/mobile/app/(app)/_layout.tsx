@@ -54,6 +54,24 @@ export default function AppLayout() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="motorcycle/[id]/documents"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="motorcycle/[id]/kilometers"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="motorcycle/[id]/maintenance"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
