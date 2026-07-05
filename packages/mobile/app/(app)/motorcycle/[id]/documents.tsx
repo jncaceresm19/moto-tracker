@@ -5,7 +5,6 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import * as MediaLibrary from 'expo-media-library';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
@@ -172,25 +171,17 @@ export default function DocumentsScreen() {
   const handleBulkDownload = async () => {
     const photos = docs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
-      Alert.alert('No photos', 'No documents with photos to download.');
-      return;
-    }
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant media library permission to save.');
+      Alert.alert('No photos', 'No documents with photos to share.');
       return;
     }
     try {
-      let saved = 0;
       for (const doc of photos) {
-        const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
+        const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
         const file = await writeBase64ToFile(doc.fileUrl, filename);
-        await MediaLibrary.saveToLibraryAsync(file.uri);
-        saved++;
+        await Sharing.shareAsync(file.uri);
       }
-      Alert.alert('Done', `${saved} document photo${saved > 1 ? 's' : ''} saved to your gallery.`);
     } catch (e: any) {
-      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
+      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
     }
   };
 
@@ -225,17 +216,11 @@ export default function DocumentsScreen() {
   const handleDownload = async (doc: Document) => {
     if (!doc.fileUrl) return;
     try {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission needed', 'Please grant media library permission to save.');
-        return;
-      }
-      const filename = `${doc.title.replace(/\s+/g, '_')}_${Date.now()}.jpg`;
+      const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
       const file = await writeBase64ToFile(doc.fileUrl, filename);
-      await MediaLibrary.saveToLibraryAsync(file.uri);
-      Alert.alert('Saved', `${doc.title} saved to your gallery`);
+      await Sharing.shareAsync(file.uri);
     } catch (e: any) {
-      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
+      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
     }
   };
 
@@ -254,7 +239,7 @@ export default function DocumentsScreen() {
           {docs.some((d) => d.fileUrl) && (
             <View style={styles.bulkActions}>
               <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkDownload}>
-                <Text style={styles.bulkBtnText}>⬇ All</Text>
+                <Text style={styles.bulkBtnText}>↗ Save All</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkShare}>
                 <Text style={styles.bulkBtnText}>↗ All</Text>
@@ -333,7 +318,7 @@ export default function DocumentsScreen() {
 
               <View style={styles.detailBtnRow}>
                 <TouchableOpacity style={styles.detailActionBtn} onPress={() => viewing && handleDownload(viewing)}>
-                  <Text style={styles.detailActionBtnText}>⬇ Download</Text>
+                  <Text style={styles.detailActionBtnText}>↗ Save</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.detailActionBtn} onPress={() => viewing && handleShare(viewing)}>
                   <Text style={styles.detailActionBtnText}>↗ Share</Text>
@@ -355,7 +340,7 @@ export default function DocumentsScreen() {
           )}
           <View style={styles.photoViewerActions}>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleDownload(viewing)}>
-              <Text style={styles.photoViewerBtnText}>⬇ Download</Text>
+              <Text style={styles.photoViewerBtnText}>↗ Save</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleShare(viewing)}>
               <Text style={styles.photoViewerBtnText}>↗ Share</Text>
