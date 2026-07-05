@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 
@@ -28,7 +28,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Moto Tracker</Text>
+      <Image source={require('../../assets/nombre.jpeg')} style={styles.logo} resizeMode="contain" />
       <Text style={styles.subtitle}>Sign in to your account</Text>
 
       <TextInput
@@ -87,10 +87,10 @@ const styles = StyleSheet.create({
     padding: 24,
     backgroundColor: '#fff',
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
+  logo: {
+    width: 280,
+    height: 80,
+    alignSelf: 'center',
     marginBottom: 8,
   },
   subtitle: {
