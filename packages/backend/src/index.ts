@@ -7,6 +7,7 @@ import motorcycleRoutes from './routes/motorcycles';
 import maintenanceRoutes from './routes/maintenance';
 import documentRoutes from './routes/documents';
 import kilometerRoutes from './routes/kilometers';
+import profileRoutes from './routes/profile';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.get('/health', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/profile', profileRoutes);
 app.use('/api/motorcycles', motorcycleRoutes);
 app.use('/api/motorcycles/:id/maintenance', maintenanceRoutes);
 app.use('/api/motorcycles/:id/documents', documentRoutes);

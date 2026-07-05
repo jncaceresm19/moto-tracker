@@ -86,6 +86,11 @@ const translations = {
     // Help
     helpTitle: 'Help & Support',
     helpMessage: 'For support, contact us at support@mototracker.app',
+    // Profile Edit
+    changePhoto: 'Change Photo',
+    profileUpdated: 'Profile updated successfully',
+    name: 'Name',
+    email: 'Email',
   },
   es: {
     // Tabs
@@ -169,6 +174,11 @@ const translations = {
     // Help
     helpTitle: 'Ayuda y Soporte',
     helpMessage: 'Para soporte, contáctanos en support@mototracker.app',
+    // Profile Edit
+    changePhoto: 'Cambiar Foto',
+    profileUpdated: 'Perfil actualizado exitosamente',
+    name: 'Nombre',
+    email: 'Email',
   },
 };
 

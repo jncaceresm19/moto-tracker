@@ -1,16 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator, Switch, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
-import { changePassword } from '../../src/api';
+import { changePassword, updateProfile } from '../../src/api';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { mode, colors, toggleTheme } = useTheme();
   const { language, t, setLanguage } = useLanguage();
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({ name: user?.email?.split('@')[0] || '', email: user?.email || '' });
+  const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -34,6 +40,39 @@ export default function ProfileScreen() {
       Alert.alert(t('error'), e?.message || 'Failed to change password');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    const newErrors: Record<string, string> = {};
+    if (!profileForm.name.trim()) newErrors.name = 'Name is required';
+    if (!profileForm.email.trim()) newErrors.email = 'Email is required';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileForm.email)) newErrors.email = 'Invalid email';
+    if (Object.keys(newErrors).length > 0) { setProfileErrors(newErrors); return; }
+
+    setProfileErrors({});
+    setSavingProfile(true);
+    try {
+      await updateProfile({
+        name: profileForm.name.trim(),
+        email: profileForm.email.trim(),
+      });
+      Alert.alert(t('success'), t('profileUpdated'));
+      setShowEditProfile(false);
+    } catch (e: any) {
+      Alert.alert(t('error'), e?.message || 'Failed to update profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handlePickAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      quality: 0.5,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
     }
   };
 
@@ -81,7 +120,12 @@ export default function ProfileScreen() {
       {/* Account Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('account')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert('Coming Soon', 'Edit profile will be available soon.')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => {
+          setProfileForm({ name: user?.email?.split('@')[0] || '', email: user?.email || '' });
+          setAvatarUri(null);
+          setProfileErrors({});
+          setShowEditProfile(true);
+        }}>
           <View style={styles.rowLeft}>
             <Ionicons name="person-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('editProfile')}</Text>
@@ -226,6 +270,56 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={showEditProfile} animationType="slide" presentationStyle="pageSheet">
+        <View style={dynamicStyles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={dynamicStyles.modalTitle}>{t('editProfile')}</Text>
+            <TouchableOpacity onPress={() => { setShowEditProfile(false); setProfileErrors({}); }}>
+              <Text style={dynamicStyles.cancel}>{t('cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Avatar Picker */}
+          <TouchableOpacity style={styles.avatarPicker} onPress={handlePickAvatar}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarPreview} />
+            ) : (
+              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                <Ionicons name="camera" size={32} color={colors.primaryText} />
+              </View>
+            )}
+            <Text style={[styles.avatarPickerText, { color: colors.primary }]}>{t('changePhoto')}</Text>
+          </TouchableOpacity>
+
+          {/* Name Input */}
+          <TextInput
+            style={dynamicStyles.input}
+            placeholder={t('name')}
+            placeholderTextColor={colors.textMuted}
+            value={profileForm.name}
+            onChangeText={(v) => { setProfileForm(p => ({ ...p, name: v })); setProfileErrors(p => ({ ...p, name: '' })); }}
+          />
+          {profileErrors.name ? <Text style={dynamicStyles.errorText}>{profileErrors.name}</Text> : null}
+
+          {/* Email Input */}
+          <TextInput
+            style={dynamicStyles.input}
+            placeholder={t('email')}
+            placeholderTextColor={colors.textMuted}
+            value={profileForm.email}
+            onChangeText={(v) => { setProfileForm(p => ({ ...p, email: v })); setProfileErrors(p => ({ ...p, email: '' })); }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          {profileErrors.email ? <Text style={dynamicStyles.errorText}>{profileErrors.email}</Text> : null}
+
+          <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleSaveProfile} disabled={savingProfile}>
+            {savingProfile ? <ActivityIndicator color={colors.primaryText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -279,5 +373,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 24,
+  },
+  avatarPicker: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  avatarPreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 8,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  avatarPickerText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

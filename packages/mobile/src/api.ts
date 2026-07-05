@@ -210,3 +210,25 @@ export async function updateKilometer(
 export async function deleteKilometer(motorcycleId: string, entryId: string): Promise<void> {
   await api(`/api/motorcycles/${motorcycleId}/kilometers/${entryId}`, { method: 'DELETE' });
 }
+
+// Profile
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getProfile(): Promise<UserProfile> {
+  return api<UserProfile>('/api/profile');
+}
+
+export async function updateProfile(data: {
+  name?: string;
+  email?: string;
+  avatarUrl?: string;
+}): Promise<UserProfile> {
+  return api<UserProfile>('/api/profile', { method: 'PUT', body: data });
+}
