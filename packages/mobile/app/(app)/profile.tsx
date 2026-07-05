@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator, Switch, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { File } from 'expo-file-system';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
 
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
   const { mode, colors, toggleTheme } = useTheme();
   const { language, t, setLanguage } = useLanguage();
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -53,10 +54,20 @@ export default function ProfileScreen() {
     setProfileErrors({});
     setSavingProfile(true);
     try {
-      await updateProfile({
+      const updateData: { name: string; email: string; avatarUrl?: string } = {
         name: profileForm.name.trim(),
         email: profileForm.email.trim(),
-      });
+      };
+
+      // Convert avatar to base64 if picked
+      if (avatarUri) {
+        const file = new File(avatarUri);
+        const base64 = await file.base64();
+        updateData.avatarUrl = `data:image/jpeg;base64,${base64}`;
+      }
+
+      await updateProfile(updateData);
+      await refreshUser();
       Alert.alert(t('success'), t('profileUpdated'));
       setShowEditProfile(false);
     } catch (e: any) {
@@ -110,10 +121,14 @@ export default function ProfileScreen() {
     <ScrollView style={dynamicStyles.container}>
       {/* Profile Header */}
       <View style={dynamicStyles.header}>
-        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.avatarText}>{userInitial}</Text>
-        </View>
-        <Text style={dynamicStyles.name}>{user?.email?.split('@')[0] || 'User'}</Text>
+        {user?.avatarUrl ? (
+          <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+        ) : (
+          <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+            <Text style={styles.avatarText}>{userInitial}</Text>
+          </View>
+        )}
+        <Text style={dynamicStyles.name}>{user?.name || user?.email?.split('@')[0] || 'User'}</Text>
         <Text style={dynamicStyles.email}>{user?.email || 'Not logged in'}</Text>
       </View>
 
@@ -121,7 +136,7 @@ export default function ProfileScreen() {
       <Text style={dynamicStyles.sectionTitle}>{t('account')}</Text>
       <View style={dynamicStyles.section}>
         <TouchableOpacity style={dynamicStyles.row} onPress={() => {
-          setProfileForm({ name: user?.email?.split('@')[0] || '', email: user?.email || '' });
+          setProfileForm({ name: user?.name || user?.email?.split('@')[0] || '', email: user?.email || '' });
           setAvatarUri(null);
           setProfileErrors({});
           setShowEditProfile(true);
@@ -285,6 +300,8 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.avatarPicker} onPress={handlePickAvatar}>
             {avatarUri ? (
               <Image source={{ uri: avatarUri }} style={styles.avatarPreview} />
+            ) : user?.avatarUrl ? (
+              <Image source={{ uri: user.avatarUrl }} style={styles.avatarPreview} />
             ) : (
               <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
                 <Ionicons name="camera" size={32} color={colors.primaryText} />
@@ -331,6 +348,12 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     marginBottom: 12,
   },
   avatarText: {
