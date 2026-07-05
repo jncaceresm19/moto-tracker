@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import { File, Paths } from 'expo-file-system';
+import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
@@ -75,8 +75,8 @@ export default function DocumentsScreen() {
       if (result.assets[0].base64) {
         uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
       } else {
-        // Fallback: read file as base64 if ImagePicker didn't return it
-        const b64 = await new File(result.assets[0].uri).base64();
+        const file = new File(result.assets[0].uri);
+        const b64 = await file.base64();
         uri = `data:image/jpeg;base64,${b64}`;
       }
       setForm((p) => ({ ...p, fileUrl: uri }));
@@ -161,64 +161,50 @@ export default function DocumentsScreen() {
     ]);
   };
 
-  const writeBase64ToFile = async (fileUrl: string, filename: string): Promise<File> => {
-    const base64 = fileUrl.includes('base64,') ? fileUrl.split('base64,')[1] : fileUrl;
-    const file = new File(Paths.cache, filename);
-    await file.write(base64, { encoding: 'base64' });
-    return file;
+  const generatePDF = async (doc: Document) => {
+    if (!doc.fileUrl) return null;
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;height:100vh;">
+        <img src="${doc.fileUrl}" style="max-width:100%;max-height:100vh;" />
+      </body>
+      </html>
+    `;
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    return uri;
   };
 
-  const handleBulkDownload = async () => {
+  const handleSaveAsPDF = async (doc: Document) => {
+    try {
+      const uri = await generatePDF(doc);
+      if (uri) await Sharing.shareAsync(uri);
+    } catch (e: any) {
+      Alert.alert('Error', `Failed to generate PDF: ${e?.message || e}`);
+    }
+  };
+
+  const handleBulkSaveAsPDF = async () => {
     const photos = docs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
-      Alert.alert('No photos', 'No documents with photos to share.');
+      Alert.alert('No photos', 'No documents with photos to save.');
       return;
     }
     try {
       for (const doc of photos) {
-        const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
-        const file = await writeBase64ToFile(doc.fileUrl, filename);
-        await Sharing.shareAsync(file.uri);
+        await handleSaveAsPDF(doc);
       }
     } catch (e: any) {
-      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
-    }
-  };
-
-  const handleBulkShare = async () => {
-    const photos = docs.filter((d) => d.fileUrl);
-    if (photos.length === 0) {
-      Alert.alert('No photos', 'No documents with photos to share.');
-      return;
-    }
-    try {
-      for (const doc of photos) {
-        const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
-        const file = await writeBase64ToFile(doc.fileUrl, filename);
-        await Sharing.shareAsync(file.uri);
-      }
-    } catch (e: any) {
-      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
+      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
   };
 
   const handleShare = async (doc: Document) => {
     if (!doc.fileUrl) return;
     try {
-      const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
-      const file = await writeBase64ToFile(doc.fileUrl, filename);
-      await Sharing.shareAsync(file.uri);
-    } catch (e: any) {
-      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
-    }
-  };
-
-  const handleDownload = async (doc: Document) => {
-    if (!doc.fileUrl) return;
-    try {
-      const filename = `${doc.title.replace(/\s+/g, '_')}.jpg`;
-      const file = await writeBase64ToFile(doc.fileUrl, filename);
-      await Sharing.shareAsync(file.uri);
+      const uri = await generatePDF(doc);
+      if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
       Alert.alert('Error', `Failed to share: ${e?.message || e}`);
     }
@@ -237,14 +223,9 @@ export default function DocumentsScreen() {
         <Text style={styles.title}>Documents</Text>
         <View style={styles.headerActions}>
           {docs.some((d) => d.fileUrl) && (
-            <View style={styles.bulkActions}>
-              <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkDownload}>
-                <Text style={styles.bulkBtnText}>↗ Save All</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkShare}>
-                <Text style={styles.bulkBtnText}>↗ All</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
+              <Text style={styles.bulkBtnText}>📄 Save All</Text>
+            </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
             <Text style={styles.addBtnText}>+ Add</Text>
@@ -306,24 +287,16 @@ export default function DocumentsScreen() {
               {viewing.expiryDate && <Text style={styles.detailDate}>Expires: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
 
               {viewing.fileUrl ? (
-                <TouchableOpacity onPress={() => setShowPhotoViewer(true)}>
-                  <Image source={{ uri: viewing.fileUrl }} style={styles.detailImage} resizeMode="contain" />
-                  <Text style={styles.viewPhotoHint}>Tap to view full size</Text>
+                <TouchableOpacity style={styles.pdfThumbnail} onPress={() => setShowPhotoViewer(true)}>
+                  <Text style={styles.pdfIcon}>📄</Text>
+                  <Text style={styles.pdfName}>{viewing.title}.pdf</Text>
+                  <Text style={styles.pdfHint}>Tap to view</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.noPhoto}>
-                  <Text style={styles.noPhotoText}>No photo available</Text>
+                  <Text style={styles.noPhotoText}>No document attached</Text>
                 </View>
               )}
-
-              <View style={styles.detailBtnRow}>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={() => viewing && handleDownload(viewing)}>
-                  <Text style={styles.detailActionBtnText}>↗ Save</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.detailActionBtn} onPress={() => viewing && handleShare(viewing)}>
-                  <Text style={styles.detailActionBtnText}>↗ Share</Text>
-                </TouchableOpacity>
-              </View>
             </ScrollView>
           )}
         </View>
@@ -339,8 +312,8 @@ export default function DocumentsScreen() {
             <Image source={{ uri: viewing.fileUrl }} style={styles.photoViewerImage} resizeMode="contain" />
           )}
           <View style={styles.photoViewerActions}>
-            <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleDownload(viewing)}>
-              <Text style={styles.photoViewerBtnText}>↗ Save</Text>
+            <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleSaveAsPDF(viewing)}>
+              <Text style={styles.photoViewerBtnText}>📥 Save as PDF</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleShare(viewing)}>
               <Text style={styles.photoViewerBtnText}>↗ Share</Text>
@@ -431,7 +404,6 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   title: { fontSize: 20, fontWeight: 'bold' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bulkActions: { flexDirection: 'row', gap: 6 },
   bulkBtn: { backgroundColor: '#34C759', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   bulkBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
@@ -459,21 +431,29 @@ const styles = StyleSheet.create({
   detailType: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize', color: '#666' },
   detailTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 4 },
   detailDate: { fontSize: 15, color: '#666', marginTop: 8 },
-  detailImage: { width: '100%', height: 300, borderRadius: 10, marginTop: 16, backgroundColor: '#f0f0f0' },
-  viewPhotoHint: { textAlign: 'center', color: '#999', fontSize: 12, marginTop: 6 },
+  pdfThumbnail: {
+    marginTop: 20,
+    padding: 24,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  pdfIcon: { fontSize: 48, marginBottom: 8 },
+  pdfName: { fontSize: 14, fontWeight: '600', color: '#333' },
+  pdfHint: { fontSize: 12, color: '#999', marginTop: 4 },
   noPhoto: { height: 150, borderRadius: 10, marginTop: 16, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
   noPhotoText: { color: '#999' },
-  detailBtnRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  detailActionBtn: { flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 14, alignItems: 'center' },
-  detailActionBtnText: { fontSize: 15, fontWeight: '600', color: '#333' },
   // Photo Viewer
   photoViewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   photoViewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },
   photoViewerCloseText: { color: '#fff', fontSize: 24 },
   photoViewerImage: { width: '90%', height: '70%' },
   photoViewerActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
-  photoViewerBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 },
-  photoViewerBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  photoViewerBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 },
+  photoViewerBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   // Create/Edit Modal
   modal: { flex: 1, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
