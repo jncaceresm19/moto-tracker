@@ -49,9 +49,9 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="motorcycle"
+        name="motorcycle/[id]"
         options={{
-          href: null, // Hide motorcycle detail from tabs
+          href: null,
         }}
       />
     </Tabs>
