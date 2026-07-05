@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { listDocuments, createDocument, Document } from '../../../../src/api';
+import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
 
@@ -10,6 +10,7 @@ export default function DocumentsScreen() {
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<Document | null>(null);
   const [form, setForm] = useState({ type: 'insurance', title: '', fileUrl: '', expiryDate: '' });
 
   const load = async () => {
@@ -20,6 +21,20 @@ export default function DocumentsScreen() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  const resetForm = () => setForm({ type: 'insurance', title: '', fileUrl: '', expiryDate: '' });
+
+  const openCreate = () => { resetForm(); setShowCreate(true); };
+
+  const openEdit = (doc: Document) => {
+    setForm({
+      type: doc.type,
+      title: doc.title,
+      fileUrl: doc.fileUrl,
+      expiryDate: doc.expiryDate ? doc.expiryDate.split('T')[0] : '',
+    });
+    setEditing(doc);
+  };
 
   const handleCreate = async () => {
     if (!id || !form.title || !form.fileUrl) {
@@ -35,9 +50,47 @@ export default function DocumentsScreen() {
       });
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
-      setForm({ type: 'insurance', title: '', fileUrl: '', expiryDate: '' });
+      resetForm();
     } catch { Alert.alert('Error', 'Failed to create'); }
   };
+
+  const handleUpdate = async () => {
+    if (!id || !editing || !form.title || !form.fileUrl) {
+      Alert.alert('Error', 'Fill required fields');
+      return;
+    }
+    try {
+      const updated = await updateDocument(id, editing.id, {
+        type: form.type,
+        title: form.title,
+        fileUrl: form.fileUrl,
+        expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
+      });
+      setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
+      setEditing(null);
+    } catch { Alert.alert('Error', 'Failed to update'); }
+  };
+
+  const handleDelete = (doc: Document) => {
+    Alert.alert('Delete Document', 'This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          if (!id) return;
+          try {
+            await deleteDocument(id, doc.id);
+            setDocs((prev) => prev.filter((d) => d.id !== doc.id));
+          } catch { Alert.alert('Error', 'Failed to delete'); }
+        },
+      },
+    ]);
+  };
+
+  const modalTitle = editing ? 'Edit Document' : 'New Document';
+  const modalSave = editing ? handleUpdate : handleCreate;
+  const showModal = showCreate || editing !== null;
+  const closeModal = () => { setShowCreate(false); setEditing(null); };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
 
@@ -45,7 +98,7 @@ export default function DocumentsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Documents</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
+        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
           <Text style={styles.addBtnText}>+ Add</Text>
         </TouchableOpacity>
       </View>
@@ -55,7 +108,11 @@ export default function DocumentsScreen() {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={<Text style={styles.empty}>No documents yet</Text>}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => openEdit(item)}
+            onLongPress={() => handleDelete(item)}
+          >
             <View style={styles.cardRow}>
               <Text style={styles.cardType}>{item.type.replace('_', ' ')}</Text>
               <Text style={[styles.cardStatus, item.status === 'expired' && styles.expired]}>
@@ -64,20 +121,20 @@ export default function DocumentsScreen() {
             </View>
             <Text style={styles.cardTitle}>{item.title}</Text>
             {item.expiryDate && <Text style={styles.cardExpiry}>Expires: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
-          </View>
+          </TouchableOpacity>
         )}
       />
 
-      <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Document</Text>
-            <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <Text style={styles.modalTitle}>{modalTitle}</Text>
+            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
           <TextInput style={styles.input} placeholder="Title" value={form.title} onChangeText={(t) => setForm((p) => ({ ...p, title: t }))} />
           <TextInput style={styles.input} placeholder="File URL" value={form.fileUrl} onChangeText={(t) => setForm((p) => ({ ...p, fileUrl: t }))} />
           <TextInput style={styles.input} placeholder="Expiry date (YYYY-MM-DD, optional)" value={form.expiryDate} onChangeText={(t) => setForm((p) => ({ ...p, expiryDate: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleCreate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
         </View>
       </Modal>
     </View>

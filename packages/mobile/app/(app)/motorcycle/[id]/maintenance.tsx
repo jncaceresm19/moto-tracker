@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { listMaintenance, createMaintenance, MaintenanceRecord } from '../../../../src/api';
+import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
 
 const TYPES = ['oil_change', 'tire_change', 'brake_check', 'spark_plugs', 'technical_review', 'circulation_permit', 'other'];
 
@@ -10,6 +10,7 @@ export default function MaintenanceScreen() {
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
   const [form, setForm] = useState({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
 
   const load = async () => {
@@ -21,6 +22,22 @@ export default function MaintenanceScreen() {
   };
 
   useEffect(() => { load(); }, [id]);
+
+  const resetForm = () => setForm({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
+
+  const openCreate = () => { resetForm(); setShowCreate(true); };
+
+  const openEdit = (record: MaintenanceRecord) => {
+    setForm({
+      type: record.type,
+      description: record.description,
+      kilometersAtService: String(record.kilometersAtService),
+      serviceDate: record.serviceDate.split('T')[0],
+      cost: record.cost != null ? String(record.cost) : '',
+      notes: record.notes || '',
+    });
+    setEditing(record);
+  };
 
   const handleCreate = async () => {
     if (!id || !form.description || !form.kilometersAtService || !form.serviceDate) {
@@ -38,9 +55,49 @@ export default function MaintenanceScreen() {
       });
       setRecords((prev) => [created, ...prev]);
       setShowCreate(false);
-      setForm({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
+      resetForm();
     } catch { Alert.alert('Error', 'Failed to create'); }
   };
+
+  const handleUpdate = async () => {
+    if (!id || !editing || !form.description || !form.kilometersAtService || !form.serviceDate) {
+      Alert.alert('Error', 'Fill required fields');
+      return;
+    }
+    try {
+      const updated = await updateMaintenance(id, editing.id, {
+        type: form.type,
+        description: form.description,
+        kilometersAtService: Number(form.kilometersAtService),
+        serviceDate: new Date(form.serviceDate).toISOString(),
+        cost: form.cost ? Number(form.cost) : null,
+        notes: form.notes || null,
+      });
+      setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
+      setEditing(null);
+    } catch { Alert.alert('Error', 'Failed to update'); }
+  };
+
+  const handleDelete = (record: MaintenanceRecord) => {
+    Alert.alert('Delete Record', 'This action cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          if (!id) return;
+          try {
+            await deleteMaintenance(id, record.id);
+            setRecords((prev) => prev.filter((r) => r.id !== record.id));
+          } catch { Alert.alert('Error', 'Failed to delete'); }
+        },
+      },
+    ]);
+  };
+
+  const modalTitle = editing ? 'Edit Record' : 'New Record';
+  const modalSave = editing ? handleUpdate : handleCreate;
+  const showModal = showCreate || editing !== null;
+  const closeModal = () => { setShowCreate(false); setEditing(null); };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
 
@@ -48,7 +105,7 @@ export default function MaintenanceScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Maintenance Records</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={() => setShowCreate(true)}>
+        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
           <Text style={styles.addBtnText}>+ Add</Text>
         </TouchableOpacity>
       </View>
@@ -58,7 +115,11 @@ export default function MaintenanceScreen() {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={<Text style={styles.empty}>No records yet</Text>}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => openEdit(item)}
+            onLongPress={() => handleDelete(item)}
+          >
             <View style={styles.cardRow}>
               <Text style={styles.cardType}>{item.type.replace('_', ' ')}</Text>
               <Text style={styles.cardDate}>{new Date(item.serviceDate).toLocaleDateString()}</Text>
@@ -66,22 +127,22 @@ export default function MaintenanceScreen() {
             <Text style={styles.cardDesc}>{item.description}</Text>
             <Text style={styles.cardKm}>{item.kilometersAtService.toLocaleString()} km</Text>
             {item.cost != null && <Text style={styles.cardCost}>${item.cost.toLocaleString()}</Text>}
-          </View>
+          </TouchableOpacity>
         )}
       />
 
-      <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Record</Text>
-            <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <Text style={styles.modalTitle}>{modalTitle}</Text>
+            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
           </View>
           <TextInput style={styles.input} placeholder="Description" value={form.description} onChangeText={(t) => setForm((p) => ({ ...p, description: t }))} />
           <TextInput style={styles.input} placeholder="Kilometers" keyboardType="numeric" value={form.kilometersAtService} onChangeText={(t) => setForm((p) => ({ ...p, kilometersAtService: t }))} />
           <TextInput style={styles.input} placeholder="Date (YYYY-MM-DD)" value={form.serviceDate} onChangeText={(t) => setForm((p) => ({ ...p, serviceDate: t }))} />
           <TextInput style={styles.input} placeholder="Cost (optional)" keyboardType="numeric" value={form.cost} onChangeText={(t) => setForm((p) => ({ ...p, cost: t }))} />
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleCreate}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.saveBtn} onPress={modalSave}><Text style={styles.saveBtnText}>Save</Text></TouchableOpacity>
         </View>
       </Modal>
     </View>

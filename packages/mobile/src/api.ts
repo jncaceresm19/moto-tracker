@@ -91,6 +91,13 @@ export async function createMotorcycle(data: {
   return api<Motorcycle>('/api/motorcycles', { method: 'POST', body: data });
 }
 
+export async function updateMotorcycle(
+  id: string,
+  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string }
+): Promise<Motorcycle> {
+  return api<Motorcycle>(`/api/motorcycles/${id}`, { method: 'PUT', body: data });
+}
+
 export async function deleteMotorcycle(id: string): Promise<void> {
   await api(`/api/motorcycles/${id}`, { method: 'DELETE' });
 }
@@ -118,6 +125,18 @@ export async function createMaintenance(
   return api<MaintenanceRecord>(`/api/motorcycles/${motorcycleId}/maintenance`, { method: 'POST', body: data });
 }
 
+export async function updateMaintenance(
+  motorcycleId: string,
+  recordId: string,
+  data: { type?: string; description?: string; kilometersAtService?: number; serviceDate?: string; cost?: number | null; notes?: string | null }
+): Promise<MaintenanceRecord> {
+  return api<MaintenanceRecord>(`/api/motorcycles/${motorcycleId}/maintenance/${recordId}`, { method: 'PUT', body: data });
+}
+
+export async function deleteMaintenance(motorcycleId: string, recordId: string): Promise<void> {
+  await api(`/api/motorcycles/${motorcycleId}/maintenance/${recordId}`, { method: 'DELETE' });
+}
+
 // Documents
 export interface Document {
   id: string;
@@ -140,6 +159,18 @@ export async function createDocument(
   return api<Document>(`/api/motorcycles/${motorcycleId}/documents`, { method: 'POST', body: data });
 }
 
+export async function updateDocument(
+  motorcycleId: string,
+  docId: string,
+  data: { type?: string; title?: string; fileUrl?: string; expiryDate?: string | null; notes?: string | null; status?: string | null }
+): Promise<Document> {
+  return api<Document>(`/api/motorcycles/${motorcycleId}/documents/${docId}`, { method: 'PUT', body: data });
+}
+
+export async function deleteDocument(motorcycleId: string, docId: string): Promise<void> {
+  await api(`/api/motorcycles/${motorcycleId}/documents/${docId}`, { method: 'DELETE' });
+}
+
 // Kilometer History
 export interface KilometerEntry {
   id: string;
@@ -158,4 +189,16 @@ export async function createKilometer(
   data: { readingKm: number; recordedAt: string; notes?: string }
 ): Promise<KilometerEntry> {
   return api<KilometerEntry>(`/api/motorcycles/${motorcycleId}/kilometers`, { method: 'POST', body: data });
+}
+
+export async function updateKilometer(
+  motorcycleId: string,
+  entryId: string,
+  data: { readingKm?: number; recordedAt?: string; notes?: string | null }
+): Promise<KilometerEntry> {
+  return api<KilometerEntry>(`/api/motorcycles/${motorcycleId}/kilometers/${entryId}`, { method: 'PUT', body: data });
+}
+
+export async function deleteKilometer(motorcycleId: string, entryId: string): Promise<void> {
+  await api(`/api/motorcycles/${motorcycleId}/kilometers/${entryId}`, { method: 'DELETE' });
 }
