@@ -78,13 +78,19 @@ export default function ProfileScreen() {
   };
 
   const handlePickAvatar = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      quality: 0.5,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setAvatarUri(result.assets[0].uri);
-    }
+    Alert.alert(t('changePhoto'), '', [
+      { text: t('camera'), onPress: async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') { Alert.alert(t('error'), t('cameraPermission')); return; }
+        const result = await ImagePicker.launchCameraAsync({ quality: 0.5 });
+        if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+      }},
+      { text: t('gallery'), onPress: async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.5 });
+        if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+      }},
+      { text: t('cancel'), style: 'cancel' },
+    ]);
   };
 
   const handleSignOut = () => {

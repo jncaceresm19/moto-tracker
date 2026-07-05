@@ -91,6 +91,9 @@ const translations = {
     profileUpdated: 'Profile updated successfully',
     name: 'Name',
     email: 'Email',
+    camera: 'Camera',
+    gallery: 'Gallery',
+    cameraPermission: 'Camera permission is required',
   },
   es: {
     // Tabs
@@ -179,6 +182,9 @@ const translations = {
     profileUpdated: 'Perfil actualizado exitosamente',
     name: 'Nombre',
     email: 'Email',
+    camera: 'Cámara',
+    gallery: 'Galería',
+    cameraPermission: 'Se requiere permiso de cámara',
   },
 };
 
