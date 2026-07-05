@@ -14,7 +14,7 @@ const router = Router();
 const updateProfileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100).optional(),
   email: z.string().email('Invalid email format').optional(),
-  avatarUrl: z.string().max(500000).optional(), // Base64 data URI
+  avatarUrl: z.string().max(10000000).optional(), // Base64 data URI (up to ~10MB)
 });
 
 // --- PUT /api/profile ---
