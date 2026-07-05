@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as MediaLibrary from 'expo-media-library';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
@@ -178,10 +179,18 @@ export default function DocumentsScreen() {
 
   const handleSaveAsPDF = async (doc: Document) => {
     try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant media library permission to save.');
+        return;
+      }
       const uri = await generatePDF(doc);
-      if (uri) await Sharing.shareAsync(uri);
+      if (uri) {
+        await MediaLibrary.saveToLibraryAsync(uri);
+        Alert.alert('Saved', `${doc.title}.pdf saved to your gallery`);
+      }
     } catch (e: any) {
-      Alert.alert('Error', `Failed to generate PDF: ${e?.message || e}`);
+      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
   };
 
@@ -191,10 +200,21 @@ export default function DocumentsScreen() {
       Alert.alert('No photos', 'No documents with photos to save.');
       return;
     }
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please grant media library permission to save.');
+      return;
+    }
     try {
+      let saved = 0;
       for (const doc of photos) {
-        await handleSaveAsPDF(doc);
+        const uri = await generatePDF(doc);
+        if (uri) {
+          await MediaLibrary.saveToLibraryAsync(uri);
+          saved++;
+        }
       }
+      Alert.alert('Done', `${saved} PDF${saved > 1 ? 's' : ''} saved to your gallery`);
     } catch (e: any) {
       Alert.alert('Error', `Failed to save: ${e?.message || e}`);
     }
