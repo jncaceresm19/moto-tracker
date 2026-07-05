@@ -395,13 +395,14 @@ export default function DocumentsScreen() {
               value={form.issueDate ? new Date(form.issueDate) : new Date()}
               mode="date"
               display="default"
-              onChange={(_, date) => {
+              onValueChange={(date) => {
                 setShowIssueDatePicker(false);
                 if (date) {
                   const iso = date.toISOString().split('T')[0];
                   setForm((p) => ({ ...p, issueDate: iso }));
                 }
               }}
+              onDismiss={() => setShowIssueDatePicker(false)}
             />
           )}
 
@@ -415,13 +416,14 @@ export default function DocumentsScreen() {
               value={form.expiryDate ? new Date(form.expiryDate) : new Date()}
               mode="date"
               display="default"
-              onChange={(_, date) => {
+              onValueChange={(date) => {
                 setShowExpiryDatePicker(false);
                 if (date) {
                   const iso = date.toISOString().split('T')[0];
                   setForm((p) => ({ ...p, expiryDate: iso }));
                 }
               }}
+              onDismiss={() => setShowExpiryDatePicker(false)}
             />
           )}
 

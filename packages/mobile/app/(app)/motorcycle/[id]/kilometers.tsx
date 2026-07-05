@@ -171,7 +171,7 @@ export default function KilometersScreen() {
               value={form.recordedAt ? new Date(form.recordedAt) : new Date()}
               mode="date"
               display="default"
-              onChange={(_, date) => {
+              onValueChange={(date) => {
                 setShowDatePicker(false);
                 if (date) {
                   const iso = date.toISOString().split('T')[0];
@@ -179,6 +179,7 @@ export default function KilometersScreen() {
                   setErrors((p) => ({ ...p, recordedAt: '' }));
                 }
               }}
+              onDismiss={() => setShowDatePicker(false)}
             />
           )}
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />

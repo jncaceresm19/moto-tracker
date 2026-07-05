@@ -189,7 +189,7 @@ export default function MaintenanceScreen() {
               value={form.serviceDate ? new Date(form.serviceDate) : new Date()}
               mode="date"
               display="default"
-              onChange={(_, date) => {
+              onValueChange={(date) => {
                 setShowDatePicker(false);
                 if (date) {
                   const iso = date.toISOString().split('T')[0];
@@ -197,6 +197,7 @@ export default function MaintenanceScreen() {
                   setErrors((p) => ({ ...p, serviceDate: '' }));
                 }
               }}
+              onDismiss={() => setShowDatePicker(false)}
             />
           )}
           <TextInput style={styles.input} placeholder="Cost (optional)" keyboardType="numeric" value={form.cost} onChangeText={(t) => setForm((p) => ({ ...p, cost: t }))} />
