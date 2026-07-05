@@ -27,7 +27,8 @@ const documentStatuses = ['valid', 'expiring', 'expired'] as const;
 const createDocumentSchema = z.object({
   type: z.enum(documentTypes),
   title: z.string().min(1, 'Title is required').max(200),
-  fileUrl: z.string().url('Invalid file URL'),
+  fileUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image'),
+  issueDate: z.string().datetime().optional(),
   expiryDate: z.string().datetime().optional(),
   notes: z.string().max(1000).optional(),
   imagePath: z.string().max(500).optional(),
@@ -38,7 +39,8 @@ const createDocumentSchema = z.object({
 const updateDocumentSchema = z.object({
   type: z.enum(documentTypes).optional(),
   title: z.string().min(1).max(200).optional(),
-  fileUrl: z.string().url().optional(),
+  fileUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').optional(),
+  issueDate: z.string().datetime().nullable().optional(),
   expiryDate: z.string().datetime().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   imagePath: z.string().max(500).nullable().optional(),
@@ -87,7 +89,7 @@ router.post('/', validateBody(createDocumentSchema), async (req: Request, res: R
       return;
     }
 
-    const { type, title, fileUrl, expiryDate, notes, imagePath, ocrConfidence, status } = req.body;
+    const { type, title, fileUrl, issueDate, expiryDate, notes, imagePath, ocrConfidence, status } = req.body;
     const now = new Date();
     const docId = crypto.randomUUID();
 
@@ -97,6 +99,7 @@ router.post('/', validateBody(createDocumentSchema), async (req: Request, res: R
       type,
       title,
       fileUrl,
+      issueDate: issueDate ? new Date(issueDate) : null,
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       notes: notes ?? null,
       imagePath: imagePath ?? null,
@@ -255,6 +258,7 @@ router.put('/:docId', validateParams(docIdParam), validateBody(updateDocumentSch
     if (req.body.type !== undefined) updates.type = req.body.type;
     if (req.body.title !== undefined) updates.title = req.body.title;
     if (req.body.fileUrl !== undefined) updates.fileUrl = req.body.fileUrl;
+    if (req.body.issueDate !== undefined) updates.issueDate = req.body.issueDate ? new Date(req.body.issueDate) : null;
     if (req.body.expiryDate !== undefined) updates.expiryDate = req.body.expiryDate ? new Date(req.body.expiryDate) : null;
     if (req.body.notes !== undefined) updates.notes = req.body.notes;
     if (req.body.imagePath !== undefined) updates.imagePath = req.body.imagePath;

@@ -52,6 +52,7 @@ export const documents = sqliteTable('documents', {
   type: text('type').notNull(), // 'circulation_permit', 'technical_review', 'insurance', 'registration', 'other'
   title: text('title').notNull(),
   fileUrl: text('file_url').notNull(),
+  issueDate: integer('issue_date', { mode: 'timestamp' }),
   expiryDate: integer('expiry_date', { mode: 'timestamp' }),
   notes: text('notes'),
   imagePath: text('image_path'),
