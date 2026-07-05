@@ -26,9 +26,7 @@ export default function MotorcycleListScreen() {
       const data = await listMotorcycles();
       setMotorcycles(data);
     } catch (e: any) {
-      const msg = e?.message || 'Unknown error';
-      console.log('[MOTOS] Error:', msg);
-      Alert.alert('Error loading motorcycles', msg);
+      console.log('[MOTOS] Error:', e?.message || 'Unknown error');
     } finally {
       setLoading(false);
     }

@@ -19,6 +19,10 @@ function decodeToken(token: string): User | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     if (payload.userId && payload.email) {
+      // Check if token is expired
+      if (payload.exp && payload.exp * 1000 < Date.now()) {
+        return null;
+      }
       return { id: payload.userId, email: payload.email };
     }
     return null;
