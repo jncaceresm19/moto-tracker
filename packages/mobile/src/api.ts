@@ -62,6 +62,13 @@ export async function logout() {
   await AsyncStorage.removeItem('accessToken');
 }
 
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return api<{ message: string }>('/api/auth/change-password', {
+    method: 'POST',
+    body: { currentPassword, newPassword },
+  });
+}
+
 // Motorcycles
 export interface Motorcycle {
   id: string;

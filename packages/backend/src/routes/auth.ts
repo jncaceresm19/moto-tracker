@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
-import { signTokens } from '../middleware/auth';
+import { signTokens, authenticate } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
 
@@ -25,6 +25,11 @@ const loginSchema = z.object({
 
 const googleAuthSchema = z.object({
   idToken: z.string().min(1, 'ID token is required'),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
 });
 
 // --- POST /api/auth/register ---
@@ -184,6 +189,53 @@ router.post('/google', validateBody(googleAuthSchema), async (req: Request, res:
   } catch (err) {
     console.error('Google auth error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to authenticate with Google');
+    res.status(500).json(error);
+  }
+});
+
+// --- POST /api/auth/change-password ---
+router.post('/change-password', authenticate, validateBody(changePasswordSchema), async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user!.userId;
+
+    // Find user
+    const user = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!user) {
+      const error = createErrorResponse('NOT_FOUND', 'User not found');
+      res.status(404).json(error);
+      return;
+    }
+
+    // Google users don't have a password
+    if (!user.passwordHash) {
+      const error = createErrorResponse('BAD_REQUEST', 'Cannot change password for Google accounts');
+      res.status(400).json(error);
+      return;
+    }
+
+    // Verify current password
+    const validPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!validPassword) {
+      const error = createErrorResponse('UNAUTHORIZED', 'Current password is incorrect');
+      res.status(401).json(error);
+      return;
+    }
+
+    // Hash new password
+    const saltRounds = process.env.NODE_ENV === 'test' ? 4 : 12;
+    const newHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password
+    await db.update(users).set({ passwordHash: newHash, updatedAt: new Date() }).where(eq(users.id, userId));
+
+    res.json({
+      success: true,
+      data: { message: 'Password changed successfully' },
+    });
+  } catch (err) {
+    console.error('Change password error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to change password');
     res.status(500).json(error);
   }
 });

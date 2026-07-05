@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/auth-context';
+import { changePassword } from '../../src/api';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -21,8 +22,7 @@ export default function ProfileScreen() {
     setErrors({});
     setSaving(true);
     try {
-      // TODO: Call API to change password
-      await new Promise((r) => setTimeout(r, 1000));
+      await changePassword(passwords.current, passwords.newPass);
       Alert.alert('Success', 'Password changed successfully');
       setShowChangePassword(false);
       setPasswords({ current: '', newPass: '', confirm: '' });
