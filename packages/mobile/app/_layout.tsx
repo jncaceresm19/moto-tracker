@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { AuthProvider, useAuth } from '../src/auth-context';
 import * as SplashScreen from 'expo-splash-screen';
@@ -9,6 +9,7 @@ function AuthGuard() {
   const { user, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -21,8 +22,14 @@ function AuthGuard() {
       router.replace('/(app)');
     }
 
-    SplashScreen.hideAsync();
+    // Delay splash hide to let navigation settle
+    setTimeout(() => {
+      SplashScreen.hideAsync();
+      setReady(true);
+    }, 500);
   }, [user, isLoading, segments]);
+
+  if (!ready) return null;
 
   return null;
 }

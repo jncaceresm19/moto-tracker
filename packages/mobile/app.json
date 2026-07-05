@@ -7,6 +7,11 @@
     "scheme": "moto-tracker",
     "icon": "./assets/logo.jpeg",
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/nombre.jpeg",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
     "ios": {
       "supportsTablet": true
     },
