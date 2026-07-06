@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme-context';
 
@@ -9,7 +9,6 @@ interface OfferCardProps {
   location: string;
   distance: string;
   price93?: number;
-  onPress?: () => void;
 }
 
 export function OfferCard({
@@ -18,7 +17,6 @@ export function OfferCard({
   location,
   distance,
   price93,
-  onPress,
 }: OfferCardProps) {
   const { colors } = useTheme();
 
@@ -27,7 +25,7 @@ export function OfferCard({
   const savings = price93 ? avgPrice93 - price93 : 0;
 
   return (
-    <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress}>
+    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Brand logo or fallback icon */}
       {brandLogo ? (
         <Image source={{ uri: brandLogo }} style={styles.brandLogo} resizeMode="contain" />
@@ -56,7 +54,7 @@ export function OfferCard({
           <Text style={styles.savingsText}>-${savings} vs promedio</Text>
         </View>
       ) : null}
-    </TouchableOpacity>
+    </View>
   );
 }
 
