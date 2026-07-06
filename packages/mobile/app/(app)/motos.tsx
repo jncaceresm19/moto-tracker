@@ -128,24 +128,98 @@ export default function MotorcycleListScreen() {
     ]);
   };
 
+  const dynamicStyles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+    fab: {
+      position: 'absolute',
+      bottom: 24,
+      right: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      elevation: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+    },
+    fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
+    empty: { fontSize: 18, color: colors.text, marginBottom: 4 },
+    emptySub: { fontSize: 14, color: colors.textMuted },
+    card: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      backgroundColor: colors.card,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cardImagePlaceholder: {
+      width: '100%',
+      height: 140,
+      backgroundColor: colors.surfaceSecondary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    cardTitle: { fontSize: 18, fontWeight: '600', color: colors.text },
+    cardSub: { fontSize: 14, color: colors.textSecondary, marginTop: 4 },
+    cardKm: { fontSize: 14, color: colors.primary, marginTop: 4 },
+    modal: { flex: 1, padding: 20, backgroundColor: colors.background },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    cancel: { color: colors.primary, fontSize: 16 },
+    photoBtn: {
+      width: '100%',
+      height: 160,
+      borderRadius: 10,
+      overflow: 'hidden',
+      marginBottom: 16,
+      backgroundColor: colors.surfaceSecondary,
+    },
+    photoPlaceholder: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      borderRadius: 10,
+    },
+    photoPlaceholderText: {
+      color: colors.textMuted,
+      fontSize: 14,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 15,
+      marginBottom: 10,
+      backgroundColor: colors.inputBg,
+      color: colors.text,
+    },
+    errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
+    saveBtn: { backgroundColor: colors.accent, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+    saveBtnText: { color: colors.accentText, fontSize: 16, fontWeight: '600' },
+  });
+
   if (loading) {
-    return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
+    return <View style={dynamicStyles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.text }]}>{t('myMotorcycles')}</Text>
-        <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.primary }]} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
-          <Text style={[styles.addBtnText, { color: colors.primaryText }]}>+ Add</Text>
-        </TouchableOpacity>
-      </View>
-
+    <View style={dynamicStyles.container}>
       {motorcycles.length === 0 ? (
-        <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <View style={dynamicStyles.center}>
           <Text style={styles.emptyIcon}>🏍️</Text>
-          <Text style={[styles.empty, { color: colors.text }]}>{t('noMotorcycles')}</Text>
-          <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noMotorcyclesSub')}</Text>
+          <Text style={dynamicStyles.empty}>{t('noMotorcycles')}</Text>
+          <Text style={dynamicStyles.emptySub}>{t('noMotorcyclesSub')}</Text>
         </View>
       ) : (
         <FlatList
@@ -154,58 +228,62 @@ export default function MotorcycleListScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
+              style={dynamicStyles.card}
               onPress={() => router.push(`/(app)/motorcycle/${item.id}`)}
               onLongPress={() => handleDelete(item.id, `${item.brand} ${item.model}`)}
             >
               {item.imageUrl ? (
                 <Image source={{ uri: item.imageUrl }} style={styles.cardImage} resizeMode="cover" />
               ) : (
-                <View style={styles.cardImagePlaceholder}>
+                <View style={dynamicStyles.cardImagePlaceholder}>
                   <Text style={styles.cardImagePlaceholderText}>🏍️</Text>
                 </View>
               )}
               <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle}>{item.brand} {item.model}</Text>
-                <Text style={styles.cardSub}>{item.year} · {item.licensePlate}</Text>
-                <Text style={styles.cardKm}>{item.currentKilometers.toLocaleString()} km</Text>
+                <Text style={dynamicStyles.cardTitle}>{item.brand} {item.model}</Text>
+                <Text style={dynamicStyles.cardSub}>{item.year} · {item.licensePlate}</Text>
+                <Text style={dynamicStyles.cardKm}>{item.currentKilometers.toLocaleString()} km</Text>
               </View>
             </TouchableOpacity>
           )}
         />
       )}
 
+      <TouchableOpacity style={dynamicStyles.fab} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
+        <Text style={dynamicStyles.fabText}>+</Text>
+      </TouchableOpacity>
+
       <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New Motorcycle</Text>
-            <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
-          </View>
+          <View style={dynamicStyles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+            <View style={dynamicStyles.modalHeader}>
+              <Text style={dynamicStyles.modalTitle}>New Motorcycle</Text>
+              <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={dynamicStyles.cancel}>Cancel</Text></TouchableOpacity>
+            </View>
 
-          <TouchableOpacity style={styles.photoBtn} onPress={showImageOptions}>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
-            ) : (
-              <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                <Text style={styles.photoPlaceholderText}>Tap to add photo</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity style={dynamicStyles.photoBtn} onPress={showImageOptions}>
+              {imageUri ? (
+                <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
+              ) : (
+                <View style={dynamicStyles.photoPlaceholder}>
+                  <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                  <Text style={dynamicStyles.photoPlaceholderText}>Tap to add photo</Text>
+                </View>
+              )}
+            </TouchableOpacity>
 
-          <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(t) => { setForm((p) => ({ ...p, brand: t })); setErrors((p) => ({ ...p, brand: '' })); }} />
-          {errors.brand ? <Text style={styles.errorText}>{errors.brand}</Text> : null}
-          <TextInput style={styles.input} placeholder="Model *" value={form.model} onChangeText={(t) => { setForm((p) => ({ ...p, model: t })); setErrors((p) => ({ ...p, model: '' })); }} />
-          {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
-          <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(t) => { setForm((p) => ({ ...p, year: t })); setErrors((p) => ({ ...p, year: '' })); }} />
-          {errors.year ? <Text style={styles.errorText}>{errors.year}</Text> : null}
-          <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => { setForm((p) => ({ ...p, licensePlate: t })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
-          {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
-          <TextInput style={styles.input} placeholder="Current km (optional)" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={handleCreate} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
-          </TouchableOpacity>
+            <TextInput style={dynamicStyles.input} placeholder="Brand *" placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
+            {errors.brand ? <Text style={dynamicStyles.errorText}>{errors.brand}</Text> : null}
+            <TextInput style={dynamicStyles.input} placeholder="Model *" placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
+            {errors.model ? <Text style={dynamicStyles.errorText}>{errors.model}</Text> : null}
+            <TextInput style={dynamicStyles.input} placeholder="Year *" placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
+            {errors.year ? <Text style={dynamicStyles.errorText}>{errors.year}</Text> : null}
+            <TextInput style={dynamicStyles.input} placeholder="License Plate *" placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+            {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
+            <TextInput style={dynamicStyles.input} placeholder="Current km (optional)" placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
+            <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleCreate} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>Save</Text>}
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -214,40 +292,10 @@ export default function MotorcycleListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  title: { fontSize: 22, fontWeight: 'bold' },
-  addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  addBtnText: { color: '#fff', fontWeight: '600' },
-  empty: { fontSize: 18, color: '#999', marginBottom: 4 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptySub: { fontSize: 14, color: '#ccc' },
-  card: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
   cardImage: {
     width: '100%',
     height: 140,
-  },
-  cardImagePlaceholder: {
-    width: '100%',
-    height: 140,
-    backgroundColor: '#eee',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   cardImagePlaceholderText: {
     fontSize: 48,
@@ -255,44 +303,12 @@ const styles = StyleSheet.create({
   cardInfo: {
     padding: 16,
   },
-  cardTitle: { fontSize: 18, fontWeight: '600' },
-  cardSub: { fontSize: 14, color: '#666', marginTop: 4 },
-  cardKm: { fontSize: 14, color: '#007AFF', marginTop: 4 },
-  modal: { flex: 1, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  cancel: { color: '#007AFF', fontSize: 16 },
-  photoBtn: {
-    width: '100%',
-    height: 160,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#f0f0f0',
-  },
   photoPreview: {
     width: '100%',
     height: '100%',
-  },
-  photoPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderStyle: 'dashed',
-    borderRadius: 10,
   },
   photoPlaceholderIcon: {
     fontSize: 36,
     marginBottom: 8,
   },
-  photoPlaceholderText: {
-    color: '#999',
-    fontSize: 14,
-  },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
-  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
-  saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });

@@ -14,6 +14,8 @@ export interface ThemeColors {
   borderLight: string;
   primary: string;
   primaryText: string;
+  accent: string;
+  accentText: string;
   danger: string;
   dangerText: string;
   success: string;
@@ -23,53 +25,72 @@ export interface ThemeColors {
   inputBorder: string;
   tabBar: string;
   tabBarBorder: string;
+  tabBarActive: string;
+  tabBarInactive: string;
   headerBg: string;
+  headerTintColor: string;
+  overlay: string;
+  statusBarStyle: 'dark-content' | 'light-content';
 }
 
 const lightTheme: ThemeColors = {
-  background: '#f5f5f5',
-  surface: '#fff',
-  surfaceSecondary: '#f8f8f8',
-  text: '#333',
-  textSecondary: '#666',
-  textMuted: '#999',
-  border: '#eee',
-  borderLight: '#f0f0f0',
-  primary: '#007AFF',
-  primaryText: '#fff',
-  danger: '#FF3B30',
-  dangerText: '#fff',
-  success: '#34C759',
-  successText: '#fff',
-  card: '#f8f8f8',
-  inputBg: '#fff',
-  inputBorder: '#ddd',
-  tabBar: '#fff',
-  tabBarBorder: '#eee',
-  headerBg: '#fff',
+  background: '#F0F2F5',
+  surface: '#FFFFFF',
+  surfaceSecondary: '#F7F8FA',
+  text: '#1C1D1F',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
+  border: '#E5E7EB',
+  borderLight: '#F0F1F3',
+  primary: '#1B75BC',
+  primaryText: '#FFFFFF',
+  accent: '#F7941E',
+  accentText: '#4A2A05',
+  danger: '#DC2626',
+  dangerText: '#FFFFFF',
+  success: '#16A34A',
+  successText: '#FFFFFF',
+  card: '#F7F8FA',
+  inputBg: '#FFFFFF',
+  inputBorder: '#D1D5DB',
+  tabBar: '#FFFFFF',
+  tabBarBorder: '#E5E7EB',
+  tabBarActive: '#1B75BC',
+  tabBarInactive: '#9CA3AF',
+  headerBg: '#1B75BC',
+  headerTintColor: '#FFFFFF',
+  overlay: 'rgba(15, 23, 32, 0.5)',
+  statusBarStyle: 'dark-content',
 };
 
 const darkTheme: ThemeColors = {
-  background: '#1a1a1a',
-  surface: '#2a2a2a',
-  surfaceSecondary: '#333',
-  text: '#f0f0f0',
-  textSecondary: '#aaa',
-  textMuted: '#777',
-  border: '#444',
-  borderLight: '#3a3a3a',
-  primary: '#0A84FF',
-  primaryText: '#fff',
-  danger: '#FF453A',
-  dangerText: '#fff',
-  success: '#30D158',
-  successText: '#fff',
-  card: '#2a2a2a',
-  inputBg: '#333',
-  inputBorder: '#555',
-  tabBar: '#2a2a2a',
-  tabBarBorder: '#444',
-  headerBg: '#2a2a2a',
+  background: '#121212',
+  surface: '#1C1D1F',
+  surfaceSecondary: '#232427',
+  text: '#F3F4F6',
+  textSecondary: '#A1A1AA',
+  textMuted: '#71717A',
+  border: '#2D2E30',
+  borderLight: '#252627',
+  primary: '#4C9AE0',
+  primaryText: '#FFFFFF',
+  accent: '#FFA940',
+  accentText: '#1C1D1F',
+  danger: '#F87171',
+  dangerText: '#1C1D1F',
+  success: '#4ADE80',
+  successText: '#1C1D1F',
+  card: '#1C1D1F',
+  inputBg: '#1F2023',
+  inputBorder: '#3A3B3E',
+  tabBar: '#132332',
+  tabBarBorder: '#1D3A4F',
+  tabBarActive: '#4C9AE0',
+  tabBarInactive: '#5E7A8C',
+  headerBg: '#132332',
+  headerTintColor: '#FFFFFF',
+  overlay: 'rgba(0, 0, 0, 0.65)',
+  statusBarStyle: 'light-content',
 };
 
 interface ThemeContextType {
@@ -119,4 +140,25 @@ export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) throw new Error('useTheme must be used within ThemeProvider');
   return context;
+}
+
+// Helper para pasar a <NavigationContainer theme={...}> de React Navigation
+export function getNavigationTheme(colors: ThemeColors, mode: ThemeMode) {
+  return {
+    dark: mode === 'dark',
+    colors: {
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.headerBg,
+      text: colors.text,
+      border: colors.border,
+      notification: colors.accent,
+    },
+    fonts: {
+      regular: { fontFamily: 'System', fontWeight: '400' as const },
+      medium: { fontFamily: 'System', fontWeight: '500' as const },
+      bold: { fontFamily: 'System', fontWeight: '700' as const },
+      heavy: { fontFamily: 'System', fontWeight: '900' as const },
+    },
+  };
 }
