@@ -1,7 +1,6 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 
@@ -18,7 +17,7 @@ function BackButton() {
 function TrackingBackButton() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { id } = require('expo-router').useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams<{ id: string }>();
   return (
     <TouchableOpacity onPress={() => router.replace(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
       <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
