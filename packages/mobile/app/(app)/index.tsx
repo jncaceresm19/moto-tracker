@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { useAuth } from '../../src/auth-context';
@@ -36,97 +39,152 @@ export default function HomeScreen() {
   };
 
   const firstMoto = motorcycles[0];
-  const hasAlerts = false; // TODO: connect to real alert data
-  const hasOffers = false; // TODO: connect to real offer data
+  const hasAlerts = false;
+  const hasOffers = false;
 
   if (loading) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.background }]}>
+      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['top']}>
         <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-    >
-      {/* Dashboard Panel */}
-      <DashboardPanel
-        motorcycleName={firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : ''}
-        plate={firstMoto?.licensePlate}
-        status="safe"
-        lastLocationTime={new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
-        address=""
-        timeAgo=""
-      />
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.headerBg }]} edges={['top']}>
+      <StatusBar style="light" />
 
-      {/* Multiple motorcycles indicator */}
-      {motorcycles.length > 1 && (
-        <Text style={[styles.motoIndicator, { color: colors.inkFaint }]}>
-          1 de {motorcycles.length} motos
-        </Text>
-      )}
-
-      {/* No motorcycles placeholder */}
-      {motorcycles.length === 0 && (
-        <View style={styles.emptyMotoContainer}>
-          <Text style={[styles.emptyMotoText, { color: colors.inkSoft }]}>
-            {t('registerFirstMoto')}
-          </Text>
-        </View>
-      )}
-
-      {/* Section: Alertas de robo */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
-        {hasAlerts ? (
-          <TheftAlertCard
-            title={`${firstMoto?.brand} ${firstMoto?.model} se movió de su zona segura`}
-            metadata={`${firstMoto?.licensePlate} · San Juan, Argentina`}
-            timeAgo="hace 12 min"
-            responses={[
-              { name: 'Carlos M.', text: 'Vi la moto por Av. Libertador hace 5 min', timeAgo: 'hace 5 min' },
-            ]}
+      {/* Header */}
+      <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
+        <View style={styles.brandRow}>
+          <Image
+            source={require('../../assets/logo.jpeg')}
+            style={styles.headerLogo}
+            resizeMode="contain"
           />
-        ) : (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={styles.emptyCardIcon}>🛡️</Text>
-            <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('noActiveAlerts')}</Text>
-            <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
-              {t('theftAlertsEmpty')}
-            </Text>
-          </View>
-        )}
+          <Image
+            source={require('../../assets/nombre.jpeg')}
+            style={styles.headerText}
+            resizeMode="contain"
+          />
+        </View>
+        <TouchableOpacity style={styles.bellBtn}>
+          <Ionicons name="notifications-outline" size={19} color={colors.headerTintColor} />
+          {hasAlerts && <View style={styles.bellDot} />}
+        </TouchableOpacity>
       </View>
 
-      {/* Section: Ahorra en tu ruta */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
-        {hasOffers ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
-            <OfferCard icon="flame" iconBg={colors.amberBg} name="Shell Bellavista" distance="1.2 km" price="$799/L" savings="- $32 vs promedio" />
-            <OfferCard icon="water" iconBg={colors.brandBlueBg} name="Lavado Express" distance="800 m" price="$3.500" />
-            <OfferCard icon="flame" iconBg={colors.amberBg} name="Copec Viña" distance="2.1 km" price="$815/L" />
-            <OfferCard icon="water" iconBg={colors.brandBlueBg} name="AutoSpa" distance="1.5 km" price="$4.200" savings="- $800 vs promedio" />
-          </ScrollView>
-        ) : (
-          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={styles.emptyCardIcon}>⛽</Text>
-            <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyOffers')}</Text>
-            <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
-              {t('saveOnRouteEmpty')}
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
+        {/* Dashboard Panel */}
+        <DashboardPanel
+          motorcycleName={firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : ''}
+          plate={firstMoto?.licensePlate}
+          status="safe"
+          lastLocationTime={new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+          address=""
+          timeAgo=""
+        />
+
+        {/* Multiple motorcycles indicator */}
+        {motorcycles.length > 1 && (
+          <Text style={[styles.motoIndicator, { color: colors.inkFaint }]}>
+            1 de {motorcycles.length} motos
+          </Text>
+        )}
+
+        {/* No motorcycles placeholder */}
+        {motorcycles.length === 0 && (
+          <View style={styles.emptyMotoContainer}>
+            <Text style={[styles.emptyMotoText, { color: colors.inkSoft }]}>
+              {t('registerFirstMoto')}
             </Text>
           </View>
         )}
-      </View>
-    </ScrollView>
+
+        {/* Section: Alertas de robo */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
+          {hasAlerts && firstMoto ? (
+            <TheftAlertCard
+              title={`${firstMoto.brand} ${firstMoto.model} se movió de su zona segura`}
+              metadata={`${firstMoto.licensePlate} · San Juan, Argentina`}
+              timeAgo="hace 12 min"
+              responses={[
+                { name: 'Carlos M.', text: 'Vi la moto por Av. Libertador hace 5 min', timeAgo: 'hace 5 min' },
+              ]}
+            />
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={styles.emptyCardIcon}>🛡️</Text>
+              <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('noActiveAlerts')}</Text>
+              <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
+                {t('theftAlertsEmpty')}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Section: Ahorra en tu ruta */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
+          {hasOffers ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+              <OfferCard icon="flame" iconBg={colors.amberBg} name="Shell Bellavista" distance="1.2 km" price="$799/L" savings="- $32 vs promedio" />
+              <OfferCard icon="water" iconBg={colors.brandBlueBg} name="Lavado Express" distance="800 m" price="$3.500" />
+              <OfferCard icon="flame" iconBg={colors.amberBg} name="Copec Viña" distance="2.1 km" price="$815/L" />
+              <OfferCard icon="water" iconBg={colors.brandBlueBg} name="AutoSpa" distance="1.5 km" price="$4.200" savings="- $800 vs promedio" />
+            </ScrollView>
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={styles.emptyCardIcon}>⛽</Text>
+              <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyOffers')}</Text>
+              <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
+                {t('saveOnRouteEmpty')}
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  headerLogo: { width: 36, height: 36 },
+  headerText: { width: 130, height: 40 },
+  bellBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 7,
+    right: 7,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E14336',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
   container: { flex: 1 },
   content: { paddingBottom: 32 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
