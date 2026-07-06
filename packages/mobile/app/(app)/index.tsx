@@ -80,7 +80,7 @@ export default function HomeScreen() {
           motorcycleName={firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : ''}
           plate={firstMoto?.licensePlate}
           status="safe"
-          lastLocationTime={new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+          lastLocationTime={new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
           address=""
           timeAgo=""
         />

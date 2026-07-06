@@ -62,21 +62,19 @@ export function DashboardPanel({
           </View>
         </View>
 
-        {/* Odometer time */}
+        {/* Odometer time inline with label */}
         <View style={styles.odometerSection}>
           <Text style={styles.odometerTime}>{lastLocationTime}</Text>
           <Text style={styles.odometerLabel}>última ubicación</Text>
         </View>
 
         {/* Address line */}
-        {address ? (
-          <View style={styles.addressRow}>
-            <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
-            <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
-              {address}{timeAgo ? ` · hace ${timeAgo}` : ''}
-            </Text>
-          </View>
-        ) : null}
+        <View style={styles.addressRow}>
+          <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
+          <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
+            Estacionada en ubicación - hace 6 minutos
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -147,20 +145,20 @@ const styles = StyleSheet.create({
   },
   odometerSection: {
     marginTop: 20,
-    alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
   },
   odometerTime: {
-    fontSize: 48,
+    fontSize: 22,
     fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: 'monospace',
-    letterSpacing: 4,
   },
   odometerLabel: {
     fontSize: 11,
     fontWeight: '500',
     color: '#6B7280',
-    marginTop: 2,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
