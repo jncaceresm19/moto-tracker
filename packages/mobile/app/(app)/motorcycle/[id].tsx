@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle } from '../../../src/api';
@@ -21,6 +21,7 @@ export default function MotorcycleDetailScreen() {
   const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+  const [gpsEnabled, setGpsEnabled] = useState(false);
 
   const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -142,6 +143,31 @@ export default function MotorcycleDetailScreen() {
         ))}
       </View>
 
+      {/* GPS Tracking Toggle */}
+      <View style={styles.gpsSection}>
+        <View style={styles.gpsRow}>
+          <View style={styles.gpsInfo}>
+            <Ionicons name="location" size={20} color={gpsEnabled ? '#1F9D63' : '#93A0B4'} />
+            <View>
+              <Text style={styles.gpsTitle}>{t('gpsTracking')}</Text>
+              <Text style={styles.gpsSubtitle}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
+            </View>
+          </View>
+          <Switch
+            value={gpsEnabled}
+            onValueChange={setGpsEnabled}
+            trackColor={{ false: '#E1E5EC', true: '#1F9D63' }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+        {gpsEnabled && (
+          <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(app)/motorcycle/${id}/tracking`)}>
+            <Ionicons name="map" size={18} color="#FFFFFF" />
+            <Text style={styles.mapBtnText}>{t('viewOnMap')}</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
@@ -208,4 +234,11 @@ const styles = StyleSheet.create({
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  gpsSection: { margin: 16, padding: 16, backgroundColor: '#f8f8f8', borderRadius: 12 },
+  gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gpsInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  gpsTitle: { fontSize: 16, fontWeight: '600' },
+  gpsSubtitle: { fontSize: 13, color: '#666', marginTop: 2 },
+  mapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1F9D63', borderRadius: 10, padding: 12, marginTop: 12 },
+  mapBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });

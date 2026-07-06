@@ -36,6 +36,12 @@
           "backgroundColor": "#ffffff",
           "imageWidth": 320
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Moto Tracker to use your location to track your motorcycle."
+        }
       ]
     ]
   }

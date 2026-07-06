@@ -104,6 +104,14 @@ export default function AppLayout() {
           headerLeft: () => <BackButton />,
         }}
       />
+      <Tabs.Screen
+        name="motorcycle/[id]/tracking"
+        options={{
+          href: null,
+          title: t('gpsTracking'),
+          headerLeft: () => <BackButton />,
+        }}
+      />
     </Tabs>
   );
 }
