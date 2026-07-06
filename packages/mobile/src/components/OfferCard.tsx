@@ -29,22 +29,22 @@ export function OfferCard({
 
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      {/* Brand logo or fallback icon */}
-      {brandLogo ? (
-        <Image source={{ uri: brandLogo }} style={styles.brandLogo} resizeMode="contain" />
-      ) : (
-        <View style={[styles.logoFallback, { backgroundColor: colors.amberBg }]}>
-          <Ionicons name="flame" size={22} color={colors.amber} />
-        </View>
-      )}
+      {/* Logo left + distance right */}
+      <View style={styles.topRow}>
+        {brandLogo ? (
+          <Image source={{ uri: brandLogo }} style={styles.brandLogo} resizeMode="contain" />
+        ) : (
+          <View style={[styles.logoFallback, { backgroundColor: colors.amberBg }]}>
+            <Ionicons name="flame" size={22} color={colors.amber} />
+          </View>
+        )}
+        <Text style={[styles.distance, { color: colors.inkFaint }]}>{distance}</Text>
+      </View>
 
       {/* Location - 2 lines */}
       {location ? (
         <Text style={[styles.location, { color: colors.inkFaint }]} numberOfLines={2}>{location}</Text>
       ) : null}
-
-      {/* Distance */}
-      <Text style={[styles.distance, { color: colors.inkFaint }]}>{distance}</Text>
 
       {/* Fuel prices */}
       <View style={styles.pricesContainer}>
@@ -80,10 +80,11 @@ export function OfferCard({
 
 const styles = StyleSheet.create({
   card: { width: 200, borderRadius: 14, borderWidth: 1, padding: 14, marginRight: 10 },
-  brandLogo: { width: 48, height: 48, borderRadius: 8, marginBottom: 8 },
-  logoFallback: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  location: { fontSize: 12, lineHeight: 16 },
-  distance: { fontSize: 12, marginTop: 4 },
+  topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  brandLogo: { width: 48, height: 48, borderRadius: 8 },
+  logoFallback: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  distance: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+  location: { fontSize: 12, lineHeight: 16, marginTop: 8 },
   pricesContainer: { marginTop: 10, gap: 4 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fuelLabel: { fontSize: 13, fontWeight: '600' },
