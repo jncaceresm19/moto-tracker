@@ -44,7 +44,7 @@ export default function HomeScreen() {
       setGasStations(stations);
     } catch (e: any) {
       console.log('[GAS] Error:', e?.message || 'Unknown');
-      console.log('[GAS] Error stack:', e?.stack || 'No stack');
+      // Keep previous data if available - don't clear on location error
     }
   }, []);
 
