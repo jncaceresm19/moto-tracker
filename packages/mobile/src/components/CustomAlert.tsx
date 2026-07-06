@@ -35,7 +35,7 @@ export function CustomAlert({ visible, title, message, buttons, icon, iconColor 
           )}
           <Text style={styles.title}>{title}</Text>
           {message ? <Text style={styles.message}>{message}</Text> : null}
-          <View style={styles.buttonRow}>
+          <View style={[styles.buttonRow, buttons.length === 1 && { justifyContent: 'center' }]}>
             {buttons.map((btn, i) => (
               <TouchableOpacity
                 key={i}
