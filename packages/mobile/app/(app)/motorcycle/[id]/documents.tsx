@@ -275,8 +275,8 @@ export default function DocumentsScreen() {
       />
 
       {docs.some((d) => d.fileUrl) && (
-        <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
-          <Text style={styles.bulkBtnText}>📄 {t('saveAll')}</Text>
+        <TouchableOpacity style={styles.bulkFab} onPress={handleBulkSaveAsPDF}>
+          <Ionicons name="download-outline" size={24} color="#fff" />
         </TouchableOpacity>
       )}
 
@@ -426,8 +426,24 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   title: { fontSize: 20, fontWeight: 'bold' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bulkBtn: { position: 'absolute', top: 16, right: 16, backgroundColor: '#34C759', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
+  bulkBtn: { backgroundColor: '#34C759', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
   bulkBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  bulkFab: {
+    position: 'absolute',
+    bottom: 92,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#34C759',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40 },
