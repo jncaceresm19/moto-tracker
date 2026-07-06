@@ -150,6 +150,7 @@ export default function MaintenanceScreen() {
       <FlatList
         data={records}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -232,7 +233,7 @@ const styles = StyleSheet.create({
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#999', marginTop: 40 },
-  emptyContainer: { alignItems: 'center', marginTop: 40 },
+  emptyContainer: { alignItems: 'center' },
   emptyIcon: { fontSize: 48, marginBottom: 8 },
   emptySub: { fontSize: 13, color: '#ccc', marginTop: 4 },
   card: { padding: 14, marginHorizontal: 16, marginTop: 8, backgroundColor: '#f8f8f8', borderRadius: 8 },
