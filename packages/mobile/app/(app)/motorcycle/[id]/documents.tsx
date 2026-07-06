@@ -262,11 +262,11 @@ export default function DocumentsScreen() {
             onPress={() => setViewing(item)}
           >
             <View style={styles.cardRow}>
+              <Text style={styles.cardTitle}>{item.title}</Text>
               <Text style={[styles.cardStatus, item.status === 'expired' && styles.expired]}>
-                {item.status}
+                {item.status === 'expired' ? t('expired') : item.status === 'expiring' ? t('expiring') : t('valid')}
               </Text>
             </View>
-            <Text style={styles.cardTitle}>{item.title}</Text>
             {item.issueDate && <Text style={styles.cardDate}>{t('issued')}: {new Date(item.issueDate).toLocaleDateString()}</Text>}
             {item.expiryDate && <Text style={styles.cardDate}>{t('expires')}: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
           </TouchableOpacity>
