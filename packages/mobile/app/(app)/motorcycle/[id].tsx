@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle } from '../../../src/api';
+import { useLanguage } from '../../../src/language-context';
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t } = useLanguage();
   const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -16,7 +18,7 @@ export default function MotorcycleDetailScreen() {
     if (!id) return;
     (async () => {
       try { setMotorcycle(await getMotorcycle(id)); }
-      catch { Alert.alert('Error', 'Failed to load motorcycle'); }
+      catch { Alert.alert(t('error'), t('failedToLoad')); }
       finally { setLoading(false); }
     })();
   }, [id]);
@@ -36,10 +38,10 @@ export default function MotorcycleDetailScreen() {
 
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.brand) newErrors.brand = 'Brand is required';
-    if (!form.model) newErrors.model = 'Model is required';
-    if (!form.year) newErrors.year = 'Year is required';
-    if (!form.licensePlate) newErrors.licensePlate = 'License plate is required';
+    if (!form.brand) newErrors.brand = t('required');
+    if (!form.model) newErrors.model = t('required');
+    if (!form.year) newErrors.year = t('required');
+    if (!form.licensePlate) newErrors.licensePlate = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -53,35 +55,35 @@ export default function MotorcycleDetailScreen() {
       });
       setMotorcycle(updated);
       setEditing(false);
-      Alert.alert('Success', 'Motorcycle updated');
+      Alert.alert(t('success'), t('motorcycleUpdated'));
     } catch {
-      Alert.alert('Error', 'Failed to update');
+      Alert.alert(t('error'), t('failedToUpdate'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert('Delete Motorcycle', 'This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('deleteMotorcycle'), t('deleteConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: t('delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           try { await deleteMotorcycle(id); router.back(); }
-          catch { Alert.alert('Error', 'Failed to delete'); }
+          catch { Alert.alert(t('error'), t('failedToDelete')); }
         },
       },
     ]);
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
-  if (!motorcycle) return <View style={styles.center}><Text>Motorcycle not found</Text></View>;
+  if (!motorcycle) return <View style={styles.center}><Text>{t('motorcycleNotFound')}</Text></View>;
 
   const sections = [
-    { title: 'Maintenance Records', route: `/(app)/motorcycle/${id}/maintenance`, icon: '🔧' },
-    { title: 'Documents', route: `/(app)/motorcycle/${id}/documents`, icon: '📄' },
-    { title: 'Kilometer History', route: `/(app)/motorcycle/${id}/kilometers`, icon: '📏' },
+    { title: t('maintenanceRecords'), route: `/(app)/motorcycle/${id}/maintenance`, icon: '🔧' },
+    { title: t('documents'), route: `/(app)/motorcycle/${id}/documents`, icon: '📄' },
+    { title: t('kilometerHistory'), route: `/(app)/motorcycle/${id}/kilometers`, icon: '📏' },
   ];
 
   return (
@@ -94,26 +96,26 @@ export default function MotorcycleDetailScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.editBtn} onPress={openEdit}>
-            <Text style={styles.editBtnText}>Edit</Text>
+            <Text style={styles.editBtnText}>{t('edit')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <Text style={styles.deleteBtnText}>Delete</Text>
+            <Text style={styles.deleteBtnText}>{t('delete')}</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.label}>License Plate</Text>
+        <Text style={styles.label}>{t('licensePlate')}</Text>
         <Text style={styles.value}>{motorcycle.licensePlate}</Text>
       </View>
 
       <View style={styles.infoRow}>
-        <Text style={styles.label}>Current Kilometers</Text>
+        <Text style={styles.label}>{t('currentKilometers')}</Text>
         <Text style={styles.value}>{motorcycle.currentKilometers.toLocaleString()} km</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sections</Text>
+        <Text style={styles.sectionTitle}>{t('sections')}</Text>
         {sections.map((s) => (
           <TouchableOpacity key={s.route} style={styles.sectionBtn} onPress={() => router.push(s.route as any)}>
             <Text style={styles.sectionIcon}>{s.icon}</Text>
@@ -127,8 +129,8 @@ export default function MotorcycleDetailScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Edit Motorcycle</Text>
-            <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <Text style={styles.modalTitle}>{t('editMotorcycle')}</Text>
+            <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
           </View>
           <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(t) => { setForm((p) => ({ ...p, brand: t })); setErrors((p) => ({ ...p, brand: '' })); }} />
           {errors.brand ? <Text style={styles.errorText}>{errors.brand}</Text> : null}
@@ -140,7 +142,7 @@ export default function MotorcycleDetailScreen() {
           {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
           <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

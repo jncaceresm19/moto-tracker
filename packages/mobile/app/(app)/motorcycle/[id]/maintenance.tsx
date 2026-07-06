@@ -1,14 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
+import { useLanguage } from '../../../../src/language-context';
 
 const TYPES = ['oil_change', 'tire_change', 'brake_check', 'spark_plugs', 'technical_review', 'circulation_permit', 'other'];
 
 export default function MaintenanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const navigation = useNavigation();
+  const router = useRouter();
+  const { t } = useLanguage();
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => router.push(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
+          <Ionicons name="chevron-back" size={26} color="white" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, id, router]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
@@ -22,7 +37,7 @@ export default function MaintenanceScreen() {
     if (!id) return;
     try {
       setRecords(await listMaintenance(id));
-    } catch { Alert.alert('Error', 'Failed to load'); }
+    } catch { Alert.alert(t('error'), t('failedToLoad')); }
     finally { setLoading(false); }
   };
 
@@ -53,9 +68,9 @@ export default function MaintenanceScreen() {
 
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.description) newErrors.description = 'Description is required';
-    if (!form.kilometersAtService) newErrors.kilometersAtService = 'Kilometers is required';
-    if (!form.serviceDate) newErrors.serviceDate = 'Date is required';
+    if (!form.description) newErrors.description = t('required');
+    if (!form.kilometersAtService) newErrors.kilometersAtService = t('required');
+    if (!form.serviceDate) newErrors.serviceDate = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -71,9 +86,9 @@ export default function MaintenanceScreen() {
       setRecords((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      Alert.alert('Success', 'Record saved');
+      Alert.alert(t('success'), t('recordSaved'));
     } catch {
-      Alert.alert('Error', 'Failed to create');
+      Alert.alert(t('error'), t('failedToCreate'));
     } finally {
       setSaving(false);
     }
@@ -81,9 +96,9 @@ export default function MaintenanceScreen() {
 
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.description) newErrors.description = 'Description is required';
-    if (!form.kilometersAtService) newErrors.kilometersAtService = 'Kilometers is required';
-    if (!form.serviceDate) newErrors.serviceDate = 'Date is required';
+    if (!form.description) newErrors.description = t('required');
+    if (!form.kilometersAtService) newErrors.kilometersAtService = t('required');
+    if (!form.serviceDate) newErrors.serviceDate = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
@@ -99,31 +114,31 @@ export default function MaintenanceScreen() {
       });
       setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       setEditing(null);
-      Alert.alert('Success', 'Record updated');
+      Alert.alert(t('success'), t('recordUpdated'));
     } catch {
-      Alert.alert('Error', 'Failed to update');
+      Alert.alert(t('error'), t('failedToUpdate'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (record: MaintenanceRecord) => {
-    Alert.alert('Delete Record', 'This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('deleteRecord'), t('deleteConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: t('delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           try {
             await deleteMaintenance(id, record.id);
             setRecords((prev) => prev.filter((r) => r.id !== record.id));
-          } catch { Alert.alert('Error', 'Failed to delete'); }
+          } catch { Alert.alert(t('error'), t('failedToDelete')); }
         },
       },
     ]);
   };
 
-  const modalTitle = editing ? 'Edit Record' : 'New Record';
+  const modalTitle = editing ? t('editRecord') : t('newRecord');
   const modalSave = editing ? handleUpdate : handleCreate;
   const showModal = showCreate || editing !== null;
   const closeModal = () => { setShowCreate(false); setEditing(null); };
@@ -133,9 +148,9 @@ export default function MaintenanceScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Maintenance Records</Text>
+        <Text style={styles.title}>{t('maintenanceRecords')}</Text>
         <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-          <Text style={styles.addBtnText}>+ Add</Text>
+          <Text style={styles.addBtnText}>+ {t('addRecord')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -146,8 +161,8 @@ export default function MaintenanceScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🔧</Text>
-            <Text style={styles.empty}>No records yet</Text>
-            <Text style={styles.emptySub}>Tap + to log maintenance</Text>
+            <Text style={styles.empty}>{t('noRecords')}</Text>
+            <Text style={styles.emptySub}>{t('noRecordsSub')}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -172,7 +187,7 @@ export default function MaintenanceScreen() {
           <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
           </View>
           <TextInput style={styles.input} placeholder="Description *" value={form.description} onChangeText={(t) => { setForm((p) => ({ ...p, description: t })); setErrors((p) => ({ ...p, description: '' })); }} />
           {errors.description ? <Text style={styles.errorText}>{errors.description}</Text> : null}
@@ -180,7 +195,7 @@ export default function MaintenanceScreen() {
           {errors.kilometersAtService ? <Text style={styles.errorText}>{errors.kilometersAtService}</Text> : null}
           <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
             <Text style={form.serviceDate ? styles.dateText : styles.datePlaceholder}>
-              {form.serviceDate || 'Select date *'}
+              {form.serviceDate || t('selectDate')}
             </Text>
           </TouchableOpacity>
           {errors.serviceDate ? <Text style={styles.errorText}>{errors.serviceDate}</Text> : null}
@@ -203,7 +218,7 @@ export default function MaintenanceScreen() {
           <TextInput style={styles.input} placeholder="Cost (optional)" keyboardType="numeric" value={form.cost} onChangeText={(t) => setForm((p) => ({ ...p, cost: t }))} />
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

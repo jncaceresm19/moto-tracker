@@ -1,12 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import { listKilometers, createKilometer, updateKilometer, deleteKilometer, KilometerEntry } from '../../../../src/api';
+import { useLanguage } from '../../../../src/language-context';
 
 export default function KilometersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const navigation = useNavigation();
+  const router = useRouter();
+  const { t } = useLanguage();
   const [entries, setEntries] = useState<KilometerEntry[]>([]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => router.push(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
+          <Ionicons name="chevron-back" size={26} color="white" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, id, router]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<KilometerEntry | null>(null);
@@ -19,7 +34,7 @@ export default function KilometersScreen() {
   const load = async () => {
     if (!id) return;
     try { setEntries(await listKilometers(id)); }
-    catch { Alert.alert('Error', 'Failed to load'); }
+    catch { Alert.alert(t('error'), t('failedToLoad')); }
     finally { setLoading(false); }
   };
 
@@ -47,8 +62,8 @@ export default function KilometersScreen() {
 
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.readingKm) newErrors.readingKm = 'Kilometers is required';
-    if (!form.recordedAt) newErrors.recordedAt = 'Date is required';
+    if (!form.readingKm) newErrors.readingKm = t('required');
+    if (!form.recordedAt) newErrors.recordedAt = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -61,9 +76,9 @@ export default function KilometersScreen() {
       setEntries((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      Alert.alert('Success', 'Reading saved');
+      Alert.alert(t('success'), t('readingSaved'));
     } catch {
-      Alert.alert('Error', 'Failed to create');
+      Alert.alert(t('error'), t('failedToCreate'));
     } finally {
       setSaving(false);
     }
@@ -71,8 +86,8 @@ export default function KilometersScreen() {
 
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.readingKm) newErrors.readingKm = 'Kilometers is required';
-    if (!form.recordedAt) newErrors.recordedAt = 'Date is required';
+    if (!form.readingKm) newErrors.readingKm = t('required');
+    if (!form.recordedAt) newErrors.recordedAt = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
@@ -85,31 +100,31 @@ export default function KilometersScreen() {
       });
       setEntries((prev) => prev.map((e) => e.id === updated.id ? updated : e));
       setEditing(null);
-      Alert.alert('Success', 'Reading updated');
+      Alert.alert(t('success'), t('readingUpdated'));
     } catch {
-      Alert.alert('Error', 'Failed to update');
+      Alert.alert(t('error'), t('failedToUpdate'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (entry: KilometerEntry) => {
-    Alert.alert('Delete Entry', 'This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('deleteEntry'), t('deleteConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: t('delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           try {
             await deleteKilometer(id, entry.id);
             setEntries((prev) => prev.filter((e) => e.id !== entry.id));
-          } catch { Alert.alert('Error', 'Failed to delete'); }
+          } catch { Alert.alert(t('error'), t('failedToDelete')); }
         },
       },
     ]);
   };
 
-  const modalTitle = editing ? 'Edit Reading' : 'New Reading';
+  const modalTitle = editing ? t('editReading') : t('newReading');
   const modalSave = editing ? handleUpdate : handleCreate;
   const showModal = showCreate || editing !== null;
   const closeModal = () => { setShowCreate(false); setEditing(null); };
@@ -119,9 +134,9 @@ export default function KilometersScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Kilometer History</Text>
+        <Text style={styles.title}>{t('kilometerHistory')}</Text>
         <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-          <Text style={styles.addBtnText}>+ Add</Text>
+          <Text style={styles.addBtnText}>+ {t('addEntry')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -132,8 +147,8 @@ export default function KilometersScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📏</Text>
-            <Text style={styles.empty}>No readings yet</Text>
-            <Text style={styles.emptySub}>Tap + to record mileage</Text>
+            <Text style={styles.empty}>{t('noEntries')}</Text>
+            <Text style={styles.emptySub}>{t('noEntriesSub')}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -156,13 +171,13 @@ export default function KilometersScreen() {
           <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
           </View>
           <TextInput style={styles.input} placeholder="Kilometers *" keyboardType="numeric" value={form.readingKm} onChangeText={(t) => { setForm((p) => ({ ...p, readingKm: t })); setErrors((p) => ({ ...p, readingKm: '' })); }} />
           {errors.readingKm ? <Text style={styles.errorText}>{errors.readingKm}</Text> : null}
           <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
             <Text style={form.recordedAt ? styles.dateText : styles.datePlaceholder}>
-              {form.recordedAt || 'Select date *'}
+              {form.recordedAt || t('selectDate')}
             </Text>
           </TouchableOpacity>
           {errors.recordedAt ? <Text style={styles.errorText}>{errors.recordedAt}</Text> : null}
@@ -184,7 +199,7 @@ export default function KilometersScreen() {
           )}
           <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

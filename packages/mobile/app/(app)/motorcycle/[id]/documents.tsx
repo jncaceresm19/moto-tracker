@@ -1,16 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
+import { useLanguage } from '../../../../src/language-context';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
 
 export default function DocumentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const navigation = useNavigation();
+  const router = useRouter();
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => router.push(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
+          <Ionicons name="chevron-back" size={26} color="white" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, id, router]);
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -27,7 +42,7 @@ export default function DocumentsScreen() {
   const load = async () => {
     if (!id) return;
     try { setDocs(await listDocuments(id)); }
-    catch { Alert.alert('Error', 'Failed to load'); }
+    catch { Alert.alert(t('error'), t('failedToLoad')); }
     finally { setLoading(false); }
   };
 
@@ -62,7 +77,7 @@ export default function DocumentsScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert('Permission needed', `Please grant ${fromCamera ? 'camera' : 'gallery'} permission.`);
+      Alert.alert(t('permissionNeeded'), t('permissionMessage'));
       return;
     }
 
@@ -85,17 +100,17 @@ export default function DocumentsScreen() {
   };
 
   const showImageOptions = () => {
-    Alert.alert('Add Document Photo', 'Choose an option', [
-      { text: 'Take Photo', onPress: () => pickImage(true) },
-      { text: 'Choose from Gallery', onPress: () => pickImage(false) },
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('addDocumentPhoto'), t('chooseOption'), [
+      { text: t('takePhoto'), onPress: () => pickImage(true) },
+      { text: t('chooseFromGallery'), onPress: () => pickImage(false) },
+      { text: t('cancel'), style: 'cancel' },
     ]);
   };
 
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.title) newErrors.title = 'Title is required';
-    if (!form.fileUrl) newErrors.fileUrl = 'Document photo is required';
+    if (!form.title) newErrors.title = t('required');
+    if (!form.fileUrl) newErrors.fileUrl = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -110,9 +125,9 @@ export default function DocumentsScreen() {
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      Alert.alert('Success', 'Document saved');
+      Alert.alert(t('success'), t('documentSaved'));
     } catch {
-      Alert.alert('Error', 'Failed to create');
+      Alert.alert(t('error'), t('failedToCreate'));
     } finally {
       setSaving(false);
     }
@@ -120,8 +135,8 @@ export default function DocumentsScreen() {
 
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.title) newErrors.title = 'Title is required';
-    if (!form.fileUrl) newErrors.fileUrl = 'Document photo is required';
+    if (!form.title) newErrors.title = t('required');
+    if (!form.fileUrl) newErrors.fileUrl = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
@@ -136,26 +151,26 @@ export default function DocumentsScreen() {
       });
       setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
       setEditing(null);
-      Alert.alert('Success', 'Document updated');
+      Alert.alert(t('success'), t('documentUpdated'));
     } catch {
-      Alert.alert('Error', 'Failed to update');
+      Alert.alert(t('error'), t('failedToUpdate'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (doc: Document) => {
-    Alert.alert('Delete Document', 'This action cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('deleteDocument'), t('deleteConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Delete', style: 'destructive',
+        text: t('delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           try {
             await deleteDocument(id, doc.id);
             setDocs((prev) => prev.filter((d) => d.id !== doc.id));
             setViewing(null);
-          } catch { Alert.alert('Error', 'Failed to delete'); }
+          } catch { Alert.alert(t('error'), t('failedToDelete')); }
         },
       },
     ]);
@@ -181,14 +196,14 @@ export default function DocumentsScreen() {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
-      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
+      Alert.alert(t('error'), `Failed to save: ${e?.message || e}`);
     }
   };
 
   const handleBulkSaveAsPDF = async () => {
     const photos = docs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
-      Alert.alert('No photos', 'No documents with photos to save.');
+      Alert.alert(t('noPhotos'), t('noPhotosSub'));
       return;
     }
     try {
@@ -197,7 +212,7 @@ export default function DocumentsScreen() {
         if (uri) await Sharing.shareAsync(uri);
       }
     } catch (e: any) {
-      Alert.alert('Error', `Failed to save: ${e?.message || e}`);
+      Alert.alert(t('error'), `Failed to save: ${e?.message || e}`);
     }
   };
 
@@ -207,11 +222,11 @@ export default function DocumentsScreen() {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
-      Alert.alert('Error', `Failed to share: ${e?.message || e}`);
+      Alert.alert(t('error'), `Failed to share: ${e?.message || e}`);
     }
   };
 
-  const modalTitle = editing ? 'Edit Document' : 'New Document';
+  const modalTitle = editing ? t('editDocument') : t('newDocument');
   const modalSave = editing ? handleUpdate : handleCreate;
   const showModal = showCreate || editing !== null;
   const closeModal = () => { setShowCreate(false); setEditing(null); };
@@ -221,15 +236,15 @@ export default function DocumentsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Documents</Text>
+        <Text style={styles.title}>{t('documents')}</Text>
         <View style={styles.headerActions}>
           {docs.some((d) => d.fileUrl) && (
             <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
-              <Text style={styles.bulkBtnText}>📄 Save All</Text>
+              <Text style={styles.bulkBtnText}>📄 {t('saveAll')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-            <Text style={styles.addBtnText}>+ Add</Text>
+            <Text style={styles.addBtnText}>+ {t('addDocument')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -241,8 +256,8 @@ export default function DocumentsScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📄</Text>
-            <Text style={styles.empty}>No documents yet</Text>
-            <Text style={styles.emptySub}>Tap + to add a document</Text>
+            <Text style={styles.empty}>{t('noDocuments')}</Text>
+            <Text style={styles.emptySub}>{t('noDocumentsSub')}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -257,8 +272,8 @@ export default function DocumentsScreen() {
               </Text>
             </View>
             <Text style={styles.cardTitle}>{item.title}</Text>
-            {item.issueDate && <Text style={styles.cardDate}>Issued: {new Date(item.issueDate).toLocaleDateString()}</Text>}
-            {item.expiryDate && <Text style={styles.cardDate}>Expires: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
+            {item.issueDate && <Text style={styles.cardDate}>{t('issued')}: {new Date(item.issueDate).toLocaleDateString()}</Text>}
+            {item.expiryDate && <Text style={styles.cardDate}>{t('expires')}: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
           </TouchableOpacity>
         )}
       />
@@ -268,14 +283,14 @@ export default function DocumentsScreen() {
         <View style={styles.detailContainer}>
           <View style={styles.detailHeader}>
             <TouchableOpacity onPress={() => setViewing(null)}>
-              <Text style={styles.done}>Done</Text>
+              <Text style={styles.done}>{t('done')}</Text>
             </TouchableOpacity>
             <View style={styles.detailActions}>
               <TouchableOpacity onPress={() => viewing && openEdit(viewing)} style={styles.editBtn}>
-                <Text style={styles.editBtnText}>Edit</Text>
+                <Text style={styles.editBtnText}>{t('edit')}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => viewing && handleDelete(viewing)}>
-                <Text style={styles.deleteBtnText}>Delete</Text>
+                <Text style={styles.deleteBtnText}>{t('delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -284,18 +299,18 @@ export default function DocumentsScreen() {
             <ScrollView contentContainerStyle={styles.detailContent}>
               <Text style={styles.detailType}>{viewing.type.replace('_', ' ')}</Text>
               <Text style={styles.detailTitle}>{viewing.title}</Text>
-              {viewing.issueDate && <Text style={styles.detailDate}>Issued: {new Date(viewing.issueDate).toLocaleDateString()}</Text>}
-              {viewing.expiryDate && <Text style={styles.detailDate}>Expires: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
+              {viewing.issueDate && <Text style={styles.detailDate}>{t('issued')}: {new Date(viewing.issueDate).toLocaleDateString()}</Text>}
+              {viewing.expiryDate && <Text style={styles.detailDate}>{t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
 
               {viewing.fileUrl ? (
                 <TouchableOpacity style={styles.pdfThumbnail} onPress={() => setShowPhotoViewer(true)}>
                   <Text style={styles.pdfIcon}>📄</Text>
                   <Text style={styles.pdfName}>{viewing.title}.pdf</Text>
-                  <Text style={styles.pdfHint}>Tap to view</Text>
+                  <Text style={styles.pdfHint}>{t('tapToView')}</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.noPhoto}>
-                  <Text style={styles.noPhotoText}>No document attached</Text>
+                  <Text style={styles.noPhotoText}>{t('noDocumentAttached')}</Text>
                 </View>
               )}
             </ScrollView>
@@ -314,10 +329,10 @@ export default function DocumentsScreen() {
           )}
           <View style={styles.photoViewerActions}>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleSaveAsPDF(viewing)}>
-              <Text style={styles.photoViewerBtnText}>📥 Save as PDF</Text>
+              <Text style={styles.photoViewerBtnText}>📥 {t('saveAsPdf')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleShare(viewing)}>
-              <Text style={styles.photoViewerBtnText}>↗ Share</Text>
+              <Text style={styles.photoViewerBtnText}>↗ {t('share')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -329,7 +344,7 @@ export default function DocumentsScreen() {
           <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>Cancel</Text></TouchableOpacity>
+            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
           </View>
 
           <TouchableOpacity style={styles.photoBtn} onPress={showImageOptions}>
@@ -338,7 +353,7 @@ export default function DocumentsScreen() {
             ) : (
               <View style={styles.photoPlaceholder}>
                 <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                <Text style={styles.photoPlaceholderText}>Tap to add document photo</Text>
+                <Text style={styles.photoPlaceholderText}>{t('tapToAddPhoto')}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -349,7 +364,7 @@ export default function DocumentsScreen() {
 
           <TouchableOpacity style={styles.input} onPress={() => setShowIssueDatePicker(true)}>
             <Text style={form.issueDate ? styles.dateText : styles.datePlaceholder}>
-              {form.issueDate || 'Issue date (optional)'}
+              {form.issueDate || t('issueDate')}
             </Text>
           </TouchableOpacity>
           {showIssueDatePicker && (
@@ -370,7 +385,7 @@ export default function DocumentsScreen() {
 
           <TouchableOpacity style={styles.input} onPress={() => setShowExpiryDatePicker(true)}>
             <Text style={form.expiryDate ? styles.dateText : styles.datePlaceholder}>
-              {form.expiryDate || 'Expiry date (optional)'}
+              {form.expiryDate || t('expiryDate')}
             </Text>
           </TouchableOpacity>
           {showExpiryDatePicker && (
@@ -390,7 +405,7 @@ export default function DocumentsScreen() {
           )}
 
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Save</Text>}
+            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

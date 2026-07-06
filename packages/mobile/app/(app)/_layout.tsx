@@ -1,7 +1,19 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
+
+function BackButton() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity onPress={() => router.back()} style={{ marginLeft: 12 }}>
+      <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
+    </TouchableOpacity>
+  );
+}
 
 export default function AppLayout() {
   const { colors } = useTheme();
@@ -11,14 +23,19 @@ export default function AppLayout() {
     <Tabs
       screenOptions={{
         headerShown: true,
+        headerTitleAlign: 'center',
         headerStyle: { backgroundColor: colors.headerBg },
-        headerTintColor: colors.text,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        headerTintColor: colors.headerTintColor,
+        headerTitleStyle: {
+          fontSize: 20,
+          fontWeight: '600',
+        },
+        tabBarActiveTintColor: colors.tabBarActive,
+        tabBarInactiveTintColor: colors.tabBarInactive,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
           borderTopColor: colors.tabBarBorder,
-          height: 70,
+          height: 75,
           paddingBottom: 14,
           paddingTop: 6,
         },
@@ -59,24 +76,32 @@ export default function AppLayout() {
         name="motorcycle/[id]"
         options={{
           href: null,
+          title: t('motorcycleDetail'),
+          headerLeft: () => <BackButton />,
         }}
       />
       <Tabs.Screen
         name="motorcycle/[id]/documents"
         options={{
           href: null,
+          title: t('documents'),
+          headerLeft: () => <BackButton />,
         }}
       />
       <Tabs.Screen
         name="motorcycle/[id]/kilometers"
         options={{
           href: null,
+          title: t('kilometers'),
+          headerLeft: () => <BackButton />,
         }}
       />
       <Tabs.Screen
         name="motorcycle/[id]/maintenance"
         options={{
           href: null,
+          title: t('maintenance'),
+          headerLeft: () => <BackButton />,
         }}
       />
     </Tabs>
