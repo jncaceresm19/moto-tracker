@@ -12,6 +12,13 @@ const translations = {
     // Home
     homeTitle: 'Welcome to Moto Tracker',
     homeSubtitle: 'Track your motorcycle maintenance and documents',
+    registerFirstMoto: 'Register your first motorcycle to see its status here',
+    theftAlerts: 'Theft Alerts',
+    noActiveAlerts: 'No active alerts',
+    theftAlertsEmpty: 'You will only receive notifications when your motorcycle leaves its safe zone.',
+    saveOnRoute: 'Save on your route',
+    nearbyOffers: 'Nearby offers',
+    saveOnRouteEmpty: 'Gas, wash and more deals near you',
     // Motorcycles
     myMotorcycles: 'My Motorcycles',
     noMotorcycles: 'No motorcycles yet',
@@ -174,6 +181,13 @@ const translations = {
     // Home
     homeTitle: 'Bienvenido a Moto Tracker',
     homeSubtitle: 'Seguimiento del mantenimiento y documentos de tu moto',
+    registerFirstMoto: 'Registra tu primera moto para ver su estado aquí',
+    theftAlerts: 'Alertas de robo',
+    noActiveAlerts: 'Sin alertas activas',
+    theftAlertsEmpty: 'Solo recibirás notificaciones cuando tu moto salga de su zona segura.',
+    saveOnRoute: 'Ahorra en tu ruta',
+    nearbyOffers: 'Ofertas cercanas',
+    saveOnRouteEmpty: 'Ofertas de bencina, lavado y más cerca de ti',
     // Motorcycles
     myMotorcycles: 'Mis Motos',
     noMotorcycles: 'Aún no hay motos',

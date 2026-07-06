@@ -31,6 +31,18 @@ export interface ThemeColors {
   headerTintColor: string;
   overlay: string;
   statusBarStyle: 'dark-content' | 'light-content';
+  // Dashboard colors
+  ink: string;
+  inkSoft: string;
+  inkFaint: string;
+  alertRed: string;
+  alertRedBg: string;
+  alertRedBorder: string;
+  brandBlue: string;
+  brandBlueBg: string;
+  amber: string;
+  amberBg: string;
+  green: string;
 }
 
 const lightTheme: ThemeColors = {
@@ -61,6 +73,18 @@ const lightTheme: ThemeColors = {
   headerTintColor: '#FFFFFF',
   overlay: 'rgba(15, 23, 32, 0.5)',
   statusBarStyle: 'dark-content',
+  // Dashboard colors
+  ink: '#171B26',
+  inkSoft: '#5A6478',
+  inkFaint: '#93A0B4',
+  alertRed: '#E14336',
+  alertRedBg: '#FDEBEA',
+  alertRedBorder: '#F6C7C3',
+  brandBlue: '#2F6FED',
+  brandBlueBg: '#EAF1FE',
+  amber: '#F5A623',
+  amberBg: '#FEF3E0',
+  green: '#1F9D63',
 };
 
 const darkTheme: ThemeColors = {
@@ -91,6 +115,18 @@ const darkTheme: ThemeColors = {
   headerTintColor: '#FFFFFF',
   overlay: 'rgba(0, 0, 0, 0.65)',
   statusBarStyle: 'light-content',
+  // Dashboard colors
+  ink: '#F0F2F5',
+  inkSoft: '#A0A8B8',
+  inkFaint: '#6B7280',
+  alertRed: '#F87171',
+  alertRedBg: '#3D1A1A',
+  alertRedBorder: '#5C2A2A',
+  brandBlue: '#6B8FE8',
+  brandBlueBg: '#1A2440',
+  amber: '#FBBF24',
+  amberBg: '#3D2E10',
+  green: '#34D399',
 };
 
 interface ThemeContextType {
