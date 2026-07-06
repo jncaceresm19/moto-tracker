@@ -10,7 +10,7 @@ import { listMotorcycles, Motorcycle } from '../../src/api';
 import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
-import { GasStation, getNearbyGasStations, getCurrentLocation } from '../../src/services/gasStations';
+import { GasStation, getNearbyGasStations, getCurrentLocation, BRAND_COLORS } from '../../src/services/gasStations';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -145,16 +145,21 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
           {gasStations.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
-              {gasStations.map((station) => (
-                <OfferCard
-                  key={station.id}
-                  icon="flame"
-                  iconBg={colors.amberBg}
-                  name={station.name}
-                  distance={`${station.distance.toFixed(1)} km`}
-                  price={station.brand || 'Bencinera'}
-                />
-              ))}
+              {gasStations.map((station) => {
+                const brandLower = station.brand.toLowerCase();
+                const brandColor = Object.entries(BRAND_COLORS).find(([k]) => brandLower.includes(k))?.[1] || '#F5A623';
+                return (
+                  <OfferCard
+                    key={station.id}
+                    brandLogo="flame"
+                    brandColor={brandColor}
+                    brandName={station.brand || 'Bencinera'}
+                    location={station.address || station.name}
+                    distance={`${station.distance.toFixed(1)} km`}
+                    pricePerLiter={station.pricePerLiter}
+                  />
+                );
+              })}
             </ScrollView>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

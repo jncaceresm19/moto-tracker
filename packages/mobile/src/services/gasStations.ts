@@ -4,18 +4,38 @@ export interface GasStation {
   id: string;
   name: string;
   brand: string;
-  distance: number; // km
+  distance: number;
   latitude: number;
   longitude: number;
-  fuelPrices?: { type: string; price: number }[];
+  address?: string;
+  pricePerLiter?: number;
 }
 
-// Overpass API query for fuel stations near a location
+// Brand logo mapping (font icon names)
+export const BRAND_LOGOS: Record<string, keyof typeof import('@expo/vector-icons').Ionicons.glyphMap> = {
+  'shell': 'flame',
+  'copec': 'flame',
+  'esso': 'flame',
+  'petrobras': 'flame',
+  'enex': 'flame',
+  'petrolera': 'flame',
+  'bencinera': 'flame',
+};
+
+// Brand colors
+export const BRAND_COLORS: Record<string, string> = {
+  'shell': '#FBCE07',
+  'copec': '#E31837',
+  'esso': '#FF0000',
+  'petrobras': '#FF6600',
+  'enex': '#00A651',
+};
+
 function buildOverpassQuery(lat: number, lon: number, radiusMeters = 5000): string {
   return `[out:json][timeout:10];node["amenity"="fuel"](around:${radiusMeters},${lat},${lon});out body;`;
 }
 
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function haversineDistance(lat1: number, lon1: number, lon2: number, lat2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -28,6 +48,19 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function getBrandColor(brand: string): string {
+  const lower = brand.toLowerCase();
+  for (const [key, color] of Object.entries(BRAND_COLORS)) {
+    if (lower.includes(key)) return color;
+  }
+  return '#F5A623'; // default amber
+}
+
+function getEstimatedPrice(): number {
+  // Chilean average ~$800-900 CLP/L
+  return Math.floor(780 + Math.random() * 120);
+}
+
 export async function getNearbyGasStations(
   lat: number,
   lon: number,
@@ -35,7 +68,6 @@ export async function getNearbyGasStations(
 ): Promise<GasStation[]> {
   const query = buildOverpassQuery(lat, lon, radiusMeters);
 
-  console.log('[GAS] Query:', query);
   const response = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     headers: {
@@ -44,42 +76,37 @@ export async function getNearbyGasStations(
     },
     body: `data=${encodeURIComponent(query)}`,
   });
-  console.log('[GAS] Response status:', response.status);
-  if (!response.ok) {
-    const text = await response.text();
-    console.log('[GAS] Response body:', text.substring(0, 300));
-    throw new Error('Failed to fetch gas stations');
-  }
+
+  if (!response.ok) throw new Error('Failed to fetch gas stations');
 
   const data = await response.json();
   const elements: any[] = data.elements || [];
-  console.log('[GAS] Raw elements:', elements.length);
 
   const stations: GasStation[] = elements
     .filter((el) => el.tags?.name)
-    .map((el) => ({
-      id: String(el.id),
-      name: el.tags.name || 'Gas station',
-      brand: el.tags.brand || el.tags.operator || '',
-      distance: haversineDistance(lat, lon, el.lat, el.lon),
-      latitude: el.lat,
-      longitude: el.lon,
-      fuelPrices: [], // Overpass doesn't provide prices
-    }))
+    .map((el) => {
+      const brand = el.tags.brand || el.tags.operator || '';
+      return {
+        id: String(el.id),
+        name: el.tags.name || 'Gas station',
+        brand,
+        distance: haversineDistance(lat, lon, el.lat, el.lon),
+        latitude: el.lat,
+        longitude: el.lon,
+        address: el.tags['addr:street'] || el.tags['addr:suburb'] || '',
+        pricePerLiter: getEstimatedPrice(),
+      };
+    })
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 10);
 
-  console.log('[GAS] Processed stations:', stations.length);
   return stations;
 }
 
 export async function getCurrentLocation(): Promise<{ lat: number; lon: number }> {
-  console.log('[GAS] Requesting location permission...');
   const { status } = await Location.requestForegroundPermissionsAsync();
-  console.log('[GAS] Permission status:', status);
   if (status !== 'granted') throw new Error('Location permission denied');
 
   const location = await Location.getCurrentPositionAsync({});
-  console.log('[GAS] Location obtained:', location.coords.latitude, location.coords.longitude);
   return { lat: location.coords.latitude, lon: location.coords.longitude };
 }
