@@ -89,6 +89,16 @@ const translations = {
     recordUpdated: 'Record updated',
     failedToCreate: 'Failed to create',
     deleteRecord: 'Delete Record',
+    // Type labels
+    oilChange: 'Oil Change',
+    tireChange: 'Tire Change',
+    brakeCheck: 'Brake Check',
+    sparkPlugs: 'Spark Plugs',
+    technicalReview: 'Technical Review',
+    circulationPermit: 'Circulation Permit',
+    insurance: 'Insurance',
+    registration: 'Registration',
+    other: 'Other',
     // Documents Screen
     addDocument: 'Add Document',
     noDocuments: 'No documents yet',
@@ -237,6 +247,16 @@ const translations = {
     recordUpdated: 'Registro actualizado',
     failedToCreate: 'Error al crear',
     deleteRecord: 'Eliminar Registro',
+    // Type labels
+    oilChange: 'Cambio de Aceite',
+    tireChange: 'Cambio de Cubiertas',
+    brakeCheck: 'Revisión de Frenos',
+    sparkPlugs: 'Bujías',
+    technicalReview: 'Revisión Técnica',
+    circulationPermit: 'Permiso de Circulación',
+    insurance: 'Seguro',
+    registration: 'Registro',
+    other: 'Otro',
     // Documents Screen
     addDocument: 'Agregar Documento',
     noDocuments: 'Aún no hay documentos',

@@ -11,6 +11,14 @@ import { useLanguage } from '../../../../src/language-context';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
 
+const TYPE_KEYS: Record<string, string> = {
+  circulation_permit: 'circulationPermit',
+  technical_review: 'technicalReview',
+  insurance: 'insurance',
+  registration: 'registration',
+  other: 'other',
+};
+
 export default function DocumentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
@@ -240,6 +248,7 @@ export default function DocumentsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={docs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        ListHeaderComponent={docs.length > 0 ? <View style={{ height: 8 }} /> : null}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📄</Text>
@@ -253,7 +262,7 @@ export default function DocumentsScreen() {
             onPress={() => setViewing(item)}
           >
             <View style={styles.cardRow}>
-              <Text style={styles.cardType}>{item.type.replace('_', ' ')}</Text>
+              <Text style={styles.cardType}>{t(TYPE_KEYS[item.type] as any || 'other')}</Text>
               <Text style={[styles.cardStatus, item.status === 'expired' && styles.expired]}>
                 {item.status}
               </Text>
@@ -417,7 +426,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   title: { fontSize: 20, fontWeight: 'bold' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bulkBtn: { position: 'absolute', top: 12, right: 16, backgroundColor: '#34C759', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
+  bulkBtn: { position: 'absolute', top: 16, right: 16, backgroundColor: '#34C759', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
   bulkBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },

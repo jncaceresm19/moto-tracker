@@ -8,6 +8,16 @@ import { useLanguage } from '../../../../src/language-context';
 
 const TYPES = ['oil_change', 'tire_change', 'brake_check', 'spark_plugs', 'technical_review', 'circulation_permit', 'other'];
 
+const TYPE_KEYS: Record<string, string> = {
+  oil_change: 'oilChange',
+  tire_change: 'tireChange',
+  brake_check: 'brakeCheck',
+  spark_plugs: 'sparkPlugs',
+  technical_review: 'technicalReview',
+  circulation_permit: 'circulationPermit',
+  other: 'other',
+};
+
 export default function MaintenanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
@@ -166,7 +176,7 @@ export default function MaintenanceScreen() {
             onLongPress={() => handleDelete(item)}
           >
             <View style={styles.cardRow}>
-              <Text style={styles.cardType}>{item.type.replace('_', ' ')}</Text>
+              <Text style={styles.cardType}>{t(TYPE_KEYS[item.type] as any || 'other')}</Text>
               <Text style={styles.cardDate}>{new Date(item.serviceDate).toLocaleDateString()}</Text>
             </View>
             <Text style={styles.cardDesc}>{item.description}</Text>
