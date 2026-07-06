@@ -282,7 +282,7 @@ export default function MotorcycleListScreen() {
               ) : (
                 <View style={dynamicStyles.photoPlaceholder}>
                   <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                  <Text style={dynamicStyles.photoPlaceholderText}>{t('tapToAddPhoto')}</Text>
+                  <Text style={dynamicStyles.photoPlaceholderText}>{t('tapToAddMotoPhoto')}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -315,7 +315,7 @@ export default function MotorcycleListScreen() {
             <TouchableOpacity style={styles.photoModalClose} onPress={() => setShowPhotoModal(false)}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.photoModalTitle, { color: colors.text }]}>{t('addDocumentPhoto')}</Text>
+            <Text style={[styles.photoModalTitle, { color: colors.text }]}>{t('addMotoPhoto')}</Text>
             <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(true); }}>
               <Ionicons name="camera" size={20} color="#fff" />
               <Text style={styles.photoModalBtnText}>{t('takePhoto')}</Text>
