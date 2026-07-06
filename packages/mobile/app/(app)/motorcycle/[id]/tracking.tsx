@@ -52,7 +52,7 @@ export default function TrackingScreen() {
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <Ionicons name="location-outline" size={48} color={colors.inkFaint} />
         <Text style={[styles.errorText, { color: colors.ink }]}>{error}</Text>
-        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
+        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={() => router.replace(`/(app)/motorcycle/${id}`)}>
           <Text style={styles.retryBtnText}>{t('goBack')}</Text>
         </TouchableOpacity>
       </View>
@@ -61,6 +61,15 @@ export default function TrackingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header with back button */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={() => router.replace(`/(app)/motorcycle/${id}`)}>
+          <Ionicons name="arrow-back" size={24} color={colors.ink} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.ink }]}>{t('gpsTracking')}</Text>
+        <View style={{ width: 24 }} />
+      </View>
+
       {/* Map placeholder - react-native-maps would go here */}
       <View style={[styles.mapPlaceholder, { backgroundColor: colors.surface }]}>
         <Ionicons name="map-outline" size={64} color={colors.inkFaint} />
@@ -112,6 +121,8 @@ export default function TrackingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
+  headerTitle: { fontSize: 17, fontWeight: '600' },
   loadingText: { fontSize: 15, marginTop: 12 },
   errorText: { fontSize: 16, textAlign: 'center', marginTop: 12, marginBottom: 20 },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
