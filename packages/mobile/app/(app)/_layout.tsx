@@ -15,6 +15,17 @@ function BackButton() {
   );
 }
 
+function TrackingBackButton() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  const { id } = require('expo-router').useLocalSearchParams<{ id: string }>();
+  return (
+    <TouchableOpacity onPress={() => router.replace(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
+      <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
+    </TouchableOpacity>
+  );
+}
+
 export default function AppLayout() {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -48,6 +59,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="index"
         options={{
+          headerShown: false,
           title: t('tabHome'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
@@ -109,7 +121,7 @@ export default function AppLayout() {
         options={{
           href: null,
           title: t('gpsTracking'),
-          headerLeft: () => <BackButton />,
+          headerLeft: () => <TrackingBackButton />,
         }}
       />
     </Tabs>
