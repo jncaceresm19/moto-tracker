@@ -38,7 +38,7 @@ export function DashboardPanel({
 
   const isAlert = status === 'alert';
   const statusColor = isAlert ? colors.alertRed : colors.green;
-  const statusText = isAlert ? 'FUERA DE ZONA' : 'EN ZONA SEGURA';
+  const statusText = isAlert ? 'OUT OF ZONE' : 'IN SAFE ZONE';
 
   return (
     <View style={styles.container}>
@@ -65,14 +65,14 @@ export function DashboardPanel({
         {/* Odometer time inline with label */}
         <View style={styles.odometerSection}>
           <Text style={styles.odometerTime}>{lastLocationTime}</Text>
-          <Text style={styles.odometerLabel}>última ubicación</Text>
+          <Text style={styles.odometerLabel}>LAST LOCATION</Text>
         </View>
 
         {/* Address line */}
         <View style={styles.addressRow}>
           <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
           <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
-            Estacionada en ubicación - hace 6 minutos
+            Parked at location - 6 minutes ago
           </Text>
         </View>
       </View>
