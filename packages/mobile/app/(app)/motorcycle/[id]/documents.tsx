@@ -235,16 +235,10 @@ export default function DocumentsScreen() {
 
   return (
     <View style={styles.container}>
-      {docs.some((d) => d.fileUrl) && (
-        <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
-          <Text style={styles.bulkBtnText}>📄 {t('saveAll')}</Text>
-        </TouchableOpacity>
-      )}
-
       <FlatList
         data={docs}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        contentContainerStyle={docs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -270,6 +264,12 @@ export default function DocumentsScreen() {
           </TouchableOpacity>
         )}
       />
+
+      {docs.some((d) => d.fileUrl) && (
+        <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
+          <Text style={styles.bulkBtnText}>📄 {t('saveAll')}</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.fab} onPress={openCreate}>
         <Text style={styles.fabText}>+</Text>
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   title: { fontSize: 20, fontWeight: 'bold' },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bulkBtn: { backgroundColor: '#34C759', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  bulkBtn: { position: 'absolute', top: 12, right: 16, backgroundColor: '#34C759', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, elevation: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 3 },
   bulkBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
   addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   addBtnText: { color: '#fff', fontWeight: '600' },

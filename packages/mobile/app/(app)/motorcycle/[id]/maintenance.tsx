@@ -150,7 +150,7 @@ export default function MaintenanceScreen() {
       <FlatList
         data={records}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        contentContainerStyle={records.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>

@@ -136,7 +136,7 @@ export default function KilometersScreen() {
       <FlatList
         data={entries}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        contentContainerStyle={entries.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
