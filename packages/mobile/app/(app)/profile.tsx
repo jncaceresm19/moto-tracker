@@ -79,16 +79,20 @@ export default function ProfileScreen() {
 
   const handlePickAvatar = async () => {
     Alert.alert(t('changePhoto'), '', [
-      { text: t('camera'), onPress: async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') { Alert.alert(t('error'), t('cameraPermission')); return; }
-        const result = await ImagePicker.launchCameraAsync({ quality: 0.3, base64: true });
-        if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
-      }},
-      { text: t('gallery'), onPress: async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.3, base64: true });
-        if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
-      }},
+      {
+        text: t('camera'), onPress: async () => {
+          const { status } = await ImagePicker.requestCameraPermissionsAsync();
+          if (status !== 'granted') { Alert.alert(t('error'), t('cameraPermission')); return; }
+          const result = await ImagePicker.launchCameraAsync({ quality: 0.3, base64: true });
+          if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+        }
+      },
+      {
+        text: t('gallery'), onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.3, base64: true });
+          if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
+        }
+      },
       { text: t('cancel'), style: 'cancel' },
     ]);
   };
@@ -119,8 +123,15 @@ export default function ProfileScreen() {
     cancel: { color: colors.primary, fontSize: 16 },
     input: { borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10, backgroundColor: colors.inputBg, color: colors.text },
     errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
-    saveBtn: { backgroundColor: colors.primary, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
-    saveBtnText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
+    saveBtn: { backgroundColor: colors.accent, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+    saveBtnText: { color: colors.accentText, fontSize: 16, fontWeight: '600' },
+    avatarText: { color: colors.primaryText, fontSize: 32, fontWeight: 'bold' },
+    badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: colors.success },
+    badgeText: { color: colors.successText, fontSize: 11, fontWeight: '600' },
+    langBtn: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.surfaceSecondary },
+    langBtnActive: { backgroundColor: colors.primary },
+    langBtnText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+    langBtnTextActive: { color: colors.primaryText },
   });
 
   return (
@@ -131,7 +142,7 @@ export default function ProfileScreen() {
           <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>{userInitial}</Text>
+            <Text style={dynamicStyles.avatarText}>{userInitial}</Text>
           </View>
         )}
         <Text style={dynamicStyles.name}>{user?.name || user?.email?.split('@')[0] || 'User'}</Text>
@@ -167,8 +178,8 @@ export default function ProfileScreen() {
             <Ionicons name="logo-google" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('googleAccount')}</Text>
           </View>
-          <View style={[styles.badge, { backgroundColor: colors.success }]}>
-            <Text style={styles.badgeText}>{t('connected')}</Text>
+          <View style={dynamicStyles.badge}>
+            <Text style={dynamicStyles.badgeText}>{t('connected')}</Text>
           </View>
         </View>
       </View>
@@ -192,7 +203,8 @@ export default function ProfileScreen() {
           <Switch
             value={mode === 'dark'}
             onValueChange={toggleTheme}
-            trackColor={{ false: '#ccc', true: colors.primary }}
+            trackColor={{ false: colors.inputBorder, true: colors.primary }}
+            thumbColor={colors.surface}
           />
         </View>
 
@@ -203,16 +215,16 @@ export default function ProfileScreen() {
           </View>
           <View style={styles.langButtons}>
             <TouchableOpacity
-              style={[styles.langBtn, language === 'en' && { backgroundColor: colors.primary }]}
+              style={[dynamicStyles.langBtn, language === 'en' && dynamicStyles.langBtnActive]}
               onPress={() => setLanguage('en')}
             >
-              <Text style={[styles.langBtnText, language === 'en' && { color: colors.primaryText }]}>EN</Text>
+              <Text style={[dynamicStyles.langBtnText, language === 'en' && dynamicStyles.langBtnTextActive]}>EN</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.langBtn, language === 'es' && { backgroundColor: colors.primary }]}
+              style={[dynamicStyles.langBtn, language === 'es' && dynamicStyles.langBtnActive]}
               onPress={() => setLanguage('es')}
             >
-              <Text style={[styles.langBtnText, language === 'es' && { color: colors.primaryText }]}>ES</Text>
+              <Text style={[dynamicStyles.langBtnText, language === 'es' && dynamicStyles.langBtnTextActive]}>ES</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -287,7 +299,7 @@ export default function ProfileScreen() {
           {errors.confirm ? <Text style={dynamicStyles.errorText}>{errors.confirm}</Text> : null}
 
           <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleChangePassword} disabled={saving}>
-            {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
+            {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
         </View>
       </Modal>
@@ -339,7 +351,7 @@ export default function ProfileScreen() {
           {profileErrors.email ? <Text style={dynamicStyles.errorText}>{profileErrors.email}</Text> : null}
 
           <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleSaveProfile} disabled={savingProfile}>
-            {savingProfile ? <ActivityIndicator color={colors.primaryText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
+            {savingProfile ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
         </View>
       </Modal>
@@ -362,40 +374,14 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     marginBottom: 12,
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold',
-  },
   rowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
-  },
   langButtons: {
     flexDirection: 'row',
     gap: 6,
-  },
-  langBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
-  },
-  langBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
   },
   modalHeader: {
     flexDirection: 'row',

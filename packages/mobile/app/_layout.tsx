@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../src/auth-context';
-import { ThemeProvider } from '../src/theme-context';
+import { ThemeProvider, useTheme } from '../src/theme-context';
 import { LanguageProvider } from '../src/language-context';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -34,11 +35,17 @@ function AuthGuard() {
   return null;
 }
 
+function ThemedStatusBar() {
+  const { mode } = useTheme();
+  return <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />;
+}
+
 export default function RootLayout() {
   return (
     <ThemeProvider>
       <LanguageProvider>
         <AuthProvider>
+          <ThemedStatusBar />
           <AuthGuard />
           <Stack screenOptions={{ headerShown: false }} />
         </AuthProvider>

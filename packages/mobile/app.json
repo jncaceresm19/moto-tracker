@@ -5,25 +5,25 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "moto-tracker",
-    "icon": "./assets/logo.jpeg",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "splash": {
-      "image": "./assets/nombre.jpeg",
+      "image": "./assets/nombre.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/logo.jpeg",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/icon-adaptive.png",
+        "backgroundColor": "#ffffff"
       },
       "package": "com.anonymous.mototracker"
     },
     "web": {
-      "favicon": "./assets/logo.jpeg"
+      "favicon": "./assets/icon.png"
     },
     "plugins": [
       "expo-router",
@@ -31,9 +31,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/nombre.jpeg",
+          "image": "./assets/icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#ffffff",
           "imageWidth": 320
         }
       ]

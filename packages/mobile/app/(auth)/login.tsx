@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
+import { useTheme } from '../../src/theme-context';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
+  const { colors } = useTheme();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,8 +41,81 @@ export default function LoginScreen() {
     }
   };
 
+  const dynamicStyles = StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      backgroundColor: colors.background,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 0,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 10,
+      padding: 14,
+      fontSize: 16,
+      marginBottom: 14,
+      backgroundColor: colors.inputBg,
+      color: colors.text,
+    },
+    button: {
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 6,
+    },
+    buttonText: {
+      color: colors.primaryText,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerText: {
+      marginHorizontal: 12,
+      color: colors.textMuted,
+      fontSize: 14,
+    },
+    googleButton: {
+      backgroundColor: colors.surfaceSecondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    googleButtonTextDisabled: {
+      color: colors.textMuted,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    googleNote: {
+      color: colors.textMuted,
+      fontSize: 12,
+      textAlign: 'center',
+      marginTop: 6,
+    },
+    link: {
+      color: colors.accent,
+      textAlign: 'center',
+      marginTop: 20,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });
+
   return (
-    <View style={styles.container}>
+    <View style={dynamicStyles.container}>
       <View style={styles.brandBlock}>
         <Image
           source={require('../../assets/logo.jpeg')}
@@ -52,14 +127,15 @@ export default function LoginScreen() {
           style={styles.logo}
           resizeMode="contain"
         />
-        <Text style={styles.subtitle}>
+        <Text style={dynamicStyles.subtitle}>
           Sign in to your account
         </Text>
       </View>
 
       <TextInput
-        style={styles.input}
+        style={dynamicStyles.input}
         placeholder="Email"
+        placeholderTextColor={colors.textMuted}
         value={email}
         onChangeText={setEmail}
         autoCapitalize="none"
@@ -67,31 +143,32 @@ export default function LoginScreen() {
       />
 
       <TextInput
-        style={styles.input}
+        style={dynamicStyles.input}
         placeholder="Password"
+        placeholderTextColor={colors.textMuted}
         value={password}
         onChangeText={setPassword}
         secureTextEntry
       />
 
       <TouchableOpacity
-        style={styles.button}
+        style={dynamicStyles.button}
         onPress={handleLogin}
         disabled={loading}
       >
-        <Text style={styles.buttonText}>
+        <Text style={dynamicStyles.buttonText}>
           {loading ? 'Signing in...' : 'Sign In'}
         </Text>
       </TouchableOpacity>
 
       <View style={styles.divider}>
-        <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>or</Text>
-        <View style={styles.dividerLine} />
+        <View style={dynamicStyles.dividerLine} />
+        <Text style={dynamicStyles.dividerText}>or</Text>
+        <View style={dynamicStyles.dividerLine} />
       </View>
 
       <TouchableOpacity
-        style={styles.googleButton}
+        style={dynamicStyles.googleButton}
         onPress={() =>
           Alert.alert(
             'Coming Soon',
@@ -100,18 +177,18 @@ export default function LoginScreen() {
         }
         disabled
       >
-        <Text style={styles.googleButtonTextDisabled}>
+        <Text style={dynamicStyles.googleButtonTextDisabled}>
           Continue with Google
         </Text>
       </TouchableOpacity>
 
-      <Text style={styles.googleNote}>
+      <Text style={dynamicStyles.googleNote}>
         Coming soon — requires development build
       </Text>
 
       <Link href="/(auth)/register" asChild>
         <TouchableOpacity>
-          <Text style={styles.link}>
+          <Text style={dynamicStyles.link}>
             Don't have an account? Sign Up
           </Text>
         </TouchableOpacity>
@@ -121,13 +198,6 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-    backgroundColor: '#fff',
-  },
-
   brandBlock: {
     alignItems: 'center',
     marginBottom: 28,
@@ -145,81 +215,9 @@ const styles = StyleSheet.create({
     marginBottom: -60,
   },
 
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 0,
-  },
-
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 14,
-  },
-
-  button: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 22,
-  },
-
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#ddd',
-  },
-
-  dividerText: {
-    marginHorizontal: 12,
-    color: '#999',
-    fontSize: 14,
-  },
-
-  googleButton: {
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 10,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-
-  googleButtonTextDisabled: {
-    color: '#999',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  googleNote: {
-    color: '#bbb',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 6,
-  },
-
-  link: {
-    color: '#007AFF',
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 15,
-    fontWeight: '500',
   },
 });
