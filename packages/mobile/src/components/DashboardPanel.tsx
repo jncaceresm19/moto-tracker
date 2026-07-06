@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme-context';
+import { useLanguage } from '../language-context';
 
 interface DashboardPanelProps {
   motorcycleName?: string;
@@ -21,6 +22,7 @@ export function DashboardPanel({
   timeAgo = '',
 }: DashboardPanelProps) {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export function DashboardPanel({
 
   const isAlert = status === 'alert';
   const statusColor = isAlert ? colors.alertRed : colors.green;
-  const statusText = isAlert ? 'OUT OF ZONE' : 'IN SAFE ZONE';
+  const statusText = isAlert ? t('outOfZone') : t('inSafeZone');
 
   return (
     <View style={styles.container}>
@@ -53,7 +55,7 @@ export function DashboardPanel({
         {/* Top row: motorcycle info + status pill */}
         <View style={styles.topRow}>
           <View style={styles.motoInfo}>
-            <Text style={styles.motoName}>{motorcycleName || 'Sin moto asignada'}</Text>
+            <Text style={styles.motoName}>{motorcycleName || t('noMotoAssigned')}</Text>
             {plate ? <Text style={styles.plate}>{plate}</Text> : null}
           </View>
           <View style={[styles.statusPill, { backgroundColor: statusColor + '20', borderColor: statusColor }]}>
@@ -65,14 +67,14 @@ export function DashboardPanel({
         {/* Odometer time inline with label */}
         <View style={styles.odometerSection}>
           <Text style={styles.odometerTime}>{lastLocationTime}</Text>
-          <Text style={styles.odometerLabel}>LAST LOCATION</Text>
+          <Text style={styles.odometerLabel}>{t('lastLocation')}</Text>
         </View>
 
         {/* Address line */}
         <View style={styles.addressRow}>
           <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
           <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
-            Parked at location - 6 minutes ago
+            {t('parkedAtLocation')}
           </Text>
         </View>
       </View>
