@@ -22,6 +22,7 @@ export default function MotorcycleListScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
@@ -90,19 +91,15 @@ export default function MotorcycleListScreen() {
   };
 
   const showImageOptions = () => {
-    showAlert('Add Photo', 'Choose an option', [
-      { text: 'Take Photo', onPress: () => pickImage(true) },
-      { text: 'Choose from Gallery', onPress: () => pickImage(false) },
-      { text: 'Cancel', style: 'cancel' },
-    ], 'camera', '#007AFF');
+    setShowPhotoModal(true);
   };
 
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.brand) newErrors.brand = 'Brand is required';
-    if (!form.model) newErrors.model = 'Model is required';
-    if (!form.year) newErrors.year = 'Year is required';
-    if (!form.licensePlate) newErrors.licensePlate = 'License plate is required';
+    if (!form.brand) newErrors.brand = t('required');
+    if (!form.model) newErrors.model = t('required');
+    if (!form.year) newErrors.year = t('required');
+    if (!form.licensePlate) newErrors.licensePlate = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -120,9 +117,9 @@ export default function MotorcycleListScreen() {
       setShowCreate(false);
       setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '' });
       setImageUri(null);
-      showAlert('Success', 'Motorcycle added', [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('motorcycleUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      showAlert('Error', 'Failed to create motorcycle', [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -275,8 +272,8 @@ export default function MotorcycleListScreen() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={dynamicStyles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
             <View style={dynamicStyles.modalHeader}>
-              <Text style={dynamicStyles.modalTitle}>New Motorcycle</Text>
-              <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={dynamicStyles.cancel}>Cancel</Text></TouchableOpacity>
+              <Text style={dynamicStyles.modalTitle}>{t('addMotorcycle')}</Text>
+              <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={dynamicStyles.cancel}>X</Text></TouchableOpacity>
             </View>
 
             <TouchableOpacity style={dynamicStyles.photoBtn} onPress={showImageOptions}>
@@ -285,30 +282,50 @@ export default function MotorcycleListScreen() {
               ) : (
                 <View style={dynamicStyles.photoPlaceholder}>
                   <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                  <Text style={dynamicStyles.photoPlaceholderText}>Tap to add photo</Text>
+                  <Text style={dynamicStyles.photoPlaceholderText}>{t('tapToAddPhoto')}</Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            <TextInput style={dynamicStyles.input} placeholder="Brand *" placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
+            <TextInput style={dynamicStyles.input} placeholder={t('brand') + ' *'} placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
             {errors.brand ? <Text style={dynamicStyles.errorText}>{errors.brand}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder="Model *" placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
+            <TextInput style={dynamicStyles.input} placeholder={t('model') + ' *'} placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
             {errors.model ? <Text style={dynamicStyles.errorText}>{errors.model}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder="Year *" placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
+            <TextInput style={dynamicStyles.input} placeholder={t('year') + ' *'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
             {errors.year ? <Text style={dynamicStyles.errorText}>{errors.year}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder="License Plate *" placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+            <TextInput style={dynamicStyles.input} placeholder={t('licensePlate') + ' *'} placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
             {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder="Current km (optional)" placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
+            <TextInput style={dynamicStyles.input} placeholder={t('currentKilometers') + ' (' + t('optional') + ')'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
             <View style={{ marginTop: 10, marginBottom: 6 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{t('gpsQuestion')}</Text>
               <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
             </View>
             <TextInput style={dynamicStyles.input} placeholder={t('gpsIdPlaceholder')} placeholderTextColor={colors.textMuted} value={form.gpsTracker} onChangeText={(v) => setForm((p) => ({ ...p, gpsTracker: v }))} />
             <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleCreate} disabled={saving}>
-              {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>Save</Text>}
+              {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Photo Options Modal */}
+      <Modal visible={showPhotoModal} transparent animationType="fade">
+        <View style={styles.photoModalOverlay}>
+          <View style={[styles.photoModalContent, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.photoModalClose} onPress={() => setShowPhotoModal(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.photoModalTitle, { color: colors.text }]}>{t('addDocumentPhoto')}</Text>
+            <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(true); }}>
+              <Ionicons name="camera" size={20} color="#fff" />
+              <Text style={styles.photoModalBtnText}>{t('takePhoto')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(false); }}>
+              <Ionicons name="images" size={20} color="#fff" />
+              <Text style={styles.photoModalBtnText}>{t('chooseFromGallery')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       <CustomAlert
@@ -343,5 +360,43 @@ const styles = StyleSheet.create({
   photoPlaceholderIcon: {
     fontSize: 36,
     marginBottom: 8,
+  },
+  photoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoModalContent: {
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  photoModalClose: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  photoModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 24,
+    marginTop: 8,
+  },
+  photoModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  photoModalBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
