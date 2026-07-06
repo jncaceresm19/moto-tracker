@@ -292,17 +292,16 @@ export default function DocumentsScreen() {
             </TouchableOpacity>
             <View style={styles.detailActions}>
               <TouchableOpacity onPress={() => viewing && openEdit(viewing)} style={styles.editBtn}>
-                <Text style={styles.editBtnText}>{t('edit')}</Text>
+                <Ionicons name="pencil" size={20} color="#007AFF" />
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => viewing && handleDelete(viewing)}>
-                <Text style={styles.deleteBtnText}>{t('delete')}</Text>
+              <TouchableOpacity onPress={() => viewing && handleDelete(viewing)} style={styles.deleteBtn}>
+                <Ionicons name="trash" size={20} color="#FF3B30" />
               </TouchableOpacity>
             </View>
           </View>
 
           {viewing && (
             <ScrollView contentContainerStyle={styles.detailContent}>
-              <Text style={styles.detailType}>{viewing.type.replace('_', ' ')}</Text>
               <Text style={styles.detailTitle}>{viewing.title}</Text>
               {viewing.issueDate && <Text style={styles.detailDate}>{t('issued')}: {new Date(viewing.issueDate).toLocaleDateString()}</Text>}
               {viewing.expiryDate && <Text style={styles.detailDate}>{t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
@@ -461,7 +460,8 @@ const styles = StyleSheet.create({
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
   done: { color: '#007AFF', fontSize: 16 },
   detailActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  editBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  editBtn: { padding: 8 },
+  deleteBtn: { padding: 8 },
   editBtnText: { color: '#fff', fontWeight: '600' },
   deleteBtnText: { color: '#FF3B30', fontSize: 14 },
   detailContent: { padding: 20 },
