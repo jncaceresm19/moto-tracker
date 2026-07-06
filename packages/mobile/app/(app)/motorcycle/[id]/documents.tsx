@@ -262,7 +262,6 @@ export default function DocumentsScreen() {
             onPress={() => setViewing(item)}
           >
             <View style={styles.cardRow}>
-              <Text style={styles.cardType}>{t(TYPE_KEYS[item.type] as any || 'other')}</Text>
               <Text style={[styles.cardStatus, item.status === 'expired' && styles.expired]}>
                 {item.status}
               </Text>
