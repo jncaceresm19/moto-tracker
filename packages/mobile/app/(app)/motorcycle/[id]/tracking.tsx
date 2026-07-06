@@ -61,15 +61,6 @@ export default function TrackingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header with back button */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.replace(`/(app)/motorcycle/${id}`)}>
-          <Ionicons name="arrow-back" size={24} color={colors.ink} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.ink }]}>{t('gpsTracking')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
       {/* Map placeholder - react-native-maps would go here */}
       <View style={[styles.mapPlaceholder, { backgroundColor: colors.surface }]}>
         <Ionicons name="map-outline" size={64} color={colors.inkFaint} />
@@ -86,32 +77,26 @@ export default function TrackingScreen() {
 
       {/* Bottom info card */}
       <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.infoRow}>
+        <View style={styles.infoItem}>
           <Ionicons name="speedometer" size={20} color={colors.green} />
-          <View>
-            <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('speed')}</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>
-              {location ? `${Math.round((location.coords.speed || 0) * 3.6)} km/h` : '--'}
-            </Text>
-          </View>
+          <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('speed')}</Text>
+          <Text style={[styles.infoValue, { color: colors.ink }]}>
+            {location ? `${Math.round((location.coords.speed || 0) * 3.6)} km/h` : '--'}
+          </Text>
         </View>
-        <View style={styles.infoRow}>
+        <View style={styles.infoItem}>
           <Ionicons name="compass" size={20} color={colors.brandBlue} />
-          <View>
-            <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('heading')}</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>
-              {location ? `${Math.round(location.coords.heading || 0)}°` : '--'}
-            </Text>
-          </View>
+          <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('heading')}</Text>
+          <Text style={[styles.infoValue, { color: colors.ink }]}>
+            {location ? `${Math.round(location.coords.heading || 0)}°` : '--'}
+          </Text>
         </View>
-        <View style={styles.infoRow}>
+        <View style={styles.infoItem}>
           <Ionicons name="time" size={20} color={colors.amber} />
-          <View>
-            <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('lastUpdate')}</Text>
-            <Text style={[styles.infoValue, { color: colors.ink }]}>
-              {location ? new Date(location.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '--'}
-            </Text>
-          </View>
+          <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('lastUpdate')}</Text>
+          <Text style={[styles.infoValue, { color: colors.ink }]}>
+            {location ? new Date(location.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '--'}
+          </Text>
         </View>
       </View>
     </View>
@@ -121,8 +106,6 @@ export default function TrackingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 17, fontWeight: '600' },
   loadingText: { fontSize: 15, marginTop: 12 },
   errorText: { fontSize: 16, textAlign: 'center', marginTop: 12, marginBottom: 20 },
   retryBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
@@ -132,8 +115,8 @@ const styles = StyleSheet.create({
   coordsBox: { alignItems: 'center', marginTop: 20 },
   coords: { fontSize: 15, fontFamily: 'monospace', fontWeight: '600' },
   coordsLabel: { fontSize: 12, marginTop: 4 },
-  infoCard: { margin: 16, padding: 16, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-around' },
-  infoRow: { alignItems: 'center', gap: 6 },
+  infoCard: { margin: 16, marginBottom: 24, padding: 16, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-around' },
+  infoItem: { alignItems: 'center', gap: 4 },
   infoLabel: { fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   infoValue: { fontSize: 16, fontWeight: '600', fontFamily: 'monospace' },
 });
