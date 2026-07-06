@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
+import { Ionicons } from '@expo/vector-icons';
 import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
+import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function MotorcycleListScreen() {
   const { user } = useAuth();
@@ -20,6 +22,21 @@ export default function MotorcycleListScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   const loadMotorcycles = async () => {
     if (!user) {
@@ -52,7 +69,7 @@ export default function MotorcycleListScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert('Permission needed', `Please grant ${fromCamera ? 'camera' : 'gallery'} permission.`);
+      showAlert('Permission needed', `Please grant ${fromCamera ? 'camera' : 'gallery'} permission.`, [{text: 'OK'}], 'lock-closed', '#FF9500');
       return;
     }
 
@@ -73,11 +90,11 @@ export default function MotorcycleListScreen() {
   };
 
   const showImageOptions = () => {
-    Alert.alert('Add Photo', 'Choose an option', [
+    showAlert('Add Photo', 'Choose an option', [
       { text: 'Take Photo', onPress: () => pickImage(true) },
       { text: 'Choose from Gallery', onPress: () => pickImage(false) },
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ], 'camera', '#007AFF');
   };
 
   const handleCreate = async () => {
@@ -102,16 +119,16 @@ export default function MotorcycleListScreen() {
       setShowCreate(false);
       setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
       setImageUri(null);
-      Alert.alert('Success', 'Motorcycle added');
+      showAlert('Success', 'Motorcycle added', [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert('Error', 'Failed to create motorcycle');
+      showAlert('Error', 'Failed to create motorcycle', [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (id: string, name: string) => {
-    Alert.alert('Delete', `Delete ${name}?`, [
+    showAlert('Delete', `Delete ${name}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -121,7 +138,7 @@ export default function MotorcycleListScreen() {
             await deleteMotorcycle(id);
             setMotorcycles((prev) => prev.filter((m) => m.id !== id));
           } catch {
-            Alert.alert('Error', 'Failed to delete');
+            showAlert('Error', 'Failed to delete', [{text: 'OK'}], 'close-circle', '#FF3B30');
           }
         },
       },
@@ -287,6 +304,16 @@ export default function MotorcycleListScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }

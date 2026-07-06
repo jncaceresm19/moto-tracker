@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Modal, TextInput, ActivityIndicator, Switch, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Switch, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
@@ -7,6 +7,7 @@ import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
+import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -21,6 +22,21 @@ export default function ProfileScreen() {
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   const handleChangePassword = async () => {
     const newErrors: Record<string, string> = {};
@@ -34,11 +50,11 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       await changePassword(passwords.current, passwords.newPass);
-      Alert.alert(t('success'), t('passwordChanged'));
+      showAlert(t('success'), t('passwordChanged'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
       setShowChangePassword(false);
       setPasswords({ current: '', newPass: '', confirm: '' });
     } catch (e: any) {
-      Alert.alert(t('error'), e?.message || 'Failed to change password');
+      showAlert(t('error'), e?.message || 'Failed to change password', [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -68,21 +84,21 @@ export default function ProfileScreen() {
 
       await updateProfile(updateData);
       await refreshUser();
-      Alert.alert(t('success'), t('profileUpdated'));
+      showAlert(t('success'), t('profileUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
       setShowEditProfile(false);
     } catch (e: any) {
-      Alert.alert(t('error'), e?.message || 'Failed to update profile');
+      showAlert(t('error'), e?.message || 'Failed to update profile', [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSavingProfile(false);
     }
   };
 
   const handlePickAvatar = async () => {
-    Alert.alert(t('changePhoto'), '', [
+    showAlert(t('changePhoto'), '', [
       {
         text: t('camera'), onPress: async () => {
           const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') { Alert.alert(t('error'), t('cameraPermission')); return; }
+          if (status !== 'granted') { showAlert(t('error'), t('cameraPermission'), [{text: 'OK'}], 'lock-closed', '#FF9500'); return; }
           const result = await ImagePicker.launchCameraAsync({ quality: 0.3, base64: true });
           if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
         }
@@ -94,14 +110,14 @@ export default function ProfileScreen() {
         }
       },
       { text: t('cancel'), style: 'cancel' },
-    ]);
+    ], 'camera', '#007AFF');
   };
 
   const handleSignOut = () => {
-    Alert.alert(t('signOut'), t('signOutConfirm'), [
+    showAlert(t('signOut'), t('signOutConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       { text: t('signOut'), style: 'destructive', onPress: signOut },
-    ]);
+    ], 'log-out-outline', '#FF3B30');
   };
 
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?';
@@ -187,7 +203,7 @@ export default function ProfileScreen() {
       {/* App Settings Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('appSettings')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert('Coming Soon', 'Notifications settings coming soon.')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'Notifications settings coming soon.', [{text: 'OK'}], 'information-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="notifications-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('notifications')}</Text>
@@ -233,7 +249,7 @@ export default function ProfileScreen() {
       {/* Support Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('support')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert(t('helpTitle'), t('helpMessage'))}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('helpTitle'), t('helpMessage'), [{text: 'OK'}], 'help-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="help-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('helpSupport')}</Text>
@@ -241,7 +257,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => Alert.alert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`)}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`, [{text: 'OK'}], 'information-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="information-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('about')}</Text>
@@ -355,6 +371,16 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </ScrollView>
   );
 }

@@ -156,7 +156,7 @@ const translations = {
     aboutDescription: 'Track your motorcycle maintenance and documents in one place.',
     // Help
     helpTitle: 'Help & Support',
-    helpMessage: 'For support, contact us at support@mototracker.app',
+    helpMessage: 'For support, contact us at jdevlabs.cl@gmail.com',
     // Profile Edit
     changePhoto: 'Change Photo',
     profileUpdated: 'Profile updated successfully',
@@ -317,7 +317,7 @@ const translations = {
     aboutDescription: 'Seguimiento del mantenimiento y documentos de tu moto en un solo lugar.',
     // Help
     helpTitle: 'Ayuda y Soporte',
-    helpMessage: 'Para soporte, contáctanos en support@mototracker.app',
+    helpMessage: 'Para soporte, contáctanos en jdevlabs.cl@gmail.com',
     // Profile Edit
     changePhoto: 'Cambiar Foto',
     profileUpdated: 'Perfil actualizado exitosamente',

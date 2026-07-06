@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { listKilometers, createKilometer, updateKilometer, deleteKilometer, KilometerEntry } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
+import { CustomAlert } from '../../../../src/components/CustomAlert';
 
 export default function KilometersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -30,11 +31,26 @@ export default function KilometersScreen() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   const load = async () => {
     if (!id) return;
     try { setEntries(await listKilometers(id)); }
-    catch { Alert.alert(t('error'), t('failedToLoad')); }
+    catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
     finally { setLoading(false); }
   };
 
@@ -76,9 +92,9 @@ export default function KilometersScreen() {
       setEntries((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      Alert.alert(t('success'), t('readingSaved'));
+      showAlert(t('success'), t('readingSaved'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToCreate'));
+      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -100,16 +116,16 @@ export default function KilometersScreen() {
       });
       setEntries((prev) => prev.map((e) => e.id === updated.id ? updated : e));
       setEditing(null);
-      Alert.alert(t('success'), t('readingUpdated'));
+      showAlert(t('success'), t('readingUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToUpdate'));
+      showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (entry: KilometerEntry) => {
-    Alert.alert(t('deleteEntry'), t('deleteConfirm'), [
+    showAlert(t('deleteEntry'), t('deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('delete'), style: 'destructive',
@@ -118,10 +134,10 @@ export default function KilometersScreen() {
           try {
             await deleteKilometer(id, entry.id);
             setEntries((prev) => prev.filter((e) => e.id !== entry.id));
-          } catch { Alert.alert(t('error'), t('failedToDelete')); }
+          } catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
         },
       },
-    ]);
+    ], 'warning', '#FF9500');
   };
 
   const modalTitle = editing ? t('editReading') : t('newReading');
@@ -202,6 +218,16 @@ export default function KilometersScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }

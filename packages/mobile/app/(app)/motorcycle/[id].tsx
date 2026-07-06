@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle } from '../../../src/api';
 import { useLanguage } from '../../../src/language-context';
+import { CustomAlert } from '../../../src/components/CustomAlert';
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -13,12 +15,27 @@ export default function MotorcycleDetailScreen() {
   const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     if (!id) return;
     (async () => {
       try { setMotorcycle(await getMotorcycle(id)); }
-      catch { Alert.alert(t('error'), t('failedToLoad')); }
+      catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
       finally { setLoading(false); }
     })();
   }, [id]);
@@ -55,26 +72,26 @@ export default function MotorcycleDetailScreen() {
       });
       setMotorcycle(updated);
       setEditing(false);
-      Alert.alert(t('success'), t('motorcycleUpdated'));
+      showAlert(t('success'), t('motorcycleUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToUpdate'));
+      showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = () => {
-    Alert.alert(t('deleteMotorcycle'), t('deleteConfirm'), [
+    showAlert(t('deleteMotorcycle'), t('deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('delete'), style: 'destructive',
         onPress: async () => {
           if (!id) return;
           try { await deleteMotorcycle(id); router.back(); }
-          catch { Alert.alert(t('error'), t('failedToDelete')); }
+          catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
         },
       },
-    ]);
+    ], 'warning', '#FF9500');
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
@@ -147,6 +164,16 @@ export default function MotorcycleDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </ScrollView>
   );
 }

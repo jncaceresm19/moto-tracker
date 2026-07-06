@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
+import { CustomAlert } from '../../../../src/components/CustomAlert';
 
 const TYPES = ['oil_change', 'tire_change', 'brake_check', 'spark_plugs', 'technical_review', 'circulation_permit', 'other'];
 
@@ -24,6 +25,21 @@ export default function MaintenanceScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   useEffect(() => {
     navigation.setOptions({
@@ -47,7 +63,7 @@ export default function MaintenanceScreen() {
     if (!id) return;
     try {
       setRecords(await listMaintenance(id));
-    } catch { Alert.alert(t('error'), t('failedToLoad')); }
+    } catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
     finally { setLoading(false); }
   };
 
@@ -96,9 +112,9 @@ export default function MaintenanceScreen() {
       setRecords((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      Alert.alert(t('success'), t('recordSaved'));
+      showAlert(t('success'), t('recordSaved'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToCreate'));
+      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -124,16 +140,16 @@ export default function MaintenanceScreen() {
       });
       setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       setEditing(null);
-      Alert.alert(t('success'), t('recordUpdated'));
+      showAlert(t('success'), t('recordUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToUpdate'));
+      showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (record: MaintenanceRecord) => {
-    Alert.alert(t('deleteRecord'), t('deleteConfirm'), [
+    showAlert(t('deleteRecord'), t('deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('delete'), style: 'destructive',
@@ -142,10 +158,10 @@ export default function MaintenanceScreen() {
           try {
             await deleteMaintenance(id, record.id);
             setRecords((prev) => prev.filter((r) => r.id !== record.id));
-          } catch { Alert.alert(t('error'), t('failedToDelete')); }
+          } catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
         },
       },
-    ]);
+    ], 'warning', '#FF9500');
   };
 
   const modalTitle = editing ? t('editRecord') : t('newRecord');
@@ -231,6 +247,16 @@ export default function MaintenanceScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }

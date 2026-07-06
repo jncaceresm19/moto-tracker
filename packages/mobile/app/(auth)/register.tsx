@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
+import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
@@ -11,10 +13,25 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields', [{text: 'OK'}], 'close-circle', '#FF3B30');
       return;
     }
 
@@ -23,7 +40,7 @@ export default function RegisterScreen() {
       await signUp(email, password, name);
       router.replace('/(app)');
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Registration failed');
+      showAlert('Error', err instanceof Error ? err.message : 'Registration failed', [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setLoading(false);
     }
@@ -125,6 +142,16 @@ export default function RegisterScreen() {
           <Text style={dynamicStyles.link}>Already have an account? Sign In</Text>
         </TouchableOpacity>
       </Link>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }

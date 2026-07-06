@@ -5,12 +5,13 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
+import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -19,10 +20,25 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      showAlert('Error', 'Please fill in all fields', [{text: 'OK'}], 'close-circle', '#FF3B30');
       return;
     }
 
@@ -32,9 +48,12 @@ export default function LoginScreen() {
       await signIn(email, password);
       router.replace('/(app)');
     } catch (err) {
-      Alert.alert(
+      showAlert(
         'Error',
-        err instanceof Error ? err.message : 'Login failed'
+        err instanceof Error ? err.message : 'Login failed',
+        [{text: 'OK'}],
+        'close-circle',
+        '#FF3B30'
       );
     } finally {
       setLoading(false);
@@ -170,9 +189,12 @@ export default function LoginScreen() {
       <TouchableOpacity
         style={dynamicStyles.googleButton}
         onPress={() =>
-          Alert.alert(
+          showAlert(
             'Coming Soon',
-            'Google Sign-In will be available in a future update.'
+            'Google Sign-In will be available in a future update.',
+            [{text: 'OK'}],
+            'information-circle',
+            '#007AFF'
           )
         }
         disabled
@@ -193,6 +215,16 @@ export default function LoginScreen() {
           </Text>
         </TouchableOpacity>
       </Link>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }

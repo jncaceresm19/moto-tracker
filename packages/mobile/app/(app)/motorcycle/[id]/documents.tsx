@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
+import { CustomAlert } from '../../../../src/components/CustomAlert';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
 
@@ -46,11 +47,26 @@ export default function DocumentsScreen() {
   const [saving, setSaving] = useState(false);
   const [showIssueDatePicker, setShowIssueDatePicker] = useState(false);
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
+  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+
+  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+    setAlertTitle(title);
+    setAlertMessage(message || '');
+    setAlertButtons(buttons);
+    setAlertIcon(icon);
+    setAlertIconColor(iconColor);
+    setAlertVisible(true);
+  };
 
   const load = async () => {
     if (!id) return;
     try { setDocs(await listDocuments(id)); }
-    catch { Alert.alert(t('error'), t('failedToLoad')); }
+    catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
     finally { setLoading(false); }
   };
 
@@ -85,7 +101,7 @@ export default function DocumentsScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert(t('permissionNeeded'), t('permissionMessage'));
+      showAlert(t('permissionNeeded'), t('permissionMessage'), [{text: 'OK'}], 'lock-closed', '#FF9500');
       return;
     }
 
@@ -108,11 +124,11 @@ export default function DocumentsScreen() {
   };
 
   const showImageOptions = () => {
-    Alert.alert(t('addDocumentPhoto'), t('chooseOption'), [
+    showAlert(t('addDocumentPhoto'), t('chooseOption'), [
       { text: t('takePhoto'), onPress: () => pickImage(true) },
       { text: t('chooseFromGallery'), onPress: () => pickImage(false) },
       { text: t('cancel'), style: 'cancel' },
-    ]);
+    ], 'camera', '#007AFF');
   };
 
   const handleCreate = async () => {
@@ -133,9 +149,9 @@ export default function DocumentsScreen() {
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      Alert.alert(t('success'), t('documentSaved'));
+      showAlert(t('success'), t('documentSaved'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToCreate'));
+      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -159,16 +175,16 @@ export default function DocumentsScreen() {
       });
       setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
       setEditing(null);
-      Alert.alert(t('success'), t('documentUpdated'));
+      showAlert(t('success'), t('documentUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
-      Alert.alert(t('error'), t('failedToUpdate'));
+      showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (doc: Document) => {
-    Alert.alert(t('deleteDocument'), t('deleteConfirm'), [
+    showAlert(t('deleteDocument'), t('deleteConfirm'), [
       { text: t('cancel'), style: 'cancel' },
       {
         text: t('delete'), style: 'destructive',
@@ -178,10 +194,10 @@ export default function DocumentsScreen() {
             await deleteDocument(id, doc.id);
             setDocs((prev) => prev.filter((d) => d.id !== doc.id));
             setViewing(null);
-          } catch { Alert.alert(t('error'), t('failedToDelete')); }
+          } catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
         },
       },
-    ]);
+    ], 'warning', '#FF9500');
   };
 
   const generatePDF = async (doc: Document) => {
@@ -204,14 +220,14 @@ export default function DocumentsScreen() {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
-      Alert.alert(t('error'), `Failed to save: ${e?.message || e}`);
+      showAlert(t('error'), `Failed to save: ${e?.message || e}`, [{text: 'OK'}], 'close-circle', '#FF3B30');
     }
   };
 
   const handleBulkSaveAsPDF = async () => {
     const photos = docs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
-      Alert.alert(t('noPhotos'), t('noPhotosSub'));
+      showAlert(t('noPhotos'), t('noPhotosSub'), [{text: 'OK'}], 'information-circle', '#007AFF');
       return;
     }
     try {
@@ -220,7 +236,7 @@ export default function DocumentsScreen() {
         if (uri) await Sharing.shareAsync(uri);
       }
     } catch (e: any) {
-      Alert.alert(t('error'), `Failed to save: ${e?.message || e}`);
+      showAlert(t('error'), `Failed to save: ${e?.message || e}`, [{text: 'OK'}], 'close-circle', '#FF3B30');
     }
   };
 
@@ -230,7 +246,7 @@ export default function DocumentsScreen() {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
-      Alert.alert(t('error'), `Failed to share: ${e?.message || e}`);
+      showAlert(t('error'), `Failed to share: ${e?.message || e}`, [{text: 'OK'}], 'close-circle', '#FF3B30');
     }
   };
 
@@ -415,6 +431,16 @@ export default function DocumentsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        buttons={alertButtons}
+        icon={alertIcon}
+        iconColor={alertIconColor}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }
