@@ -157,6 +157,8 @@ export default function HomeScreen() {
                   location={`${station.address}${station.comuna ? `, ${station.comuna}` : ''}`}
                   distance={`${station.distance.toFixed(1)} km`}
                   price93={station.price93}
+                  price95={station.price95}
+                  price97={station.price97}
                 />
               ))}
             </ScrollView>

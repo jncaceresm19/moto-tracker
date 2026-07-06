@@ -9,6 +9,8 @@ interface OfferCardProps {
   location: string;
   distance: string;
   price93?: number;
+  price95?: number;
+  price97?: number;
 }
 
 export function OfferCard({
@@ -17,10 +19,11 @@ export function OfferCard({
   location,
   distance,
   price93,
+  price95,
+  price97,
 }: OfferCardProps) {
   const { colors } = useTheme();
 
-  // Chilean national average for 93
   const avgPrice93 = 1604;
   const savings = price93 ? avgPrice93 - price93 : 0;
 
@@ -35,18 +38,35 @@ export function OfferCard({
         </View>
       )}
 
-      {/* Location */}
+      {/* Location - 2 lines */}
       {location ? (
-        <Text style={[styles.location, { color: colors.inkFaint }]} numberOfLines={1}>{location}</Text>
+        <Text style={[styles.location, { color: colors.inkFaint }]} numberOfLines={2}>{location}</Text>
       ) : null}
 
       {/* Distance */}
       <Text style={[styles.distance, { color: colors.inkFaint }]}>{distance}</Text>
 
-      {/* Price per liter */}
-      {price93 ? (
-        <Text style={[styles.price, { color: colors.ink }]}>${price93}/L</Text>
-      ) : null}
+      {/* Fuel prices */}
+      <View style={styles.pricesContainer}>
+        {price93 ? (
+          <View style={styles.priceRow}>
+            <Text style={[styles.fuelLabel, { color: colors.inkFaint }]}>93</Text>
+            <Text style={[styles.price, { color: colors.ink }]}>${price93}</Text>
+          </View>
+        ) : null}
+        {price95 ? (
+          <View style={styles.priceRow}>
+            <Text style={[styles.fuelLabel, { color: colors.inkFaint }]}>95</Text>
+            <Text style={[styles.price, { color: colors.ink }]}>${price95}</Text>
+          </View>
+        ) : null}
+        {price97 ? (
+          <View style={styles.priceRow}>
+            <Text style={[styles.fuelLabel, { color: colors.inkFaint }]}>97</Text>
+            <Text style={[styles.price, { color: colors.ink }]}>${price97}</Text>
+          </View>
+        ) : null}
+      </View>
 
       {/* Savings badge */}
       {savings > 0 ? (
@@ -59,13 +79,15 @@ export function OfferCard({
 }
 
 const styles = StyleSheet.create({
-  card: { width: 170, borderRadius: 14, borderWidth: 1, padding: 14, marginRight: 10 },
-  brandLogo: { width: 48, height: 48, borderRadius: 8, marginBottom: 10 },
-  logoFallback: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
-  brandName: { fontSize: 14, fontWeight: '600' },
-  location: { fontSize: 12, marginTop: 2 },
+  card: { width: 200, borderRadius: 14, borderWidth: 1, padding: 14, marginRight: 10 },
+  brandLogo: { width: 48, height: 48, borderRadius: 8, marginBottom: 8 },
+  logoFallback: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  location: { fontSize: 12, lineHeight: 16 },
   distance: { fontSize: 12, marginTop: 4 },
-  price: { fontSize: 20, fontWeight: '700', fontFamily: 'monospace', marginTop: 8 },
-  savingsBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 6 },
+  pricesContainer: { marginTop: 10, gap: 4 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  fuelLabel: { fontSize: 13, fontWeight: '600' },
+  price: { fontSize: 15, fontWeight: '700', fontFamily: 'monospace' },
+  savingsBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8 },
   savingsText: { fontSize: 11, fontWeight: '600', color: '#1F9D63' },
 });
