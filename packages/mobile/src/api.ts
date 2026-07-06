@@ -78,6 +78,7 @@ export interface Motorcycle {
   licensePlate: string;
   currentKilometers: number;
   imageUrl?: string;
+  gpsTracker?: string;
 }
 
 export async function listMotorcycles(): Promise<Motorcycle[]> {

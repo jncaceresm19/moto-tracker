@@ -12,7 +12,7 @@ export default function MotorcycleDetailScreen() {
   const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -50,6 +50,7 @@ export default function MotorcycleDetailScreen() {
       year: String(motorcycle.year),
       licensePlate: motorcycle.licensePlate,
       currentKilometers: String(motorcycle.currentKilometers),
+      gpsTracker: motorcycle.gpsTracker || '',
     });
     setEditing(true);
   };
@@ -70,6 +71,7 @@ export default function MotorcycleDetailScreen() {
         year: Number(form.year),
         licensePlate: form.licensePlate,
         currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
+        gpsTracker: form.gpsTracker || undefined,
       });
       setMotorcycle(updated);
       setEditing(false);
@@ -141,10 +143,8 @@ export default function MotorcycleDetailScreen() {
             <Text style={styles.arrow}>›</Text>
           </TouchableOpacity>
         ))}
-      </View>
 
-      {/* GPS Tracking Toggle */}
-      <View style={styles.section}>
+        {/* GPS Tracking Toggle — same section, no extra spacing */}
         <TouchableOpacity style={styles.sectionBtn} onPress={() => setGpsEnabled(!gpsEnabled)}>
           <Text style={styles.sectionIcon}>📍</Text>
           <View style={{ flex: 1 }}>
@@ -182,6 +182,11 @@ export default function MotorcycleDetailScreen() {
           <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(t) => { setForm((p) => ({ ...p, licensePlate: t })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
           {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
           <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} onChangeText={(t) => setForm((p) => ({ ...p, currentKilometers: t }))} />
+          <View style={{ marginTop: 10, marginBottom: 6 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('gpsQuestion')}</Text>
+            <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
+          </View>
+          <TextInput style={styles.input} placeholder={t('gpsIdPlaceholder')} value={form.gpsTracker} onChangeText={(t) => setForm((p) => ({ ...p, gpsTracker: t }))} />
           <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
