@@ -5,6 +5,8 @@ import { useLanguage } from '../../src/language-context';
 import { useAuth } from '../../src/auth-context';
 import { listMotorcycles, Motorcycle } from '../../src/api';
 import { DashboardPanel } from '../../src/components/DashboardPanel';
+import { TheftAlertCard } from '../../src/components/TheftAlertCard';
+import { OfferCard } from '../../src/components/OfferCard';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -34,6 +36,8 @@ export default function HomeScreen() {
   };
 
   const firstMoto = motorcycles[0];
+  const hasAlerts = false; // TODO: connect to real alert data
+  const hasOffers = false; // TODO: connect to real offer data
 
   if (loading) {
     return (
@@ -78,25 +82,45 @@ export default function HomeScreen() {
       {/* Section: Alertas de robo */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
-        <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.emptyCardIcon]}>🛡️</Text>
-          <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('noActiveAlerts')}</Text>
-          <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
-            {t('theftAlertsEmpty')}
-          </Text>
-        </View>
+        {hasAlerts ? (
+          <TheftAlertCard
+            title={`${firstMoto?.brand} ${firstMoto?.model} se movió de su zona segura`}
+            metadata={`${firstMoto?.licensePlate} · San Juan, Argentina`}
+            timeAgo="hace 12 min"
+            responses={[
+              { name: 'Carlos M.', text: 'Vi la moto por Av. Libertador hace 5 min', timeAgo: 'hace 5 min' },
+            ]}
+          />
+        ) : (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={styles.emptyCardIcon}>🛡️</Text>
+            <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('noActiveAlerts')}</Text>
+            <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
+              {t('theftAlertsEmpty')}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Section: Ahorra en tu ruta */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
-        <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.emptyCardIcon]}>⛽</Text>
-          <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyOffers')}</Text>
-          <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
-            {t('saveOnRouteEmpty')}
-          </Text>
-        </View>
+        {hasOffers ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+            <OfferCard icon="flame" iconBg={colors.amberBg} name="Shell Bellavista" distance="1.2 km" price="$799/L" savings="- $32 vs promedio" />
+            <OfferCard icon="water" iconBg={colors.brandBlueBg} name="Lavado Express" distance="800 m" price="$3.500" />
+            <OfferCard icon="flame" iconBg={colors.amberBg} name="Copec Viña" distance="2.1 km" price="$815/L" />
+            <OfferCard icon="water" iconBg={colors.brandBlueBg} name="AutoSpa" distance="1.5 km" price="$4.200" savings="- $800 vs promedio" />
+          </ScrollView>
+        ) : (
+          <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={styles.emptyCardIcon}>⛽</Text>
+            <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyOffers')}</Text>
+            <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
+              {t('saveOnRouteEmpty')}
+            </Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -115,4 +139,5 @@ const styles = StyleSheet.create({
   emptyCardIcon: { fontSize: 32, marginBottom: 10 },
   emptyCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },
   emptyCardText: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  offersScroll: { paddingRight: 16 },
 });
