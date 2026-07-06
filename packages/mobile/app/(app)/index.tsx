@@ -59,7 +59,10 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
-  const firstMoto = motorcycles[0];
+  // Prioritize motorcycle with GPS enabled
+  const motoWithGps = motorcycles.find(m => m.gpsTracker);
+  const activeMoto = motoWithGps || motorcycles[0];
+  const hasGps = !!motoWithGps;
   const hasAlerts = false;
 
   if (loading) {
@@ -97,12 +100,13 @@ export default function HomeScreen() {
       >
         {/* Dashboard Panel */}
         <DashboardPanel
-          motorcycleName={firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : ''}
-          plate={firstMoto?.licensePlate}
+          motorcycleName={activeMoto ? `${activeMoto.brand} ${activeMoto.model}` : ''}
+          plate={activeMoto?.licensePlate}
           status="safe"
-          lastLocationTime={new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false })}
+          lastLocationTime={hasGps ? new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
           address=""
           timeAgo=""
+          hasGps={hasGps}
         />
 
         {/* Multiple motorcycles indicator */}
@@ -124,10 +128,10 @@ export default function HomeScreen() {
         {/* Section: Alertas de robo */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
-          {hasAlerts && firstMoto ? (
+          {hasAlerts && activeMoto ? (
             <TheftAlertCard
-              title={`${firstMoto.brand} ${firstMoto.model} se movió de su zona segura`}
-              metadata={`${firstMoto.licensePlate} · San Juan, Argentina`}
+              title={`${activeMoto.brand} ${activeMoto.model} se movió de su zona segura`}
+              metadata={`${activeMoto.licensePlate} · San Juan, Argentina`}
               timeAgo="hace 12 min"
               responses={[
                 { name: 'Carlos M.', text: 'Vi la moto por Av. Libertador hace 5 min', timeAgo: 'hace 5 min' },

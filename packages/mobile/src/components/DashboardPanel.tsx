@@ -11,6 +11,7 @@ interface DashboardPanelProps {
   lastLocationTime?: string;
   address?: string;
   timeAgo?: string;
+  hasGps?: boolean;
 }
 
 export function DashboardPanel({
@@ -20,6 +21,7 @@ export function DashboardPanel({
   lastLocationTime = '--:--',
   address = '',
   timeAgo = '',
+  hasGps = false,
 }: DashboardPanelProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -39,8 +41,8 @@ export function DashboardPanel({
   }, [status, pulseAnim]);
 
   const isAlert = status === 'alert';
-  const statusColor = isAlert ? colors.alertRed : colors.green;
-  const statusText = isAlert ? t('outOfZone') : t('inSafeZone');
+  const statusColor = isAlert ? colors.alertRed : hasGps ? colors.green : '#6B7280';
+  const statusText = isAlert ? t('outOfZone') : hasGps ? t('inSafeZone') : t('noData');
 
   return (
     <View style={styles.container}>
@@ -74,7 +76,7 @@ export function DashboardPanel({
         <View style={styles.addressRow}>
           <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
           <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
-            {t('parkedAtLocation')}
+            {hasGps ? t('parkedAtLocation') : t('enableGpsToTrack')}
           </Text>
         </View>
       </View>
