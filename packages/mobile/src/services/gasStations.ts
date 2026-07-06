@@ -4,71 +4,73 @@ export interface GasStation {
   id: string;
   name: string;
   brand: string;
+  brandLogo?: string;
   distance: number;
   latitude: number;
   longitude: number;
-  address?: string;
+  address: string;
+  comuna: string;
+  region: string;
   price93?: number;
   price95?: number;
   price97?: number;
   priceDiesel?: number;
+  priceKerosene?: number;
+  lastUpdate?: string;
 }
 
-// Chilean fuel prices (MEPCO official - updated weekly)
-// Source: ENAP/CNE - as of July 2026
-const CHILE_FUEL_PRICES = {
-  gasolina_93: { min: 1124, avg: 1604, max: 1907 },
-  gasolina_95: { min: 1170, avg: 1646, max: 1947 },
-  gasolina_97: { min: 1230, avg: 1693, max: 1918 },
-  diesel: { min: 913, avg: 1466, max: 1779 },
-};
+// CNE API credentials
+const CNE_EMAIL = 'jdevlabs.cl@gmail.com';
+const CNE_PASSWORD = 'L&anna1925';
 
-// Brand icon mapping
-export const BRAND_ICONS: Record<string, string> = {
-  'shell': 'shield',
-  'copec': 'car-sport',
-  'esso': 'rocket',
-  'petrobras': 'thunderstorm',
-  'enex': 'leaf',
-};
+let cachedToken: string | null = null;
+let tokenExpiry: number = 0;
 
-// Brand colors
-export const BRAND_COLORS: Record<string, string> = {
-  'shell': '#FBCE07',
-  'copec': '#E31837',
-  'esso': '#FF0000',
-  'petrobras': '#FF6600',
-  'enex': '#00A651',
-};
-
-// Get realistic Chilean fuel price based on brand
-function getChileanFuelPrice(brand: string): { price93: number; price95: number; price97: number; priceDiesel: number } {
-  const lower = brand.toLowerCase();
-
-  // Major brands tend to be at or above average
-  if (lower.includes('shell') || lower.includes('copec')) {
-    return {
-      price93: CHILE_FUEL_PRICES.gasolina_93.avg + Math.floor(Math.random() * 50),
-      price95: CHILE_FUEL_PRICES.gasolina_95.avg + Math.floor(Math.random() * 50),
-      price97: CHILE_FUEL_PRICES.gasolina_97.avg + Math.floor(Math.random() * 50),
-      priceDiesel: CHILE_FUEL_PRICES.diesel.avg + Math.floor(Math.random() * 50),
-    };
+// Login to CNE API and get Bearer token
+async function getCNEToken(): Promise<string> {
+  if (cachedToken && Date.now() < tokenExpiry) {
+    return cachedToken;
   }
 
-  // Independent stations tend to be cheaper
-  return {
-    price93: CHILE_FUEL_PRICES.gasolina_93.avg - Math.floor(Math.random() * 100),
-    price95: CHILE_FUEL_PRICES.gasolina_95.avg - Math.floor(Math.random() * 100),
-    price97: CHILE_FUEL_PRICES.gasolina_97.avg - Math.floor(Math.random() * 100),
-    priceDiesel: CHILE_FUEL_PRICES.diesel.avg - Math.floor(Math.random() * 100),
-  };
+  console.log('[CNE] Requesting new token...');
+  const response = await fetch('https://api.cne.cl/api/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'MotoTracker/1.0',
+    },
+    body: JSON.stringify({ email: CNE_EMAIL, password: CNE_PASSWORD }),
+  });
+
+  if (!response.ok) throw new Error('CNE login failed');
+
+  const data = await response.json();
+  cachedToken = data.token;
+  // Token expires in 1 hour (JWT exp claim)
+  tokenExpiry = Date.now() + 3500 * 1000; // 58 min to be safe
+  console.log('[CNE] Token obtained');
+  return cachedToken!;
 }
 
-function buildOverpassQuery(lat: number, lon: number, radiusMeters = 5000): string {
-  return `[out:json][timeout:10];node["amenity"="fuel"](around:${radiusMeters},${lat},${lon});out body;`;
+// Fetch all gas stations from CNE API
+async function fetchAllStations(): Promise<any[]> {
+  const token = await getCNEToken();
+
+  const response = await fetch('https://api.cne.cl/api/v4/estaciones', {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'User-Agent': 'MotoTracker/1.0',
+    },
+  });
+
+  if (!response.ok) throw new Error('Failed to fetch CNE stations');
+
+  const data = await response.json();
+  return data.data || data.estaciones || [];
 }
 
-function haversineDistance(lat1: number, lon1: number, lon2: number, lat2: number): number {
+function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -81,56 +83,59 @@ function haversineDistance(lat1: number, lon1: number, lon2: number, lat2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function getBrandColor(brand: string): string {
-  const lower = brand.toLowerCase();
-  for (const [key, color] of Object.entries(BRAND_COLORS)) {
-    if (lower.includes(key)) return color;
-  }
-  return '#F5A623'; // default amber
+// Parse price string like "1560.000" to number 1560
+function parsePrice(priceStr: string | undefined): number | undefined {
+  if (!priceStr) return undefined;
+  const parsed = parseFloat(priceStr);
+  return isNaN(parsed) ? undefined : Math.round(parsed);
 }
 
 export async function getNearbyGasStations(
   lat: number,
   lon: number,
-  radiusMeters = 5000
+  radiusKm = 10
 ): Promise<GasStation[]> {
-  const query = buildOverpassQuery(lat, lon, radiusMeters);
+  console.log('[CNE] Fetching all stations...');
+  const allStations = await fetchAllStations();
+  console.log('[CNE] Total stations:', allStations.length);
 
-  const response = await fetch('https://overpass-api.de/api/interpreter', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'User-Agent': 'MotoTracker/1.0',
-    },
-    body: `data=${encodeURIComponent(query)}`,
-  });
+  // Filter and map nearby stations
+  const nearby: GasStation[] = [];
 
-  if (!response.ok) throw new Error('Failed to fetch gas stations');
+  for (const station of allStations) {
+    const stationLat = parseFloat(station.ubicacion?.latitud);
+    const stationLon = parseFloat(station.ubicacion?.longitud);
 
-  const data = await response.json();
-  const elements: any[] = data.elements || [];
+    if (isNaN(stationLat) || isNaN(stationLon)) continue;
 
-  const stations: GasStation[] = elements
-    .filter((el) => el.tags?.name)
-    .map((el) => {
-      const brand = el.tags.brand || el.tags.operator || '';
-      console.log('[GAS] Station:', el.tags.name, '| brand:', brand, '| tags:', Object.keys(el.tags).join(','));
-      const prices = getChileanFuelPrice(brand);
-      return {
-        id: String(el.id),
-        name: el.tags.name || 'Gas station',
-        brand,
-        distance: haversineDistance(lat, lon, el.lat, el.lon),
-        latitude: el.lat,
-        longitude: el.lon,
-        address: el.tags['addr:street'] || el.tags['addr:suburb'] || '',
-        ...prices,
-      };
-    })
-    .sort((a, b) => a.distance - b.distance)
-    .slice(0, 10);
+    const distance = haversineDistance(lat, lon, stationLat, stationLon);
+    if (distance > radiusKm) continue;
 
-  return stations;
+    nearby.push({
+      id: station.codigo,
+      name: station.razon_social || station.distribuidor?.marca || 'Estación',
+      brand: station.distribuidor?.marca || '',
+      brandLogo: station.distribuidor?.logo,
+      distance,
+      latitude: stationLat,
+      longitude: stationLon,
+      address: station.ubicacion?.direccion || '',
+      comuna: station.ubicacion?.nombre_comuna || '',
+      region: station.ubicacion?.nombre_region || '',
+      price93: parsePrice(station.precios?.['93']?.precio),
+      price95: parsePrice(station.precios?.['95']?.precio),
+      price97: parsePrice(station.precios?.['97']?.precio),
+      priceDiesel: parsePrice(station.precios?.['DI']?.precio),
+      priceKerosene: parsePrice(station.precios?.['KE']?.precio),
+      lastUpdate: station.precios?.['93']?.fecha_actualizacion,
+    });
+  }
+
+  // Sort by distance
+  nearby.sort((a, b) => a.distance - b.distance);
+
+  console.log('[CNE] Nearby stations:', nearby.length);
+  return nearby.slice(0, 15);
 }
 
 export async function getCurrentLocation(): Promise<{ lat: number; lon: number }> {

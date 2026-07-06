@@ -10,7 +10,7 @@ import { listMotorcycles, Motorcycle } from '../../src/api';
 import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
-import { GasStation, getNearbyGasStations, getCurrentLocation, BRAND_COLORS, BRAND_ICONS } from '../../src/services/gasStations';
+import { GasStation, getNearbyGasStations, getCurrentLocation } from '../../src/services/gasStations';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -145,22 +145,16 @@ export default function HomeScreen() {
           <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
           {gasStations.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
-              {gasStations.map((station) => {
-                const brandLower = station.brand.toLowerCase();
-                const brandColor = Object.entries(BRAND_COLORS).find(([k]) => brandLower.includes(k))?.[1] || '#F5A623';
-                const brandIcon = (Object.entries(BRAND_ICONS).find(([k]) => brandLower.includes(k))?.[1] || 'flame') as keyof typeof Ionicons.glyphMap;
-                return (
-                  <OfferCard
-                    key={station.id}
-                    brandLogo={brandIcon}
-                    brandColor={brandColor}
-                    brandName={station.brand || station.name}
-                    location={station.address || ''}
-                    distance={`${station.distance.toFixed(1)} km`}
-                    price93={station.price93}
-                  />
-                );
-              })}
+              {gasStations.map((station) => (
+                <OfferCard
+                  key={station.id}
+                  brandLogo={station.brandLogo}
+                  brandName={station.brand}
+                  location={`${station.address}${station.comuna ? `, ${station.comuna}` : ''}`}
+                  distance={`${station.distance.toFixed(1)} km`}
+                  price93={station.price93}
+                />
+              ))}
             </ScrollView>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
