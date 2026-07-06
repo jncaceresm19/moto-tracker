@@ -95,7 +95,7 @@ export default function TrackingScreen() {
           <Ionicons name="time" size={20} color={colors.amber} />
           <Text style={[styles.infoLabel, { color: colors.inkFaint }]}>{t('lastUpdate')}</Text>
           <Text style={[styles.infoValue, { color: colors.ink }]}>
-            {location ? new Date(location.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) : '--'}
+            {location ? new Date(location.timestamp).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--'}
           </Text>
         </View>
       </View>
