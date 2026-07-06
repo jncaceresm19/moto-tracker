@@ -10,7 +10,7 @@ import { listMotorcycles, Motorcycle } from '../../src/api';
 import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
-import { GasStation, getNearbyGasStations, getCurrentLocation, BRAND_COLORS } from '../../src/services/gasStations';
+import { GasStation, getNearbyGasStations, getCurrentLocation, BRAND_COLORS, BRAND_ICONS } from '../../src/services/gasStations';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -148,13 +148,14 @@ export default function HomeScreen() {
               {gasStations.map((station) => {
                 const brandLower = station.brand.toLowerCase();
                 const brandColor = Object.entries(BRAND_COLORS).find(([k]) => brandLower.includes(k))?.[1] || '#F5A623';
+                const brandIcon = (Object.entries(BRAND_ICONS).find(([k]) => brandLower.includes(k))?.[1] || 'flame') as keyof typeof Ionicons.glyphMap;
                 return (
                   <OfferCard
                     key={station.id}
-                    brandLogo="flame"
+                    brandLogo={brandIcon}
                     brandColor={brandColor}
-                    brandName={station.brand || 'Bencinera'}
-                    location={station.address || station.name}
+                    brandName={station.brand || station.name}
+                    location={station.address || ''}
                     distance={`${station.distance.toFixed(1)} km`}
                     pricePerLiter={station.pricePerLiter}
                   />

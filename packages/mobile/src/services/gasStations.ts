@@ -11,15 +11,13 @@ export interface GasStation {
   pricePerLiter?: number;
 }
 
-// Brand logo mapping (font icon names)
-export const BRAND_LOGOS: Record<string, keyof typeof import('@expo/vector-icons').Ionicons.glyphMap> = {
-  'shell': 'flame',
-  'copec': 'flame',
-  'esso': 'flame',
-  'petrobras': 'flame',
-  'enex': 'flame',
-  'petrolera': 'flame',
-  'bencinera': 'flame',
+// Brand icon mapping
+export const BRAND_ICONS: Record<string, keyof typeof import('@expo/vector-icons').Ionicons.glyphMap> = {
+  'shell': 'logo-shield',
+  'copec': 'car-sport',
+  'esso': 'rocket',
+  'petrobras': 'thunderstorm',
+  'enex': 'leaf',
 };
 
 // Brand colors
@@ -86,6 +84,7 @@ export async function getNearbyGasStations(
     .filter((el) => el.tags?.name)
     .map((el) => {
       const brand = el.tags.brand || el.tags.operator || '';
+      console.log('[GAS] Station:', el.tags.name, '| brand:', brand, '| tags:', Object.keys(el.tags).join(','));
       return {
         id: String(el.id),
         name: el.tags.name || 'Gas station',
