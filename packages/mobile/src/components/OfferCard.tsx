@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   brandLogo: { width: 48, height: 48, borderRadius: 8 },
   logoFallback: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   distance: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  location: { fontSize: 11, lineHeight: 15, marginTop: 6 },
+  location: { fontSize: 11, lineHeight: 15, marginTop: 4 },
   pricesContainer: { marginTop: 8, gap: 2 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fuelLabel: { fontSize: 12, fontWeight: '600' },
