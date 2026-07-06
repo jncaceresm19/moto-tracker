@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../theme-context';
 
 interface AlertButton {
   text: string;
@@ -18,7 +19,10 @@ interface CustomAlertProps {
   onClose: () => void;
 }
 
-export function CustomAlert({ visible, title, message, buttons, icon, iconColor = '#007AFF', onClose }: CustomAlertProps) {
+export function CustomAlert({ visible, title, message, buttons, icon, iconColor, onClose }: CustomAlertProps) {
+  const { colors } = useTheme();
+  const primary = iconColor || colors.primary;
+
   const handlePress = (btn: AlertButton) => {
     onClose();
     btn.onPress?.();
@@ -29,8 +33,8 @@ export function CustomAlert({ visible, title, message, buttons, icon, iconColor 
       <View style={styles.overlay}>
         <View style={styles.container}>
           {icon && (
-            <View style={[styles.iconContainer, { backgroundColor: iconColor + '15' }]}>
-              <Ionicons name={icon} size={32} color={iconColor} />
+            <View style={[styles.iconContainer, { backgroundColor: primary + '15' }]}>
+              <Ionicons name={icon} size={32} color={primary} />
             </View>
           )}
           <Text style={styles.title}>{title}</Text>
@@ -41,6 +45,7 @@ export function CustomAlert({ visible, title, message, buttons, icon, iconColor 
                 key={i}
                 style={[
                   styles.button,
+                  { backgroundColor: primary },
                   btn.style === 'destructive' && styles.destructiveBtn,
                   btn.style === 'cancel' && styles.cancelBtn,
                   buttons.length === 1 && styles.singleBtn,
@@ -116,7 +121,6 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
