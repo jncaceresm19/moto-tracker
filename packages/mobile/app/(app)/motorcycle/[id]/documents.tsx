@@ -333,7 +333,8 @@ export default function DocumentsScreen() {
           )}
           <View style={styles.photoViewerActions}>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleSaveAsPDF(viewing)}>
-              <Text style={styles.photoViewerBtnText}>📥 {t('saveAsPdf')}</Text>
+              <Ionicons name="download-outline" size={20} color="#fff" />
+              <Text style={styles.photoViewerBtnText}>{t('download')}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleShare(viewing)}>
               <Text style={styles.photoViewerBtnText}>↗ {t('share')}</Text>
@@ -489,7 +490,7 @@ const styles = StyleSheet.create({
   photoViewerCloseText: { color: '#fff', fontSize: 24 },
   photoViewerImage: { width: '90%', height: '70%' },
   photoViewerActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
-  photoViewerBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8 },
+  photoViewerBtn: { backgroundColor: 'rgba(255,255,255,0.2)', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, gap: 8 },
   photoViewerBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   // Create/Edit Modal
   modal: { flex: 1, padding: 20 },
