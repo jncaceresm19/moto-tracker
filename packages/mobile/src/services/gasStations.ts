@@ -34,14 +34,20 @@ export async function getNearbyGasStations(
   radiusMeters = 5000
 ): Promise<GasStation[]> {
   const query = buildOverpassQuery(lat, lon, radiusMeters);
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-  console.log('[GAS] URL:', url);
-  const response = await fetch(url);
+  console.log('[GAS] Query:', query);
+  const response = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'MotoTracker/1.0',
+    },
+    body: `data=${encodeURIComponent(query)}`,
+  });
   console.log('[GAS] Response status:', response.status);
   if (!response.ok) {
     const text = await response.text();
-    console.log('[GAS] Response body:', text.substring(0, 200));
+    console.log('[GAS] Response body:', text.substring(0, 300));
     throw new Error('Failed to fetch gas stations');
   }
 
