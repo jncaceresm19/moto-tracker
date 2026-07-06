@@ -235,19 +235,11 @@ export default function DocumentsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('documents')}</Text>
-        <View style={styles.headerActions}>
-          {docs.some((d) => d.fileUrl) && (
-            <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
-              <Text style={styles.bulkBtnText}>📄 {t('saveAll')}</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-            <Text style={styles.addBtnText}>+ {t('addDocument')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      {docs.some((d) => d.fileUrl) && (
+        <TouchableOpacity style={styles.bulkBtn} onPress={handleBulkSaveAsPDF}>
+          <Text style={styles.bulkBtnText}>📄 {t('saveAll')}</Text>
+        </TouchableOpacity>
+      )}
 
       <FlatList
         data={docs}
@@ -277,6 +269,10 @@ export default function DocumentsScreen() {
           </TouchableOpacity>
         )}
       />
+
+      <TouchableOpacity style={styles.fab} onPress={openCreate}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
 
       {/* Detail Modal */}
       <Modal visible={viewing !== null} animationType="slide" presentationStyle="pageSheet">
@@ -501,4 +497,21 @@ const styles = StyleSheet.create({
   datePlaceholder: { fontSize: 15, color: '#999' },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
 });

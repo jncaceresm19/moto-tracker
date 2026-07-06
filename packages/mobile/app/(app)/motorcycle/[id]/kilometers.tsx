@@ -133,13 +133,6 @@ export default function KilometersScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('kilometerHistory')}</Text>
-        <TouchableOpacity style={styles.addBtn} onPress={openCreate}>
-          <Text style={styles.addBtnText}>+ {t('addEntry')}</Text>
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={entries}
         keyExtractor={(item) => item.id}
@@ -165,6 +158,10 @@ export default function KilometersScreen() {
           </TouchableOpacity>
         )}
       />
+
+      <TouchableOpacity style={styles.fab} onPress={openCreate}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
 
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -234,4 +231,21 @@ const styles = StyleSheet.create({
   datePlaceholder: { fontSize: 15, color: '#999' },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
 });
