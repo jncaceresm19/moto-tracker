@@ -12,13 +12,7 @@ export interface GasStation {
 
 // Overpass API query for fuel stations near a location
 function buildOverpassQuery(lat: number, lon: number, radiusMeters = 5000): string {
-  return `
-    [out:json][timeout:10];
-    (
-      node["amenity"="fuel"](around:${radiusMeters},${lat},${lon});
-    );
-    out body;
-  `;
+  return `[out:json][timeout:10];(node["amenity"="fuel"](around:${radiusMeters},${lat},${lon}););out body;`;
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -40,10 +34,13 @@ export async function getNearbyGasStations(
   radiusMeters = 5000
 ): Promise<GasStation[]> {
   const query = buildOverpassQuery(lat, lon, radiusMeters);
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
-  console.log('[GAS] Fetching:', url.substring(0, 100) + '...');
-  const response = await fetch(url);
+  console.log('[GAS] Query:', query);
+  const response = await fetch('https://overpass-api.de/api/interpreter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `data=${encodeURIComponent(query)}`,
+  });
   console.log('[GAS] Response status:', response.status);
   if (!response.ok) throw new Error('Failed to fetch gas stations');
 
