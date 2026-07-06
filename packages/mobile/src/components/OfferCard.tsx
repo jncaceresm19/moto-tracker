@@ -79,16 +79,16 @@ export function OfferCard({
 }
 
 const styles = StyleSheet.create({
-  card: { width: 200, borderRadius: 14, borderWidth: 1, padding: 14, marginRight: 10 },
+  card: { width: 180, borderRadius: 14, borderWidth: 1, padding: 12, marginRight: 10 },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   brandLogo: { width: 48, height: 48, borderRadius: 8 },
   logoFallback: { width: 48, height: 48, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
-  distance: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  location: { fontSize: 12, lineHeight: 16, marginTop: 8 },
-  pricesContainer: { marginTop: 10, gap: 4 },
+  distance: { fontSize: 11, fontWeight: '600', marginTop: 2 },
+  location: { fontSize: 11, lineHeight: 15, marginTop: 6 },
+  pricesContainer: { marginTop: 8, gap: 2 },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  fuelLabel: { fontSize: 13, fontWeight: '600' },
-  price: { fontSize: 15, fontWeight: '700', fontFamily: 'monospace' },
-  savingsBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 8 },
-  savingsText: { fontSize: 11, fontWeight: '600', color: '#1F9D63' },
+  fuelLabel: { fontSize: 12, fontWeight: '600' },
+  price: { fontSize: 14, fontWeight: '700', fontFamily: 'monospace' },
+  savingsBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 6, alignSelf: 'center' },
+  savingsText: { fontSize: 10, fontWeight: '600', color: '#1F9D63' },
 });
