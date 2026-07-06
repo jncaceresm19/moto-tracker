@@ -157,7 +157,7 @@ export default function HomeScreen() {
                     brandName={station.brand || station.name}
                     location={station.address || ''}
                     distance={`${station.distance.toFixed(1)} km`}
-                    pricePerLiter={station.pricePerLiter}
+                    price93={station.price93}
                   />
                 );
               })}

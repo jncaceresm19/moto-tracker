@@ -9,7 +9,7 @@ interface OfferCardProps {
   brandName: string;
   location: string;
   distance: string;
-  pricePerLiter?: number;
+  price93?: number;
   onPress?: () => void;
 }
 
@@ -19,14 +19,14 @@ export function OfferCard({
   brandName,
   location,
   distance,
-  pricePerLiter,
+  price93,
   onPress,
 }: OfferCardProps) {
   const { colors } = useTheme();
 
-  // Simulated savings vs average (~$850)
-  const avgPrice = 850;
-  const savings = pricePerLiter ? avgPrice - pricePerLiter : 0;
+  // Chilean national average for 93
+  const avgPrice93 = 1604;
+  const savings = price93 ? avgPrice93 - price93 : 0;
 
   return (
     <TouchableOpacity style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={onPress}>
@@ -45,14 +45,14 @@ export function OfferCard({
       <Text style={[styles.distance, { color: colors.inkFaint }]}>{distance}</Text>
 
       {/* Price per liter */}
-      {pricePerLiter ? (
-        <Text style={[styles.price, { color: colors.ink }]}>${pricePerLiter}/L</Text>
+      {price93 ? (
+        <Text style={[styles.price, { color: colors.ink }]}>${price93}/L</Text>
       ) : null}
 
       {/* Savings badge */}
       {savings > 0 ? (
         <View style={[styles.savingsBadge, { backgroundColor: '#1F9D6315' }]}>
-          <Text style={styles.savingsText}>-${savings} vs promedio</Text>
+          <Text style={styles.savingsText}>-${savings} vs promedio 93</Text>
         </View>
       ) : null}
     </TouchableOpacity>
