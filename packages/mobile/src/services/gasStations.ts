@@ -67,7 +67,10 @@ async function fetchAllStations(): Promise<any[]> {
   if (!response.ok) throw new Error('Failed to fetch CNE stations');
 
   const data = await response.json();
-  return data.data || data.estaciones || [];
+  console.log('[CNE] Response type:', Array.isArray(data) ? 'array' : typeof data, 'keys:', Object.keys(data).slice(0, 5).join(','));
+  // API returns array directly OR { data: [...] } OR { estaciones: [...] }
+  if (Array.isArray(data)) return data;
+  return data.data || data.estaciones || Object.values(data).find(Array.isArray) || [];
 }
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
