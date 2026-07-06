@@ -42,11 +42,14 @@ export async function getNearbyGasStations(
   const query = buildOverpassQuery(lat, lon, radiusMeters);
   const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
 
+  console.log('[GAS] Fetching:', url.substring(0, 100) + '...');
   const response = await fetch(url);
+  console.log('[GAS] Response status:', response.status);
   if (!response.ok) throw new Error('Failed to fetch gas stations');
 
   const data = await response.json();
   const elements: any[] = data.elements || [];
+  console.log('[GAS] Raw elements:', elements.length);
 
   const stations: GasStation[] = elements
     .filter((el) => el.tags?.name)
@@ -62,13 +65,17 @@ export async function getNearbyGasStations(
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 10);
 
+  console.log('[GAS] Processed stations:', stations.length);
   return stations;
 }
 
 export async function getCurrentLocation(): Promise<{ lat: number; lon: number }> {
+  console.log('[GAS] Requesting location permission...');
   const { status } = await Location.requestForegroundPermissionsAsync();
+  console.log('[GAS] Permission status:', status);
   if (status !== 'granted') throw new Error('Location permission denied');
 
   const location = await Location.getCurrentPositionAsync({});
+  console.log('[GAS] Location obtained:', location.coords.latitude, location.coords.longitude);
   return { lat: location.coords.latitude, lon: location.coords.longitude };
 }

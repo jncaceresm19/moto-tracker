@@ -35,10 +35,12 @@ export default function HomeScreen() {
   const loadGasStations = useCallback(async () => {
     try {
       const { lat, lon } = await getCurrentLocation();
+      console.log('[GAS] Location:', lat, lon);
       const stations = await getNearbyGasStations(lat, lon);
+      console.log('[GAS] Found:', stations.length, 'stations');
       setGasStations(stations);
-    } catch {
-      // Silent fail — show empty state
+    } catch (e: any) {
+      console.log('[GAS] Error:', e?.message || 'Unknown');
     }
   }, []);
 
