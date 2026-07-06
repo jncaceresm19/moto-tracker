@@ -93,11 +93,12 @@ function parsePrice(priceStr: string | undefined): number | undefined {
 export async function getNearbyGasStations(
   lat: number,
   lon: number,
-  radiusKm = 10
+  radiusKm = 50
 ): Promise<GasStation[]> {
   console.log('[CNE] Fetching all stations...');
   const allStations = await fetchAllStations();
   console.log('[CNE] Total stations:', allStations.length);
+  console.log('[CNE] Sample station:', JSON.stringify(allStations[0]?.ubicacion || 'none').substring(0, 200));
 
   // Filter and map nearby stations
   const nearby: GasStation[] = [];
@@ -106,7 +107,10 @@ export async function getNearbyGasStations(
     const stationLat = parseFloat(station.ubicacion?.latitud);
     const stationLon = parseFloat(station.ubicacion?.longitud);
 
-    if (isNaN(stationLat) || isNaN(stationLon)) continue;
+    if (isNaN(stationLat) || isNaN(stationLon)) {
+      console.log('[CNE] Skipping station without coords:', station.codigo);
+      continue;
+    }
 
     const distance = haversineDistance(lat, lon, stationLat, stationLon);
     if (distance > radiusKm) continue;
@@ -134,7 +138,7 @@ export async function getNearbyGasStations(
   // Sort by distance
   nearby.sort((a, b) => a.distance - b.distance);
 
-  console.log('[CNE] Nearby stations:', nearby.length);
+  console.log('[CNE] Nearby stations within', radiusKm, 'km:', nearby.length);
   return nearby.slice(0, 15);
 }
 

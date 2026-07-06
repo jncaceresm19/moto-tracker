@@ -38,9 +38,13 @@ export default function HomeScreen() {
       console.log('[GAS] Location:', lat, lon);
       const stations = await getNearbyGasStations(lat, lon);
       console.log('[GAS] Found:', stations.length, 'stations');
+      if (stations.length > 0) {
+        console.log('[GAS] First station:', stations[0].brand, stations[0].address, stations[0].price93);
+      }
       setGasStations(stations);
     } catch (e: any) {
       console.log('[GAS] Error:', e?.message || 'Unknown');
+      console.log('[GAS] Error stack:', e?.stack || 'No stack');
     }
   }, []);
 
