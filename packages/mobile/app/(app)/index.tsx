@@ -58,15 +58,11 @@ export default function HomeScreen() {
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
         <View style={styles.brandRow}>
           <Image
-            source={require('../../assets/logo.jpeg')}
-            style={styles.headerLogo}
+            source={require('../../assets/icon.png')}
+            style={styles.headerIcon}
             resizeMode="contain"
           />
-          <Image
-            source={require('../../assets/nombre.jpeg')}
-            style={styles.headerText}
-            resizeMode="contain"
-          />
+          <Text style={[styles.brandName, { color: colors.headerTintColor }]}>Moto Tracker</Text>
         </View>
         <TouchableOpacity style={styles.bellBtn}>
           <Ionicons name="notifications-outline" size={19} color={colors.headerTintColor} />
@@ -163,9 +159,9 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 10,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  headerLogo: { width: 36, height: 36 },
-  headerText: { width: 130, height: 40 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerIcon: { width: 34, height: 34 },
+  brandName: { fontSize: 17, fontWeight: '700' },
   bellBtn: {
     width: 38,
     height: 38,
