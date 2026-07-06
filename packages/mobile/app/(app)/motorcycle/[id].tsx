@@ -144,14 +144,12 @@ export default function MotorcycleDetailScreen() {
       </View>
 
       {/* GPS Tracking Toggle */}
-      <View style={styles.gpsSection}>
-        <View style={styles.gpsRow}>
-          <View style={styles.gpsInfo}>
-            <Ionicons name="location" size={20} color={gpsEnabled ? '#1F9D63' : '#93A0B4'} />
-            <View>
-              <Text style={styles.gpsTitle}>{t('gpsTracking')}</Text>
-              <Text style={styles.gpsSubtitle}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
-            </View>
+      <View style={styles.section}>
+        <TouchableOpacity style={styles.sectionBtn} onPress={() => setGpsEnabled(!gpsEnabled)}>
+          <Text style={styles.sectionIcon}>📍</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionText}>{t('gpsTracking')}</Text>
+            <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
           </View>
           <Switch
             value={gpsEnabled}
@@ -159,7 +157,7 @@ export default function MotorcycleDetailScreen() {
             trackColor={{ false: '#E1E5EC', true: '#1F9D63' }}
             thumbColor="#FFFFFF"
           />
-        </View>
+        </TouchableOpacity>
         {gpsEnabled && (
           <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(app)/motorcycle/${id}/tracking`)}>
             <Ionicons name="map" size={18} color="#FFFFFF" />
@@ -234,11 +232,6 @@ const styles = StyleSheet.create({
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  gpsSection: { margin: 16, padding: 16, backgroundColor: '#f8f8f8', borderRadius: 12 },
-  gpsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  gpsInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  gpsTitle: { fontSize: 16, fontWeight: '600' },
-  gpsSubtitle: { fontSize: 13, color: '#666', marginTop: 2 },
   mapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1F9D63', borderRadius: 10, padding: 12, marginTop: 12 },
   mapBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
 });

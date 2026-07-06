@@ -94,13 +94,14 @@ export async function createMotorcycle(data: {
   year: number;
   licensePlate: string;
   currentKilometers?: number;
+  gpsTracker?: string;
 }): Promise<Motorcycle> {
   return api<Motorcycle>('/api/motorcycles', { method: 'POST', body: data });
 }
 
 export async function updateMotorcycle(
   id: string,
-  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string }
+  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string }
 ): Promise<Motorcycle> {
   return api<Motorcycle>(`/api/motorcycles/${id}`, { method: 'PUT', body: data });
 }

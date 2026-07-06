@@ -18,7 +18,7 @@ export default function MotorcycleListScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -113,11 +113,12 @@ export default function MotorcycleListScreen() {
         year: Number(form.year),
         licensePlate: form.licensePlate,
         currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
+        gpsTracker: form.gpsTracker || undefined,
         imageUrl: imageUri || undefined,
       });
       setMotorcycles((prev) => [created, ...prev]);
       setShowCreate(false);
-      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '' });
+      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '' });
       setImageUri(null);
       showAlert('Success', 'Motorcycle added', [{text: 'OK'}], 'checkmark-circle', '#34C759');
     } catch {
@@ -298,6 +299,11 @@ export default function MotorcycleListScreen() {
             <TextInput style={dynamicStyles.input} placeholder="License Plate *" placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
             {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
             <TextInput style={dynamicStyles.input} placeholder="Current km (optional)" placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
+            <View style={{ marginTop: 10, marginBottom: 6 }}>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{t('gpsQuestion')}</Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
+            </View>
+            <TextInput style={dynamicStyles.input} placeholder={t('gpsIdPlaceholder')} placeholderTextColor={colors.textMuted} value={form.gpsTracker} onChangeText={(v) => setForm((p) => ({ ...p, gpsTracker: v }))} />
             <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleCreate} disabled={saving}>
               {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>Save</Text>}
             </TouchableOpacity>
