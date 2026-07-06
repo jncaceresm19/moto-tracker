@@ -37,9 +37,6 @@ export function OfferCard({
         </View>
       )}
 
-      {/* Brand name */}
-      <Text style={[styles.brandName, { color: colors.ink }]} numberOfLines={1}>{brandName}</Text>
-
       {/* Location */}
       {location ? (
         <Text style={[styles.location, { color: colors.inkFaint }]} numberOfLines={1}>{location}</Text>
