@@ -10,12 +10,14 @@ import { listMotorcycles, Motorcycle } from '../../src/api';
 import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
+import { GasStation, getNearbyGasStations, getCurrentLocation } from '../../src/services/gasStations';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const { user } = useAuth();
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
+  const [gasStations, setGasStations] = useState<GasStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -30,17 +32,29 @@ export default function HomeScreen() {
     }
   }, [user]);
 
-  useEffect(() => { loadMotorcycles(); }, [loadMotorcycles]);
+  const loadGasStations = useCallback(async () => {
+    try {
+      const { lat, lon } = await getCurrentLocation();
+      const stations = await getNearbyGasStations(lat, lon);
+      setGasStations(stations);
+    } catch {
+      // Silent fail — show empty state
+    }
+  }, []);
+
+  useEffect(() => {
+    loadMotorcycles();
+    loadGasStations();
+  }, [loadMotorcycles, loadGasStations]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadMotorcycles();
+    await Promise.all([loadMotorcycles(), loadGasStations()]);
     setRefreshing(false);
   };
 
   const firstMoto = motorcycles[0];
   const hasAlerts = false;
-  const hasOffers = false;
 
   if (loading) {
     return (
@@ -127,12 +141,18 @@ export default function HomeScreen() {
         {/* Section: Ahorra en tu ruta */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
-          {hasOffers ? (
+          {gasStations.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
-              <OfferCard icon="flame" iconBg={colors.amberBg} name="Shell Bellavista" distance="1.2 km" price="$799/L" savings="- $32 vs promedio" />
-              <OfferCard icon="water" iconBg={colors.brandBlueBg} name="Lavado Express" distance="800 m" price="$3.500" />
-              <OfferCard icon="flame" iconBg={colors.amberBg} name="Copec Viña" distance="2.1 km" price="$815/L" />
-              <OfferCard icon="water" iconBg={colors.brandBlueBg} name="AutoSpa" distance="1.5 km" price="$4.200" savings="- $800 vs promedio" />
+              {gasStations.map((station) => (
+                <OfferCard
+                  key={station.id}
+                  icon="flame"
+                  iconBg={colors.amberBg}
+                  name={station.name}
+                  distance={`${station.distance.toFixed(1)} km`}
+                  price={station.brand || 'Bencinera'}
+                />
+              ))}
             </ScrollView>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
