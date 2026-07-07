@@ -428,30 +428,30 @@ export default function DocumentsScreen() {
           <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
             {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
           </TouchableOpacity>
+
+          {/* Inline photo picker overlay inside modal */}
+          {showPhotoModal && (
+            <View style={styles.photoOverlay}>
+              <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
+              <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
+                <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}>
+                  <Ionicons name="close" size={24} color={colors.text} />
+                </TouchableOpacity>
+                <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
+                <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}>
+                  <Ionicons name="camera" size={20} color="#fff" />
+                  <Text style={styles.photoOverlayBtnText}>{t('takePhoto')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}>
+                  <Ionicons name="images" size={20} color="#fff" />
+                  <Text style={styles.photoOverlayBtnText}>{t('chooseFromGallery')}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-      {/* Inline photo picker overlay - no nested Modal */}
-      {showPhotoModal && (
-        <View style={styles.photoOverlay}>
-          <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
-          <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
-            <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}>
-              <Ionicons name="close" size={24} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
-            <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}>
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.photoOverlayBtnText}>{t('takePhoto')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}>
-              <Ionicons name="images" size={20} color="#fff" />
-              <Text style={styles.photoOverlayBtnText}>{t('chooseFromGallery')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
 
       <CustomAlert
         visible={alertVisible}
