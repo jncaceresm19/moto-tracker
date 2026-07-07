@@ -8,8 +8,8 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
+import { useTheme } from '../../../../src/theme-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
-import { PhotoPickerModal } from '../../../../src/components/PhotoPickerModal';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
 
@@ -26,6 +26,7 @@ export default function DocumentsScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const { t } = useLanguage();
+  const { colors } = useTheme();
 
   useEffect(() => {
     navigation.setOptions({
@@ -431,12 +432,26 @@ export default function DocumentsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <PhotoPickerModal
-        visible={showPhotoModal}
-        onClose={() => setShowPhotoModal(false)}
-        onCamera={() => pickImage(true)}
-        onGallery={() => pickImage(false)}
-      />
+      {/* Inline photo picker overlay - no nested Modal */}
+      {showPhotoModal && (
+        <View style={styles.photoOverlay}>
+          <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
+          <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
+            <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}>
+              <Ionicons name="camera" size={20} color="#fff" />
+              <Text style={styles.photoOverlayBtnText}>{t('takePhoto')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}>
+              <Ionicons name="images" size={20} color="#fff" />
+              <Text style={styles.photoOverlayBtnText}>{t('chooseFromGallery')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <CustomAlert
         visible={alertVisible}
@@ -572,4 +587,55 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
+  photoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  photoOverlayBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  photoOverlayContent: {
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  photoOverlayClose: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  photoOverlayTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 24,
+    marginTop: 8,
+  },
+  photoOverlayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  photoOverlayBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
