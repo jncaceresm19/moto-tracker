@@ -10,7 +10,7 @@ import { listMotorcycles, Motorcycle } from '../../src/api';
 import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
-import { GasStation, getNearbyGasStations, getCurrentLocation } from '../../src/services/gasStations';
+import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -18,6 +18,7 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [gasStations, setGasStations] = useState<GasStation[]>([]);
+  const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -34,23 +35,44 @@ export default function HomeScreen() {
 
   const loadGasStations = useCallback(async () => {
     try {
-      const { lat, lon } = await getCurrentLocation();
-      console.log('[GAS] Location:', lat, lon);
-      const stations = await getNearbyGasStations(lat, lon);
-      console.log('[GAS] Found:', stations.length, 'stations');
-      if (stations.length > 0) {
-        console.log('[GAS] First station:', stations[0].brand, stations[0].address, stations[0].price93);
+      // First, load cached data immediately for fast display
+      const cachedStations = await getCachedGasStations();
+      if (cachedStations.length > 0) {
+        console.log('[GAS] Loaded', cachedStations.length, 'cached stations');
+        setGasStations(cachedStations);
       }
-      setGasStations(stations);
+
+      // Load last update timestamp
+      const updateLabel = await getLastUpdateLabel();
+      setLastGasUpdate(updateLabel);
+
+      // Then try to refresh from API
+      try {
+        const { lat, lon } = await getCurrentLocation();
+        console.log('[GAS] Location:', lat, lon);
+        const stations = await getNearbyGasStations(lat, lon);
+        console.log('[GAS] Found:', stations.length, 'stations');
+        if (stations.length > 0) {
+          console.log('[GAS] First station:', stations[0].brand, stations[0].address, stations[0].price93);
+        }
+        setGasStations(stations);
+        
+        // Update timestamp after refresh
+        const newLabel = await getLastUpdateLabel();
+        setLastGasUpdate(newLabel);
+      } catch (locationError: any) {
+        console.log('[GAS] Location/API error:', locationError?.message || 'Unknown');
+        // Keep cached data if available
+      }
     } catch (e: any) {
       console.log('[GAS] Error:', e?.message || 'Unknown');
-      // Keep previous data if available - don't clear on location error
     }
   }, []);
 
   useEffect(() => {
-    loadMotorcycles();
+    // Load cached gas stations immediately on mount (no await - runs in background)
     loadGasStations();
+    loadMotorcycles();
   }, [loadMotorcycles, loadGasStations]);
 
   const onRefresh = async () => {
@@ -152,20 +174,27 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
           {gasStations.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
-              {gasStations.map((station) => (
-                <OfferCard
-                  key={station.id}
-                  brandLogo={station.brandLogo}
-                  brandName={station.brand}
-                  location={`${station.address}${station.comuna ? `, ${station.comuna}` : ''}`}
-                  distance={`${station.distance.toFixed(1)} km`}
-                  price93={station.price93}
-                  price95={station.price95}
-                  price97={station.price97}
-                />
-              ))}
-            </ScrollView>
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+                {gasStations.map((station) => (
+                  <OfferCard
+                    key={station.id}
+                    brandLogo={station.brandLogo}
+                    brandName={station.brand}
+                    location={`${station.address}${station.comuna ? `, ${station.comuna}` : ''}`}
+                    distance={`${station.distance.toFixed(1)} km`}
+                    price93={station.price93}
+                    price95={station.price95}
+                    price97={station.price97}
+                  />
+                ))}
+              </ScrollView>
+              {lastGasUpdate && (
+                <Text style={[styles.lastUpdateText, { color: colors.inkFaint }]}>
+                  Precios {lastGasUpdate}
+                </Text>
+              )}
+            </>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={styles.emptyCardIcon}>⛽</Text>
@@ -226,4 +255,5 @@ const styles = StyleSheet.create({
   emptyCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },
   emptyCardText: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   offersScroll: { paddingRight: 16 },
+  lastUpdateText: { fontSize: 11, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
 });

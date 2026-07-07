@@ -1,4 +1,5 @@
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface GasStation {
   id: string;
@@ -17,6 +18,89 @@ export interface GasStation {
   priceDiesel?: number;
   priceKerosene?: number;
   lastUpdate?: string;
+}
+
+// Cache keys
+const CACHE_KEY_GAS_STATIONS = 'moto-tracker-gas-stations';
+const CACHE_KEY_LAST_UPDATE = 'moto-tracker-gas-update-time';
+
+// Cache functions
+async function saveStationsCache(stations: GasStation[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CACHE_KEY_GAS_STATIONS, JSON.stringify(stations));
+    await AsyncStorage.setItem(CACHE_KEY_LAST_UPDATE, new Date().toISOString());
+  } catch (e) {
+    console.log('[CACHE] Error saving stations:', e);
+  }
+}
+
+async function loadStationsCache(): Promise<GasStation[]> {
+  try {
+    const cached = await AsyncStorage.getItem(CACHE_KEY_GAS_STATIONS);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.log('[CACHE] Error loading stations:', e);
+  }
+  return [];
+}
+
+async function getLastUpdateTime(): Promise<Date | null> {
+  try {
+    const lastUpdate = await AsyncStorage.getItem(CACHE_KEY_LAST_UPDATE);
+    if (lastUpdate) {
+      return new Date(lastUpdate);
+    }
+  } catch (e) {
+    console.log('[CACHE] Error loading last update time:', e);
+  }
+  return null;
+}
+
+// Check if we should refresh data
+async function shouldRefreshData(): Promise<boolean> {
+  const lastUpdate = await getLastUpdateTime();
+  if (!lastUpdate) return true; // Never updated
+  
+  const now = new Date();
+  const today = now.getDay(); // 0 = Sunday, 4 = Thursday
+  const lastDay = lastUpdate.getDay();
+  const hoursSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60);
+  
+  // 1. If today is Thursday and we haven't updated today → refresh
+  if (today === 4) {
+    const lastUpdateDay = lastUpdate.toDateString();
+    const todayDate = now.toDateString();
+    if (lastUpdateDay !== todayDate) return true;
+  }
+  
+  // 2. If last update was before this Thursday and today is Thursday or later → refresh
+  if (today >= 4 && lastDay < 4) return true;
+  
+  // 3. If data is older than 3 days → refresh
+  if (hoursSinceUpdate > 72) return true;
+  
+  return false;
+}
+
+// Get human-readable time since last update
+export async function getLastUpdateLabel(): Promise<string | null> {
+  const lastUpdate = await getLastUpdateTime();
+  if (!lastUpdate) return null;
+  
+  const now = new Date();
+  const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60));
+  
+  if (hoursSinceUpdate < 1) return 'hace menos de 1 hora';
+  if (hoursSinceUpdate === 1) return 'hace 1 hora';
+  if (hoursSinceUpdate < 24) return `hace ${hoursSinceUpdate} horas`;
+  
+  const daysSinceUpdate = Math.floor(hoursSinceUpdate / 24);
+  if (daysSinceUpdate === 1) return 'hace 1 día';
+  if (daysSinceUpdate < 7) return `hace ${daysSinceUpdate} días`;
+  
+  return `hace más de ${daysSinceUpdate} días`;
 }
 
 // CNE API credentials
@@ -96,53 +180,99 @@ function parsePrice(priceStr: string | undefined): number | undefined {
 export async function getNearbyGasStations(
   lat: number,
   lon: number,
-  radiusKm = 50
+  radiusKm = 50,
+  forceRefresh = false
 ): Promise<GasStation[]> {
-  console.log('[CNE] Fetching all stations...');
-  const allStations = await fetchAllStations();
-  console.log('[CNE] Total stations:', allStations.length);
-  console.log('[CNE] Sample station:', JSON.stringify(allStations[0]?.ubicacion || 'none').substring(0, 200));
-
-  // Filter and map nearby stations
-  const nearby: GasStation[] = [];
-
-  for (const station of allStations) {
-    const stationLat = parseFloat(station.ubicacion?.latitud);
-    const stationLon = parseFloat(station.ubicacion?.longitud);
-
-    if (isNaN(stationLat) || isNaN(stationLon)) {
-      console.log('[CNE] Skipping station without coords:', station.codigo);
-      continue;
+  // Check if we should refresh
+  const shouldRefresh = forceRefresh || await shouldRefreshData();
+  
+  if (!shouldRefresh) {
+    // Use cached data
+    const cached = await loadStationsCache();
+    if (cached.length > 0) {
+      console.log('[CACHE] Using cached stations:', cached.length);
+      // Recalculate distance from current location
+      const withDistance = cached.map(station => ({
+        ...station,
+        distance: haversineDistance(lat, lon, station.latitude, station.longitude)
+      }));
+      withDistance.sort((a, b) => a.distance - b.distance);
+      return withDistance.slice(0, 15);
     }
-
-    const distance = haversineDistance(lat, lon, stationLat, stationLon);
-    if (distance > radiusKm) continue;
-
-    nearby.push({
-      id: station.codigo,
-      name: station.razon_social || station.distribuidor?.marca || 'Estación',
-      brand: station.distribuidor?.marca || '',
-      brandLogo: station.distribuidor?.logo,
-      distance,
-      latitude: stationLat,
-      longitude: stationLon,
-      address: station.ubicacion?.direccion || '',
-      comuna: station.ubicacion?.nombre_comuna || '',
-      region: station.ubicacion?.nombre_region || '',
-      price93: parsePrice(station.precios?.['93']?.precio),
-      price95: parsePrice(station.precios?.['95']?.precio),
-      price97: parsePrice(station.precios?.['97']?.precio),
-      priceDiesel: parsePrice(station.precios?.['DI']?.precio),
-      priceKerosene: parsePrice(station.precios?.['KE']?.precio),
-      lastUpdate: station.precios?.['93']?.fecha_actualizacion,
-    });
   }
 
-  // Sort by distance
-  nearby.sort((a, b) => a.distance - b.distance);
+  console.log('[CNE] Fetching fresh data...');
+  try {
+    console.log('[CNE] Fetching all stations...');
+    const allStations = await fetchAllStations();
+    console.log('[CNE] Total stations:', allStations.length);
+    console.log('[CNE] Sample station:', JSON.stringify(allStations[0]?.ubicacion || 'none').substring(0, 200));
 
-  console.log('[CNE] Nearby stations within', radiusKm, 'km:', nearby.length);
-  return nearby.slice(0, 15);
+    // Filter and map nearby stations
+    const nearby: GasStation[] = [];
+
+    for (const station of allStations) {
+      const stationLat = parseFloat(station.ubicacion?.latitud);
+      const stationLon = parseFloat(station.ubicacion?.longitud);
+
+      if (isNaN(stationLat) || isNaN(stationLon)) {
+        console.log('[CNE] Skipping station without coords:', station.codigo);
+        continue;
+      }
+
+      const distance = haversineDistance(lat, lon, stationLat, stationLon);
+      if (distance > radiusKm) continue;
+
+      nearby.push({
+        id: station.codigo,
+        name: station.razon_social || station.distribuidor?.marca || 'Estación',
+        brand: station.distribuidor?.marca || '',
+        brandLogo: station.distribuidor?.logo,
+        distance,
+        latitude: stationLat,
+        longitude: stationLon,
+        address: station.ubicacion?.direccion || '',
+        comuna: station.ubicacion?.nombre_comuna || '',
+        region: station.ubicacion?.nombre_region || '',
+        price93: parsePrice(station.precios?.['93']?.precio),
+        price95: parsePrice(station.precios?.['95']?.precio),
+        price97: parsePrice(station.precios?.['97']?.precio),
+        priceDiesel: parsePrice(station.precios?.['DI']?.precio),
+        priceKerosene: parsePrice(station.precios?.['KE']?.precio),
+        lastUpdate: station.precios?.['93']?.fecha_actualizacion,
+      });
+    }
+
+    // Sort by distance
+    nearby.sort((a, b) => a.distance - b.distance);
+    
+    const result = nearby.slice(0, 15);
+    
+    // Cache the result
+    await saveStationsCache(result);
+    console.log('[CACHE] Saved', result.length, 'stations to cache');
+    
+    console.log('[CNE] Nearby stations within', radiusKm, 'km:', result.length);
+    return result;
+  } catch (error) {
+    console.log('[CNE] Error fetching fresh data:', error);
+    // Fallback to cache on error
+    const cached = await loadStationsCache();
+    if (cached.length > 0) {
+      console.log('[CACHE] Falling back to cached stations:', cached.length);
+      const withDistance = cached.map(station => ({
+        ...station,
+        distance: haversineDistance(lat, lon, station.latitude, station.longitude)
+      }));
+      withDistance.sort((a, b) => a.distance - b.distance);
+      return withDistance.slice(0, 15);
+    }
+    throw error;
+  }
+}
+
+export async function getCachedGasStations(): Promise<GasStation[]> {
+  return await loadStationsCache();
 }
 
 export async function getCurrentLocation(): Promise<{ lat: number; lon: number }> {

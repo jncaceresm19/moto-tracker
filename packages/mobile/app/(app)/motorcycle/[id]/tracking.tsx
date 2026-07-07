@@ -5,20 +5,32 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '../../../../src/theme-context';
 import { useLanguage } from '../../../../src/language-context';
+import { getMotorcycle, Motorcycle } from '../../../../src/api';
 
 export default function TrackingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors } = useTheme();
   const { t } = useLanguage();
+  const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   const watchRef = useRef<Location.LocationSubscription | null>(null);
 
+  const hasGpsTracker = motorcycle?.gpsTracker ?? false;
+
   useEffect(() => {
     (async () => {
+      // Fetch motorcycle data first
+      try {
+        const moto = await getMotorcycle(id);
+        setMotorcycle(moto);
+      } catch {
+        // Continue without motorcycle data
+      }
+
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setError(t('locationPermissionNeeded'));
@@ -89,7 +101,26 @@ export default function TrackingScreen() {
     );
   }
 
-  // Permission granted but no location yet - show placeholder
+  // No GPS tracker registered
+  if (!hasGpsTracker) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <View style={[styles.emptyIcon, { backgroundColor: colors.surface }]}>
+          <Ionicons name="location-outline" size={48} color={colors.inkFaint} />
+        </View>
+        <Text style={[styles.emptyTitle, { color: colors.ink }]}>{t('noGpsRegistered')}</Text>
+        <Text style={[styles.emptySubtitle, { color: colors.inkFaint }]}>
+          {t('noGpsRegisteredHint')}
+        </Text>
+        <TouchableOpacity style={[styles.enableBtn, { backgroundColor: colors.primary }]} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color="#fff" />
+          <Text style={styles.enableBtnText}>{t('goBack')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Has GPS but no location yet - show waiting
   if (!location) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>

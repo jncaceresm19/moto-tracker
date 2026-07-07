@@ -23,6 +23,7 @@ const createMotorcycleSchema = z.object({
   modelId: z.string().uuid().optional(),
   currentKilometers: z.number().min(0).optional().default(0),
   imageUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').optional(),
+  gpsTracker: z.string().max(100).nullable().optional(),
 });
 
 const updateMotorcycleSchema = z.object({
@@ -34,6 +35,7 @@ const updateMotorcycleSchema = z.object({
   modelId: z.string().uuid().nullable().optional(),
   currentKilometers: z.number().min(0).optional(),
   imageUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').nullable().optional(),
+  gpsTracker: z.string().max(100).nullable().optional(),
 });
 
 const motorcycleIdParam = z.object({
@@ -110,7 +112,7 @@ router.get('/:id', validateParams(motorcycleIdParam), async (req: Request, res: 
 router.post('/', validateBody(createMotorcycleSchema), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { brand, model, year, licensePlate, brandId, modelId, currentKilometers, imageUrl } = req.body;
+    const { brand, model, year, licensePlate, brandId, modelId, currentKilometers, imageUrl, gpsTracker } = req.body;
 
     // Check for duplicate license plate
     const existing = await db
@@ -139,6 +141,7 @@ router.post('/', validateBody(createMotorcycleSchema), async (req: Request, res:
       modelId: modelId ?? null,
       currentKilometers: currentKilometers ?? 0,
       imageUrl: imageUrl ?? null,
+      gpsTracker: gpsTracker ?? null,
       createdAt: now,
       updatedAt: now,
     });

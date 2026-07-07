@@ -35,8 +35,18 @@ export default function MotorcycleDetailScreen() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      try { setMotorcycle(await getMotorcycle(id)); }
-      catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
+      try { 
+        console.log('[MOTO] Loading motorcycle:', id);
+        const moto = await getMotorcycle(id);
+        console.log('[MOTO] Loaded:', moto.brand, moto.model);
+        setMotorcycle(moto);
+        setGpsEnabled(!!moto.gpsTracker);
+      }
+      catch (e: any) {
+        console.log('[MOTO] Error:', e?.message, e?.status);
+        const msg = e?.status === 401 ? t('sessionExpired') : t('failedToLoad');
+        showAlert(t('error'), msg, [{text: 'OK'}], 'close-circle', '#FF3B30');
+      }
       finally { setLoading(false); }
     })();
   }, [id]);
@@ -65,6 +75,7 @@ export default function MotorcycleDetailScreen() {
     setErrors({});
     setSaving(true);
     try {
+      console.log('[MOTO] Updating motorcycle:', id, 'gpsTracker:', form.gpsTracker);
       const updated = await updateMotorcycle(id, {
         brand: form.brand,
         model: form.model,
@@ -73,10 +84,13 @@ export default function MotorcycleDetailScreen() {
         currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
         gpsTracker: form.gpsTracker || undefined,
       });
+      console.log('[MOTO] Updated. GPS tracker in response:', updated.gpsTracker);
       setMotorcycle(updated);
+      setGpsEnabled(!!updated.gpsTracker); // Update switch state
       setEditing(false);
       showAlert(t('success'), t('motorcycleUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
-    } catch {
+    } catch (e: any) {
+      console.log('[MOTO] Update error:', e?.message);
       showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
@@ -98,7 +112,17 @@ export default function MotorcycleDetailScreen() {
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
-  if (!motorcycle) return <View style={styles.center}><Text>{t('motorcycleNotFound')}</Text></View>;
+  if (!motorcycle) return (
+    <View style={styles.center}>
+      <Text style={{ fontSize: 16, marginBottom: 16 }}>{t('motorcycleNotFound')}</Text>
+      <TouchableOpacity 
+        style={[styles.editBtn, { backgroundColor: '#007AFF' }]} 
+        onPress={() => router.back()}
+      >
+        <Text style={styles.editBtnText}>{t('goBack')}</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const sections = [
     { title: t('maintenanceRecords'), route: `/(app)/motorcycle/${id}/maintenance`, icon: '🔧' },
@@ -145,24 +169,42 @@ export default function MotorcycleDetailScreen() {
         ))}
 
         {/* GPS Tracking Toggle — same section, no extra spacing */}
-        <TouchableOpacity style={styles.sectionBtn} onPress={() => setGpsEnabled(!gpsEnabled)}>
-          <Text style={styles.sectionIcon}>📍</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.sectionText}>{t('gpsTracking')}</Text>
-            <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
+        {motorcycle.gpsTracker ? (
+          <>
+            <TouchableOpacity style={styles.sectionBtn} onPress={() => setGpsEnabled(!gpsEnabled)}>
+              <Text style={styles.sectionIcon}>📍</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionText}>{t('gpsTracking')}</Text>
+                <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
+              </View>
+              <Switch
+                value={gpsEnabled}
+                onValueChange={setGpsEnabled}
+                trackColor={{ false: '#E1E5EC', true: '#1F9D63' }}
+                thumbColor="#FFFFFF"
+              />
+            </TouchableOpacity>
+            {gpsEnabled && (
+              <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(app)/motorcycle/${id}/tracking`)}>
+                <Ionicons name="map" size={18} color="#FFFFFF" />
+                <Text style={styles.mapBtnText}>{t('viewOnMap')}</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        ) : (
+          <View style={[styles.sectionBtn, { opacity: 0.6 }]}>
+            <Text style={styles.sectionIcon}>📍</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.sectionText}>{t('gpsTracking')}</Text>
+              <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{t('noGpsRegistered')}</Text>
+            </View>
+            <Switch
+              value={false}
+              disabled={true}
+              trackColor={{ false: '#E1E5EC', true: '#1F9D63' }}
+              thumbColor="#FFFFFF"
+            />
           </View>
-          <Switch
-            value={gpsEnabled}
-            onValueChange={setGpsEnabled}
-            trackColor={{ false: '#E1E5EC', true: '#1F9D63' }}
-            thumbColor="#FFFFFF"
-          />
-        </TouchableOpacity>
-        {gpsEnabled && (
-          <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(app)/motorcycle/${id}/tracking`)}>
-            <Ionicons name="map" size={18} color="#FFFFFF" />
-            <Text style={styles.mapBtnText}>{t('viewOnMap')}</Text>
-          </TouchableOpacity>
         )}
       </View>
 

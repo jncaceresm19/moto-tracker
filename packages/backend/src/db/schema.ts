@@ -24,6 +24,7 @@ export const motorcycles = sqliteTable('motorcycles', {
   licensePlate: text('license_plate').notNull().unique(),
   currentKilometers: real('current_kilometers').notNull().default(0),
   imageUrl: text('image_url'),
+  gpsTracker: text('gps_tracker'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
