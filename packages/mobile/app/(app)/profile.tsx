@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput,
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
@@ -13,6 +14,7 @@ export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
   const { mode, colors, toggleTheme } = useTheme();
   const { language, t, setLanguage } = useLanguage();
+  const router = useRouter();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: user?.email?.split('@')[0] || '', email: user?.email || '' });
@@ -185,6 +187,14 @@ export default function ProfileScreen() {
           <View style={styles.rowLeft}>
             <Ionicons name="lock-closed-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('changePassword')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => router.push('/my-publications')}>
+          <View style={styles.rowLeft}>
+            <Ionicons name="document-text-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('myPublications')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
