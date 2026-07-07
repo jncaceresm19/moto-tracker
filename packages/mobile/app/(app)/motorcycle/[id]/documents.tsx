@@ -9,6 +9,7 @@ import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
+import { PhotoPickerModal } from '../../../../src/components/PhotoPickerModal';
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
 
@@ -53,6 +54,7 @@ export default function DocumentsScreen() {
   const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -96,6 +98,7 @@ export default function DocumentsScreen() {
   };
 
   const pickImage = async (fromCamera: boolean) => {
+    setShowPhotoModal(false);
     const permission = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -124,11 +127,7 @@ export default function DocumentsScreen() {
   };
 
   const showImageOptions = () => {
-    showAlert(t('addDocumentPhoto'), t('chooseOption'), [
-      { text: t('takePhoto'), onPress: () => pickImage(true) },
-      { text: t('chooseFromGallery'), onPress: () => pickImage(false) },
-      { text: t('cancel'), style: 'cancel' },
-    ], 'camera', '#007AFF');
+    setShowPhotoModal(true);
   };
 
   const handleCreate = async () => {
@@ -431,6 +430,13 @@ export default function DocumentsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <PhotoPickerModal
+        visible={showPhotoModal}
+        onClose={() => setShowPhotoModal(false)}
+        onCamera={() => pickImage(true)}
+        onGallery={() => pickImage(false)}
+      />
 
       <CustomAlert
         visible={alertVisible}

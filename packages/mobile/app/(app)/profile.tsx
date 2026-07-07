@@ -9,6 +9,7 @@ import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
 import { CustomAlert } from '../../src/components/CustomAlert';
+import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -30,6 +31,7 @@ export default function ProfileScreen() {
   const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
 
   const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -95,24 +97,24 @@ export default function ProfileScreen() {
     }
   };
 
-  const handlePickAvatar = async () => {
-    showAlert(t('changePhoto'), '', [
-      {
-        text: t('camera'), onPress: async () => {
-          const { status } = await ImagePicker.requestCameraPermissionsAsync();
-          if (status !== 'granted') { showAlert(t('error'), t('cameraPermission'), [{text: 'OK'}], 'lock-closed', '#FF9500'); return; }
-          const result = await ImagePicker.launchCameraAsync({ quality: 0.3, base64: true });
-          if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
-        }
-      },
-      {
-        text: t('gallery'), onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.3, base64: true });
-          if (!result.canceled && result.assets[0]) setAvatarUri(result.assets[0].uri);
-        }
-      },
-      { text: t('cancel'), style: 'cancel' },
-    ], 'camera', '#007AFF');
+  const pickAvatarImage = async (fromCamera: boolean) => {
+    setShowPhotoModal(false);
+    const permission = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      showAlert(t('error'), t('cameraPermission'), [{text: 'OK'}], 'lock-closed', '#FF9500');
+      return;
+    }
+
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({ quality: 0.3, base64: true })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: 'images', quality: 0.3, base64: true });
+
+    if (!result.canceled && result.assets[0]) {
+      setAvatarUri(result.assets[0].uri);
+    }
   };
 
   const handleSignOut = () => {
@@ -341,7 +343,7 @@ export default function ProfileScreen() {
           </View>
 
           {/* Avatar Picker */}
-          <TouchableOpacity style={styles.avatarPicker} onPress={handlePickAvatar}>
+          <TouchableOpacity style={styles.avatarPicker} onPress={() => setShowPhotoModal(true)}>
             {avatarUri ? (
               <Image source={{ uri: avatarUri }} style={styles.avatarPreview} />
             ) : user?.avatarUrl ? (
@@ -381,6 +383,13 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <PhotoPickerModal
+        visible={showPhotoModal}
+        onClose={() => setShowPhotoModal(false)}
+        onCamera={() => pickAvatarImage(true)}
+        onGallery={() => pickAvatarImage(false)}
+      />
 
       <CustomAlert
         visible={alertVisible}
