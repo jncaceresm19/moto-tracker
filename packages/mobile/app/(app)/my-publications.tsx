@@ -159,7 +159,7 @@ export default function MyPublicationsScreen() {
         data={publications}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, publications.length === 0 && styles.listEmpty]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -189,6 +189,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: { padding: 16 },
+  listEmpty: { flexGrow: 1 },
   card: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   cardInfo: { flex: 1 },
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
   detailText: { fontSize: 13 },
   closeButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1 },
   closeButtonText: { fontSize: 14, fontWeight: '600' },
-  emptyContainer: { alignItems: 'center', paddingVertical: 48 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 48 },
   emptyTitle: { fontSize: 18, fontWeight: '600', marginTop: 16 },
   emptySubtitle: { fontSize: 14, marginTop: 8, textAlign: 'center' },
 });

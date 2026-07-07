@@ -123,6 +123,14 @@ export default function AppLayout() {
           headerLeft: () => <TrackingBackButton />,
         }}
       />
+      <Tabs.Screen
+        name="my-publications"
+        options={{
+          href: null,
+          title: t('myPublications'),
+          headerLeft: () => <BackButton />,
+        }}
+      />
     </Tabs>
   );
 }
