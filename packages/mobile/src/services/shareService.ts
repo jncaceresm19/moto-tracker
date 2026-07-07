@@ -1,5 +1,4 @@
 import { Platform, Alert } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { TheftAlert } from './theftAlertService';
 
 function formatTime(date: Date): string {
@@ -28,6 +27,43 @@ function generateShareUrl(alert: TheftAlert): string {
   return `https://mototracker.app/theft-alert/${alert.id}`;
 }
 
+export async function shareToWhatsApp(text: string): Promise<void> {
+  try {
+    const Linking = require('expo-linking');
+    const encoded = encodeURIComponent(text);
+    await Linking.openURL(`whatsapp://send?text=${encoded}`);
+  } catch (e) {
+    Alert.alert('Error', 'No se pudo abrir WhatsApp');
+  }
+}
+
+export async function shareToInstagram(alert: TheftAlert): Promise<void> {
+  try {
+    const Linking = require('expo-linking');
+    const text = generateShareText(alert);
+    // Instagram doesn't support direct text sharing via URL on mobile
+    // Copy to clipboard and open Instagram
+    const Clipboard = require('expo-clipboard');
+    await Clipboard.setStringAsync(text);
+    Alert.alert(
+      'Copiado',
+      'Texto copiado. Abrí Instagram y pegalo en tu historia o mensaje.',
+      [
+        { text: 'Abrir Instagram', onPress: async () => {
+          try {
+            await Linking.openURL('instagram://');
+          } catch {
+            await Linking.openURL('https://www.instagram.com');
+          }
+        }},
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
+  } catch (e) {
+    Alert.alert('Error', 'No se pudo compartir');
+  }
+}
+
 export async function shareTheftAlert(alert: TheftAlert): Promise<void> {
   const text = generateShareText(alert);
   const url = generateShareUrl(alert);
@@ -49,29 +85,24 @@ export async function shareTheftAlert(alert: TheftAlert): Promise<void> {
   }
 
   // Fallback to platform-specific sharing
-  showShareOptions(text, url);
+  showShareOptions(alert);
 }
 
-function showShareOptions(text: string, url: string): void {
+function showShareOptions(alert: TheftAlert): void {
   Alert.alert(
     'Compartir alerta',
     'Elige cómo compartir:',
     [
       {
         text: 'WhatsApp',
-        onPress: () => shareToWhatsApp(text),
+        onPress: () => {
+          const text = generateShareText(alert);
+          shareToWhatsApp(text);
+        },
       },
       {
-        text: 'Facebook',
-        onPress: () => shareToFacebook(url),
-      },
-      {
-        text: 'X (Twitter)',
-        onPress: () => shareToX(text),
-      },
-      {
-        text: 'Copiar',
-        onPress: () => copyToClipboard(text),
+        text: 'Instagram',
+        onPress: () => shareToInstagram(alert),
       },
       {
         text: 'Cancelar',
@@ -81,75 +112,16 @@ function showShareOptions(text: string, url: string): void {
   );
 }
 
-async function shareToWhatsApp(text: string): Promise<void> {
-  try {
-    const Linking = require('expo-linking');
-    const encoded = encodeURIComponent(text);
-    await Linking.openURL(`whatsapp://send?text=${encoded}`);
-  } catch (e) {
-    Alert.alert('Error', 'No se pudo abrir WhatsApp');
-  }
-}
-
-async function shareToFacebook(url: string): Promise<void> {
-  try {
-    const Linking = require('expo-linking');
-    await Linking.openURL(`fb://share/?link=${encodeURIComponent(url)}`);
-  } catch (e) {
-    // Fallback to web
-    try {
-      const Linking = require('expo-linking');
-      await Linking.openURL(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`);
-    } catch (e2) {
-      Alert.alert('Error', 'No se pudo abrir Facebook');
-    }
-  }
-}
-
-async function shareToX(text: string): Promise<void> {
-  try {
-    const Linking = require('expo-linking');
-    const encoded = encodeURIComponent(text);
-    await Linking.openURL(`twitter://post?message=${encoded}`);
-  } catch (e) {
-    // Fallback to web
-    try {
-      const Linking = require('expo-linking');
-      await Linking.openURL(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`);
-    } catch (e2) {
-      Alert.alert('Error', 'No se pudo abrir X');
-    }
-  }
-}
-
-async function copyToClipboard(text: string): Promise<void> {
-  try {
-    await Clipboard.setStringAsync(text);
-    Alert.alert('Copiado', 'Alerta copiada al portapapeles');
-  } catch (e) {
-    Alert.alert('Error', 'No se pudo copiar');
-  }
-}
-
 export async function shareToSpecificPlatform(
   alert: TheftAlert,
-  platform: 'whatsapp' | 'facebook' | 'x' | 'copy'
+  platform: 'whatsapp' | 'instagram'
 ): Promise<void> {
-  const text = generateShareText(alert);
-  const url = generateShareUrl(alert);
-
   switch (platform) {
     case 'whatsapp':
-      await shareToWhatsApp(text);
+      await shareToWhatsApp(generateShareText(alert));
       break;
-    case 'facebook':
-      await shareToFacebook(url);
-      break;
-    case 'x':
-      await shareToX(text);
-      break;
-    case 'copy':
-      await copyToClipboard(text);
+    case 'instagram':
+      await shareToInstagram(alert);
       break;
   }
 }

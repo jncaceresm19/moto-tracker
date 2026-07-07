@@ -180,15 +180,17 @@ export default function HomeScreen() {
             <TouchableOpacity 
               style={[styles.testBtn, { backgroundColor: colors.alertRed }]}
               onPress={() => {
+                const moto = activeMoto;
                 const fakeAlert: TheftAlert = {
                   id: `test-${Date.now()}`,
-                  brand: 'Honda',
-                  model: 'CB 500F',
-                  licensePlate: 'AB-12-34',
+                  brand: moto?.brand || 'Honda',
+                  model: moto?.model || 'CB 500F',
+                  licensePlate: moto?.licensePlate || 'AB-12-34',
                   lastLocationName: 'Av. Providencia 1234, Santiago',
                   createdAt: new Date(),
                   status: 'active',
                   userId: user?.id || '',
+                  photoUrl: moto?.imageUrl || undefined,
                 };
                 setTheftAlerts(prev => [fakeAlert, ...prev]);
               }}
@@ -203,13 +205,16 @@ export default function HomeScreen() {
                 <TheftAlertCard
                   key={alert.id}
                   title={`${alert.brand} ${alert.model} - ROBADA`}
-                  metadata={`${alert.licensePlate} · ${alert.lastLocationName || 'Ubicación desconocida'}`}
+                  metadata={alert.lastLocationName || 'Ubicación desconocida'}
                   timeAgo={formatTimeAgo(alert.createdAt)}
+                  photoUrl={alert.photoUrl}
                   responses={[]}
                   onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
-                  onFacebook={() => shareToSpecificPlatform(alert, 'facebook')}
-                  onX={() => shareToSpecificPlatform(alert, 'x')}
-                  onCopyData={() => shareToSpecificPlatform(alert, 'copy')}
+                  onInstagram={() => shareToSpecificPlatform(alert, 'instagram')}
+                  onComment={(text) => {
+                    console.log('Comment:', text);
+                    // TODO: Save comment to backend
+                  }}
                 />
               ))}
             </ScrollView>
