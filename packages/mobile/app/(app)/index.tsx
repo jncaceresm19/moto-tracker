@@ -21,7 +21,7 @@ export default function HomeScreen() {
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [gasStations, setGasStations] = useState<GasStation[]>([]);
   const [theftAlerts, setTheftAlerts] = useState<TheftAlert[]>([]);
-  const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; text: string; timeAgo: string }[]>>({});
+  const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; userAvatar?: string; text: string; timeAgo: string }[]>>({});
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -215,7 +215,8 @@ export default function HomeScreen() {
                   const alertId = theftAlerts[0].id;
                   const newComment = {
                     id: `comment-${Date.now()}`,
-                    userName: user?.email?.split('@')[0] || 'Usuario',
+                    userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
+                    userAvatar: user?.avatarUrl,
                     text,
                     timeAgo: 'ahora mismo',
                   };
@@ -240,7 +241,8 @@ export default function HomeScreen() {
                     onComment={(text) => {
                       const newComment = {
                         id: `comment-${Date.now()}`,
-                        userName: user?.email?.split('@')[0] || 'Usuario',
+                        userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
+                        userAvatar: user?.avatarUrl,
                         text,
                         timeAgo: 'ahora mismo',
                       };

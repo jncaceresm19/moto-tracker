@@ -7,6 +7,7 @@ import { useAuth } from '../auth-context';
 interface Comment {
   id: string;
   userName: string;
+  userAvatar?: string;
   text: string;
   timeAgo: string;
 }
@@ -42,6 +43,17 @@ export function TheftAlertCard({
       onComment(commentText.trim());
       setCommentText('');
     }
+  };
+
+  const renderAvatar = (avatarUrl?: string, name: string, size: number = 32, bgColor?: string) => {
+    if (avatarUrl) {
+      return <Image source={{ uri: avatarUrl }} style={[styles.avatarImage, { width: size, height: size, borderRadius: size / 2 }]} />;
+    }
+    return (
+      <View style={[styles.avatar, { backgroundColor: bgColor || colors.brandBlue, width: size, height: size, borderRadius: size / 2 }]}>
+        <Text style={[styles.avatarText, { fontSize: size * 0.44 }]}>{name.charAt(0).toUpperCase()}</Text>
+      </View>
+    );
   };
 
   return (
@@ -106,16 +118,9 @@ export function TheftAlertCard({
       {showComments && (
         <View style={[styles.commentsSection, { borderTopColor: colors.border }]}>
           {/* Comments list */}
-          {responses.length === 0 && (
-            <Text style={[styles.noComments, { color: colors.inkFaint }]}>
-              Sé el primero en comentar
-            </Text>
-          )}
           {responses.map((comment) => (
             <View key={comment.id} style={[styles.comment, { borderBottomColor: colors.borderLight }]}>
-              <View style={[styles.commentAvatar, { backgroundColor: colors.brandBlue }]}>
-                <Text style={styles.commentAvatarText}>{comment.userName.charAt(0).toUpperCase()}</Text>
-              </View>
+              {renderAvatar(comment.userAvatar, comment.userName, 32, colors.brandBlue)}
               <View style={styles.commentContent}>
                 <Text style={[styles.commentName, { color: colors.ink }]}>{comment.userName}</Text>
                 <Text style={[styles.commentText, { color: colors.inkSoft }]}>{comment.text}</Text>
@@ -126,9 +131,7 @@ export function TheftAlertCard({
 
           {/* Comment input */}
           <View style={[styles.commentInputRow, { borderTopColor: colors.border }]}>
-            <View style={[styles.commentAvatar, { backgroundColor: colors.primary }]}>
-              <Text style={styles.commentAvatarText}>{user?.email?.charAt(0).toUpperCase() || '?'}</Text>
-            </View>
+            {renderAvatar(user?.avatarUrl, user?.name || user?.email?.split('@')[0] || '?', 32, colors.primary)}
             <TextInput
               style={[styles.commentInput, { color: colors.text, borderColor: colors.border }]}
               placeholder="Escribe un comentario..."
@@ -170,10 +173,10 @@ const styles = StyleSheet.create({
   countBadge: { position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
   countBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   commentsSection: { borderTopWidth: 1 },
-  noComments: { textAlign: 'center', paddingVertical: 16, fontSize: 13, fontStyle: 'italic' },
   comment: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
-  commentAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
-  commentAvatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  avatar: { justifyContent: 'center', alignItems: 'center' },
+  avatarImage: { backgroundColor: '#E5E7EB' },
+  avatarText: { color: '#fff', fontWeight: '700' },
   commentContent: { flex: 1 },
   commentName: { fontSize: 13, fontWeight: '600' },
   commentText: { fontSize: 13, marginTop: 2 },
