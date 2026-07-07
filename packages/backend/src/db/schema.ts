@@ -125,6 +125,32 @@ export const notifications = sqliteTable('notifications', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
+// Theft Alerts table
+export const theftAlerts = sqliteTable('theft_alerts', {
+  id: text('id').primaryKey(),
+  motorcycleId: text('motorcycle_id').notNull().references(() => motorcycles.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  brand: text('brand').notNull(),
+  model: text('model').notNull(),
+  licensePlate: text('license_plate').notNull(),
+  photoUrl: text('photo_url'),
+  lastLatitude: real('last_latitude').notNull(),
+  lastLongitude: real('last_longitude').notNull(),
+  lastLocationName: text('last_location_name'),
+  status: text('status').notNull().default('active'), // 'active', 'closed', 'recovered'
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  closedAt: integer('closed_at', { mode: 'timestamp' }),
+});
+
+// Theft Alert Responses table
+export const theftAlertResponses = sqliteTable('theft_alert_responses', {
+  id: text('id').primaryKey(),
+  theftAlertId: text('theft_alert_id').notNull().references(() => theftAlerts.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  text: text('text').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 // Indexes
 export const idxMotorcyclesUserId = index('idx_motorcycles_user_id').on(motorcycles.userId);
 export const idxMaintenanceMotorcycleId = index('idx_maintenance_motorcycle_id').on(maintenanceRecords.motorcycleId);
@@ -135,3 +161,7 @@ export const idxDocumentsExpiry = index('idx_documents_expiry').on(documents.exp
 export const idxMaintenanceNextService = index('idx_maintenance_next_service').on(maintenanceRecords.nextServiceDate, maintenanceRecords.nextServiceKilometers);
 export const idxUsersEmail = uniqueIndex('idx_users_email').on(users.email);
 export const idxUsersGoogleId = uniqueIndex('idx_users_google_id').on(users.googleId);
+export const idxTheftAlertsUserId = index('idx_theft_alerts_user_id').on(theftAlerts.userId);
+export const idxTheftAlertsStatus = index('idx_theft_alerts_status').on(theftAlerts.status);
+export const idxTheftAlertsMotorcycleId = index('idx_theft_alerts_motorcycle_id').on(theftAlerts.motorcycleId);
+export const idxTheftAlertResponsesAlertId = index('idx_theft_alert_responses_alert_id').on(theftAlertResponses.theftAlertId);
