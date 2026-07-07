@@ -11,6 +11,8 @@ import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
+import { TheftAlert, getTheftAlerts } from '../../src/services/theftAlertService';
+import { shareToSpecificPlatform } from '../../src/services/shareService';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -18,9 +20,23 @@ export default function HomeScreen() {
   const { user } = useAuth();
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [gasStations, setGasStations] = useState<GasStation[]>([]);
+  const [theftAlerts, setTheftAlerts] = useState<TheftAlert[]>([]);
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (minutes < 1) return 'ahora mismo';
+    if (minutes < 60) return `hace ${minutes} min`;
+    if (hours < 24) return `hace ${hours}h`;
+    return `hace ${days}d`;
+  };
 
   const loadMotorcycles = useCallback(async () => {
     if (!user) { setLoading(false); return; }
@@ -69,15 +85,25 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadTheftAlerts = useCallback(async () => {
+    try {
+      const alerts = await getTheftAlerts();
+      setTheftAlerts(alerts);
+    } catch (e: any) {
+      console.log('[THEFT] Error loading alerts:', e?.message || 'Unknown');
+    }
+  }, []);
+
   useEffect(() => {
     // Load cached gas stations immediately on mount (no await - runs in background)
     loadGasStations();
     loadMotorcycles();
-  }, [loadMotorcycles, loadGasStations]);
+    loadTheftAlerts();
+  }, [loadMotorcycles, loadGasStations, loadTheftAlerts]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadMotorcycles(), loadGasStations()]);
+    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts()]);
     setRefreshing(false);
   };
 
@@ -85,7 +111,7 @@ export default function HomeScreen() {
   const motoWithGps = motorcycles.find(m => m.gpsTracker);
   const activeMoto = motoWithGps || motorcycles[0];
   const hasGps = !!motoWithGps;
-  const hasAlerts = false;
+  const hasAlerts = theftAlerts.length > 0;
 
   if (loading) {
     return (
@@ -150,15 +176,22 @@ export default function HomeScreen() {
         {/* Section: Alertas de robo */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
-          {hasAlerts && activeMoto ? (
-            <TheftAlertCard
-              title={`${activeMoto.brand} ${activeMoto.model} se movió de su zona segura`}
-              metadata={`${activeMoto.licensePlate} · San Juan, Argentina`}
-              timeAgo="hace 12 min"
-              responses={[
-                { name: 'Carlos M.', text: 'Vi la moto por Av. Libertador hace 5 min', timeAgo: 'hace 5 min' },
-              ]}
-            />
+          {hasAlerts ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+              {theftAlerts.map((alert) => (
+                <TheftAlertCard
+                  key={alert.id}
+                  title={`${alert.brand} ${alert.model} - ROBADA`}
+                  metadata={`${alert.licensePlate} · ${alert.lastLocationName || 'Ubicación desconocida'}`}
+                  timeAgo={formatTimeAgo(alert.createdAt)}
+                  responses={[]}
+                  onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
+                  onFacebook={() => shareToSpecificPlatform(alert, 'facebook')}
+                  onX={() => shareToSpecificPlatform(alert, 'x')}
+                  onCopyData={() => shareToSpecificPlatform(alert, 'copy')}
+                />
+              ))}
+            </ScrollView>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={styles.emptyCardIcon}>🛡️</Text>
