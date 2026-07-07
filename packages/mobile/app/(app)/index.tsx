@@ -175,7 +175,28 @@ export default function HomeScreen() {
 
         {/* Section: Alertas de robo */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
+            <TouchableOpacity 
+              style={[styles.testBtn, { backgroundColor: colors.alertRed }]}
+              onPress={() => {
+                const fakeAlert: TheftAlert = {
+                  id: `test-${Date.now()}`,
+                  brand: 'Honda',
+                  model: 'CB 500F',
+                  licensePlate: 'AB-12-34',
+                  lastLocationName: 'Av. Providencia 1234, Santiago',
+                  createdAt: new Date(),
+                  status: 'active',
+                  userId: user?.id || '',
+                };
+                setTheftAlerts(prev => [fakeAlert, ...prev]);
+              }}
+            >
+              <Ionicons name="add-circle-outline" size={14} color="#fff" />
+              <Text style={styles.testBtnText}>Simular</Text>
+            </TouchableOpacity>
+          </View>
           {hasAlerts ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
               {theftAlerts.map((alert) => (
@@ -282,7 +303,10 @@ const styles = StyleSheet.create({
   emptyMotoContainer: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 32 },
   emptyMotoText: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
   section: { marginTop: 24, paddingHorizontal: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '700' },
+  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  testBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 24, alignItems: 'center' },
   emptyCardIcon: { fontSize: 32, marginBottom: 10 },
   emptyCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },

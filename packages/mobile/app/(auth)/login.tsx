@@ -11,11 +11,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
+import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const { colors } = useTheme();
+  const { t } = useLanguage();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,7 +40,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      showAlert('Error', 'Please fill in all fields', [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('fillAllFields'), [{text: 'OK'}], 'close-circle', '#FF3B30');
       return;
     }
 
@@ -49,8 +51,8 @@ export default function LoginScreen() {
       router.replace('/(app)');
     } catch (err) {
       showAlert(
-        'Error',
-        err instanceof Error ? err.message : 'Login failed',
+        t('error'),
+        err instanceof Error ? err.message : t('loginFailed'),
         [{text: 'OK'}],
         'close-circle',
         '#FF3B30'
@@ -147,13 +149,13 @@ export default function LoginScreen() {
           resizeMode="contain"
         />
         <Text style={dynamicStyles.subtitle}>
-          Sign in to your account
+          {t('signInTitle')}
         </Text>
       </View>
 
       <TextInput
         style={dynamicStyles.input}
-        placeholder="Email"
+        placeholder={t('email')}
         placeholderTextColor={colors.textMuted}
         value={email}
         onChangeText={setEmail}
@@ -163,7 +165,7 @@ export default function LoginScreen() {
 
       <TextInput
         style={dynamicStyles.input}
-        placeholder="Password"
+        placeholder={t('password')}
         placeholderTextColor={colors.textMuted}
         value={password}
         onChangeText={setPassword}
@@ -176,13 +178,13 @@ export default function LoginScreen() {
         disabled={loading}
       >
         <Text style={dynamicStyles.buttonText}>
-          {loading ? 'Signing in...' : 'Sign In'}
+          {loading ? t('signInLoading') : t('signInButton')}
         </Text>
       </TouchableOpacity>
 
       <View style={styles.divider}>
         <View style={dynamicStyles.dividerLine} />
-        <Text style={dynamicStyles.dividerText}>or</Text>
+        <Text style={dynamicStyles.dividerText}>{t('or')}</Text>
         <View style={dynamicStyles.dividerLine} />
       </View>
 
@@ -200,18 +202,18 @@ export default function LoginScreen() {
         disabled
       >
         <Text style={dynamicStyles.googleButtonTextDisabled}>
-          Continue with Google
+          {t('continueWithGoogle')}
         </Text>
       </TouchableOpacity>
 
       <Text style={dynamicStyles.googleNote}>
-        Coming soon — requires development build
+        {t('googleComingSoon')}
       </Text>
 
       <Link href="/(auth)/register" asChild>
         <TouchableOpacity>
           <Text style={dynamicStyles.link}>
-            Don't have an account? Sign Up
+            {t('noAccount')}
           </Text>
         </TouchableOpacity>
       </Link>

@@ -4,11 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
+import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function RegisterScreen() {
   const { signUp } = useAuth();
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +33,7 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      showAlert('Error', 'Please fill in all fields', [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('fillAllFields'), [{text: 'OK'}], 'close-circle', '#FF3B30');
       return;
     }
 
@@ -40,7 +42,7 @@ export default function RegisterScreen() {
       await signUp(email, password, name);
       router.replace('/(app)');
     } catch (err) {
-      showAlert('Error', err instanceof Error ? err.message : 'Registration failed', [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), err instanceof Error ? err.message : t('registrationFailed'), [{text: 'OK'}], 'close-circle', '#FF3B30');
     } finally {
       setLoading(false);
     }
@@ -99,12 +101,12 @@ export default function RegisterScreen() {
 
   return (
     <View style={dynamicStyles.container}>
-      <Text style={dynamicStyles.title}>Create Account</Text>
-      <Text style={dynamicStyles.subtitle}>Sign up to start tracking</Text>
+      <Text style={dynamicStyles.title}>{t('signUpTitle')}</Text>
+      <Text style={dynamicStyles.subtitle}>{t('signUpSubtitle')}</Text>
 
       <TextInput
         style={dynamicStyles.input}
-        placeholder="Name"
+        placeholder={t('name')}
         placeholderTextColor={colors.textMuted}
         value={name}
         onChangeText={setName}
@@ -112,7 +114,7 @@ export default function RegisterScreen() {
 
       <TextInput
         style={dynamicStyles.input}
-        placeholder="Email"
+        placeholder={t('email')}
         placeholderTextColor={colors.textMuted}
         value={email}
         onChangeText={setEmail}
@@ -122,7 +124,7 @@ export default function RegisterScreen() {
 
       <TextInput
         style={dynamicStyles.input}
-        placeholder="Password"
+        placeholder={t('password')}
         placeholderTextColor={colors.textMuted}
         value={password}
         onChangeText={setPassword}
@@ -134,12 +136,12 @@ export default function RegisterScreen() {
         onPress={handleRegister}
         disabled={loading}
       >
-        <Text style={dynamicStyles.buttonText}>{loading ? 'Creating account...' : 'Sign Up'}</Text>
+        <Text style={dynamicStyles.buttonText}>{loading ? t('signUpLoading') : t('signUpButton')}</Text>
       </TouchableOpacity>
 
       <Link href="/(auth)/login" asChild>
         <TouchableOpacity>
-          <Text style={dynamicStyles.link}>Already have an account? Sign In</Text>
+          <Text style={dynamicStyles.link}>{t('hasAccount')}</Text>
         </TouchableOpacity>
       </Link>
 
