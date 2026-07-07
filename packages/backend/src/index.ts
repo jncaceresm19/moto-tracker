@@ -8,6 +8,7 @@ import maintenanceRoutes from './routes/maintenance';
 import documentRoutes from './routes/documents';
 import kilometerRoutes from './routes/kilometers';
 import profileRoutes from './routes/profile';
+import theftAlertRoutes from './routes/theft-alerts';
 
 dotenv.config();
 
@@ -34,6 +35,7 @@ app.use('/api/motorcycles', motorcycleRoutes);
 app.use('/api/motorcycles/:id/maintenance', maintenanceRoutes);
 app.use('/api/motorcycles/:id/documents', documentRoutes);
 app.use('/api/motorcycles/:id/kilometers', kilometerRoutes);
+app.use('/api/theft-alerts', theftAlertRoutes);
 
 // Only listen when not in test environment
 if (process.env.NODE_ENV !== 'test') {
