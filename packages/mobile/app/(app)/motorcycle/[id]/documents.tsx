@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
@@ -11,15 +13,36 @@ import { useLanguage } from '../../../../src/language-context';
 import { useTheme } from '../../../../src/theme-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
 
-const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'registration', 'other'];
+const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'padron', 'drivers_license', 'fines'];
 
 const TYPE_KEYS: Record<string, string> = {
   circulation_permit: 'circulationPermit',
   technical_review: 'technicalReview',
   insurance: 'insurance',
-  registration: 'registration',
-  other: 'other',
+  padron: 'padron',
+  drivers_license: 'driversLicense',
+  fines: 'fines',
 };
+
+const CATEGORY_ICONS: Record<string, string> = {
+  circulation_permit: '🚦',
+  technical_review: '🔍',
+  insurance: '🛡️',
+  padron: '📋',
+  drivers_license: '🪪',
+  fines: '💸',
+};
+
+// Types where the title is auto-set and non-editable
+const FIXED_TITLE_TYPES: Record<string, string> = {
+  circulation_permit: 'circulationPermit',
+  insurance: 'insurance',
+  padron: 'padron',
+  drivers_license: 'driversLicense',
+};
+
+// Types that allow multiple documents
+const MULTI_DOC_TYPES = ['technical_review', 'fines'];
 
 export default function DocumentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,23 +51,16 @@ export default function DocumentsScreen() {
   const { t } = useLanguage();
   const { colors } = useTheme();
 
-  useEffect(() => {
-    navigation.setOptions({
-      headerLeft: () => (
-        <TouchableOpacity onPress={() => router.push(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
-          <Ionicons name="chevron-back" size={26} color="white" />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, id, router]);
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<Document | null>(null);
   const [viewing, setViewing] = useState<Document | null>(null);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+  const [viewingPhoto, setViewingPhoto] = useState<'front' | 'back'>('front');
   const [refreshing, setRefreshing] = useState(false);
-  const [form, setForm] = useState({ type: 'insurance', title: '', fileUrl: '', issueDate: '', expiryDate: '' });
+  const [form, setForm] = useState({ type: 'other', title: '', fileUrl: '', fileUrlBack: '', issueDate: '', expiryDate: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showIssueDatePicker, setShowIssueDatePicker] = useState(false);
@@ -52,12 +68,27 @@ export default function DocumentsScreen() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoSide, setPhotoSide] = useState<'front' | 'back'>('front');
 
-  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  useEffect(() => {
+    navigation.setOptions({
+      title: selectedType ? t(TYPE_KEYS[selectedType]) : t('documents'),
+      headerLeft: () => (
+        <TouchableOpacity
+          onPress={() => (selectedType ? setSelectedType(null) : router.push(`/(app)/motorcycle/${id}`))}
+          style={{ marginLeft: 12 }}
+        >
+          <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, id, router, selectedType, t, colors]);
+
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = colors.primary) => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -69,7 +100,7 @@ export default function DocumentsScreen() {
   const load = async () => {
     if (!id) return;
     try { setDocs(await listDocuments(id)); }
-    catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
+    catch { showAlert(t('error'), t('failedToLoad'), [{ text: 'OK' }], 'close-circle', colors.danger); }
     finally { setLoading(false); }
   };
 
@@ -81,9 +112,16 @@ export default function DocumentsScreen() {
     setRefreshing(false);
   };
 
-  const resetForm = () => setForm({ type: 'insurance', title: '', fileUrl: '', issueDate: '', expiryDate: '' });
+  const filteredDocs = selectedType ? docs.filter((d) => d.type === selectedType) : [];
 
-  const openCreate = () => { resetForm(); setErrors({}); setShowCreate(true); };
+  const isTitleEditable = !FIXED_TITLE_TYPES[form.type];
+
+  const resetForm = (type: string = 'other') => {
+    const titleKey = FIXED_TITLE_TYPES[type];
+    setForm({ type, title: titleKey ? t(titleKey) : '', fileUrl: '', fileUrlBack: '', issueDate: '', expiryDate: '' });
+  };
+
+  const openCreate = () => { resetForm(selectedType || 'other'); setErrors({}); setShowCreate(true); };
 
   const openEdit = (doc: Document) => {
     setErrors({});
@@ -91,6 +129,7 @@ export default function DocumentsScreen() {
       type: doc.type,
       title: doc.title,
       fileUrl: doc.fileUrl,
+      fileUrlBack: doc.fileUrlBack || '',
       issueDate: doc.issueDate ? doc.issueDate.split('T')[0] : '',
       expiryDate: doc.expiryDate ? doc.expiryDate.split('T')[0] : '',
     });
@@ -105,36 +144,46 @@ export default function DocumentsScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showAlert(t('permissionNeeded'), t('permissionMessage'), [{text: 'OK'}], 'lock-closed', '#FF9500');
+      showAlert(t('permissionNeeded'), t('permissionMessage'), [{ text: 'OK' }], 'lock-closed', colors.accent);
       return;
     }
 
     const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 0.5, base64: true })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.5, base64: true });
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.8, allowsEditing: true });
 
     if (!result.canceled && result.assets[0]) {
-      let uri: string;
-      if (result.assets[0].base64) {
-        uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      } else {
-        const file = new File(result.assets[0].uri);
-        const b64 = await file.base64();
-        uri = `data:image/jpeg;base64,${b64}`;
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (base64) {
+        const dataUri = `data:image/jpeg;base64,${base64}`;
+        if (photoSide === 'back') {
+          setForm((p) => ({ ...p, fileUrlBack: dataUri }));
+        } else {
+          setForm((p) => ({ ...p, fileUrl: dataUri }));
+          setErrors((p) => ({ ...p, fileUrl: '' }));
+        }
       }
-      setForm((p) => ({ ...p, fileUrl: uri }));
-      setErrors((p) => ({ ...p, fileUrl: '' }));
     }
   };
 
-  const showImageOptions = () => {
+  const showImageOptions = (side: 'front' | 'back' = 'front') => {
+    setPhotoSide(side);
     setShowPhotoModal(true);
   };
 
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.title) newErrors.title = t('required');
     if (!form.fileUrl) newErrors.fileUrl = t('required');
+    if (form.issueDate && form.expiryDate && new Date(form.expiryDate) < new Date(form.issueDate)) {
+      newErrors.expiryDate = t('expiryBeforeIssue');
+    }
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -143,15 +192,16 @@ export default function DocumentsScreen() {
         type: form.type,
         title: form.title,
         fileUrl: form.fileUrl,
+        fileUrlBack: form.fileUrlBack || undefined,
         issueDate: form.issueDate ? new Date(form.issueDate).toISOString() : undefined,
         expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : undefined,
       });
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      showAlert(t('success'), t('documentSaved'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('documentSaved'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
     } catch {
-      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToCreate'), [{ text: 'OK' }], 'close-circle', colors.danger);
     } finally {
       setSaving(false);
     }
@@ -159,8 +209,10 @@ export default function DocumentsScreen() {
 
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {};
-    if (!form.title) newErrors.title = t('required');
     if (!form.fileUrl) newErrors.fileUrl = t('required');
+    if (form.issueDate && form.expiryDate && new Date(form.expiryDate) < new Date(form.issueDate)) {
+      newErrors.expiryDate = t('expiryBeforeIssue');
+    }
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     if (!id || !editing) return;
@@ -170,14 +222,15 @@ export default function DocumentsScreen() {
         type: form.type,
         title: form.title,
         fileUrl: form.fileUrl,
+        fileUrlBack: form.fileUrlBack || null,
         issueDate: form.issueDate ? new Date(form.issueDate).toISOString() : null,
         expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
       });
       setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
       setEditing(null);
-      showAlert(t('success'), t('documentUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('documentUpdated'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
     } catch {
-      showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToUpdate'), [{ text: 'OK' }], 'close-circle', colors.danger);
     } finally {
       setSaving(false);
     }
@@ -194,20 +247,44 @@ export default function DocumentsScreen() {
             await deleteDocument(id, doc.id);
             setDocs((prev) => prev.filter((d) => d.id !== doc.id));
             setViewing(null);
-          } catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
+          } catch { showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', colors.danger); }
         },
       },
-    ], 'warning', '#FF9500');
+    ], 'warning', colors.accent);
   };
 
   const generatePDF = async (doc: Document) => {
     if (!doc.fileUrl) return null;
+    const issuedStr = doc.issueDate ? new Date(doc.issueDate).toLocaleDateString() : '—';
+    const expiresStr = doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString() : '—';
+    const backSection = doc.fileUrlBack
+      ? `<div style="page-break-before: always; text-align: center; padding-top: 20px;">
+           <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Reverso</div>
+           <img src="${doc.fileUrlBack}" style="max-width: 100%; max-height: 85vh;" />
+         </div>`
+      : '';
     const html = `
       <!DOCTYPE html>
       <html>
-      <head><meta charset="utf-8"></head>
-      <body style="margin:0;padding:0;display:flex;justify-content:center;align-items:center;height:100vh;">
-        <img src="${doc.fileUrl}" style="max-width:100%;max-height:100vh;" />
+      <head><meta charset="utf-8"><style>
+        body { margin: 0; padding: 20px; font-family: -apple-system, sans-serif; color: #333; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .title { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+        .type { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
+        .dates { font-size: 13px; color: #666; margin: 10px 0; text-align: center; }
+        .img-container { text-align: center; }
+        img { max-width: 100%; max-height: 85vh; }
+      </style></head>
+      <body>
+        <div class="header">
+          <div class="title">${doc.title}</div>
+          <div class="type">${doc.type.replace(/_/g, ' ')}</div>
+        </div>
+        <div class="dates">Emitido: ${issuedStr} | Vence: ${expiresStr}</div>
+        <div class="img-container">
+          <img src="${doc.fileUrl}" />
+        </div>
+        ${backSection}
       </body>
       </html>
     `;
@@ -220,23 +297,45 @@ export default function DocumentsScreen() {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
-      showAlert(t('error'), `Failed to save: ${e?.message || e}`, [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
     }
   };
 
   const handleBulkSaveAsPDF = async () => {
-    const photos = docs.filter((d) => d.fileUrl);
+    const photos = filteredDocs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
-      showAlert(t('noPhotos'), t('noPhotosSub'), [{text: 'OK'}], 'information-circle', '#007AFF');
+      showAlert(t('noPhotos'), t('noPhotosSub'), [{ text: 'OK' }], 'information-circle', colors.primary);
       return;
     }
+
+    const pages = photos.map((doc) => {
+      const issuedStr = doc.issueDate ? new Date(doc.issueDate).toLocaleDateString() : '—';
+      const expiresStr = doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString() : '—';
+      return `
+        <div style="page-break-after: always; padding: 20px; text-align: center;">
+          <div style="font-size: 18px; font-weight: bold; margin-bottom: 4px;">${doc.title}</div>
+          <div style="font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px;">${doc.type.replace(/_/g, ' ')}</div>
+          <div style="font-size: 13px; color: #666; margin: 10px 0;">Emitido: ${issuedStr} | Vence: ${expiresStr}</div>
+          <img src="${doc.fileUrl}" style="max-width: 100%; max-height: 80vh;" />
+        </div>
+      `;
+    }).join('');
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"><style>
+        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; color: #333; }
+      </style></head>
+      <body>${pages}</body>
+      </html>
+    `;
+
     try {
-      for (const doc of photos) {
-        const uri = await generatePDF(doc);
-        if (uri) await Sharing.shareAsync(uri);
-      }
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await Sharing.shareAsync(uri);
     } catch (e: any) {
-      showAlert(t('error'), `Failed to save: ${e?.message || e}`, [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
     }
   };
 
@@ -246,7 +345,7 @@ export default function DocumentsScreen() {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
     } catch (e: any) {
-      showAlert(t('error'), `Failed to share: ${e?.message || e}`, [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToShare'), [{ text: 'OK' }], 'close-circle', colors.danger);
     }
   };
 
@@ -255,82 +354,150 @@ export default function DocumentsScreen() {
   const showModal = showCreate || editing !== null;
   const closeModal = () => { setShowCreate(false); setEditing(null); };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
+  if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
+  // ============================================================
+  // VISTA 1: LISTA DE CATEGORÍAS
+  // ============================================================
+  if (!selectedType) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <FlatList
+          data={TYPES}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.categoryList}
+          ListHeaderComponent={
+            <View style={[styles.infoBanner, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue} />
+              <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('documentsDisclaimer')}</Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const count = docs.filter((d) => d.type === item).length;
+            return (
+              <TouchableOpacity style={[styles.categoryBtn, { backgroundColor: colors.card }]} onPress={() => setSelectedType(item)}>
+                <Text style={styles.categoryIcon}>{CATEGORY_ICONS[item]}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.categoryText, { color: colors.text }]}>{t(TYPE_KEYS[item])}</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
+                    {count} {count === 1 ? t('documents').replace(/s$/, '') : t('documents')}
+                  </Text>
+                </View>
+                <Text style={[styles.arrow, { color: colors.textMuted }]}>›</Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          buttons={alertButtons}
+          icon={alertIcon}
+          iconColor={alertIconColor}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
+
+  // ============================================================
+  // VISTA 2: LISTADO DE DOCUMENTOS DE LA CATEGORÍA SELECCIONADA
+  // ============================================================
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={docs}
+        data={filteredDocs}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={docs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListHeaderComponent={docs.length > 0 ? <View style={{ height: 8 }} /> : null}
+        contentContainerStyle={filteredDocs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        ListHeaderComponent={filteredDocs.length > 0 ? <View style={{ height: 8 }} /> : null}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📄</Text>
-            <Text style={styles.empty}>{t('noDocuments')}</Text>
-            <Text style={styles.emptySub}>{t('noDocumentsSub')}</Text>
+            <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noDocuments')}</Text>
+            <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noDocumentsSub')}</Text>
           </View>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, { backgroundColor: colors.card }]}
             onPress={() => setViewing(item)}
           >
             <View style={styles.cardRow}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={[styles.cardStatus, item.status === 'expired' && styles.expired]}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+              <Text style={[styles.cardStatus, item.status === 'expired' && { color: colors.danger }, item.status === 'expiring' && { color: colors.accent }, item.status === 'valid' && { color: colors.success }]}>
                 {item.status === 'expired' ? t('expired') : item.status === 'expiring' ? t('expiring') : t('valid')}
               </Text>
             </View>
-            {item.issueDate && <Text style={styles.cardDate}>{t('issued')}: {new Date(item.issueDate).toLocaleDateString()}</Text>}
-            {item.expiryDate && <Text style={styles.cardDate}>{t('expires')}: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
+            {item.issueDate && <Text style={[styles.cardDate, { color: colors.textSecondary }]}>{t('issued')}: {new Date(item.issueDate).toLocaleDateString()}</Text>}
+            {item.expiryDate && <Text style={[styles.cardDate, { color: colors.textSecondary }]}>{t('expires')}: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
           </TouchableOpacity>
         )}
       />
 
-      {docs.some((d) => d.fileUrl) && (
-        <TouchableOpacity style={styles.bulkFab} onPress={handleBulkSaveAsPDF}>
-          <Ionicons name="download-outline" size={24} color="#fff" />
+      {filteredDocs.some((d) => d.fileUrl) && (
+        <TouchableOpacity style={[styles.bulkFab, { backgroundColor: colors.success }]} onPress={handleBulkSaveAsPDF}>
+          <Ionicons name="download-outline" size={24} color={colors.successText} />
         </TouchableOpacity>
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={openCreate}>
-        <Text style={styles.fabText}>+</Text>
+      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+        <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
       </TouchableOpacity>
 
       {/* Detail Modal */}
       <Modal visible={viewing !== null} animationType="slide" presentationStyle="pageSheet">
-        <View style={styles.detailContainer}>
-          <View style={styles.detailHeader}>
+        <View style={[styles.detailContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.detailHeader, { borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setViewing(null)}>
-              <Text style={styles.done}>{t('done')}</Text>
+              <Text style={{ color: colors.primary, fontSize: 16 }}>{t('done')}</Text>
             </TouchableOpacity>
             <View style={styles.detailActions}>
               <TouchableOpacity onPress={() => viewing && openEdit(viewing)} style={styles.editBtn}>
-                <Ionicons name="pencil" size={20} color="#007AFF" />
+                <Ionicons name="pencil" size={20} color={colors.primary} />
               </TouchableOpacity>
               <TouchableOpacity onPress={() => viewing && handleDelete(viewing)} style={styles.deleteBtn}>
-                <Ionicons name="trash" size={20} color="#FF3B30" />
+                <Ionicons name="trash" size={20} color={colors.danger} />
               </TouchableOpacity>
             </View>
           </View>
 
           {viewing && (
             <ScrollView contentContainerStyle={styles.detailContent}>
-              <Text style={styles.detailTitle}>{viewing.title}</Text>
-              {viewing.issueDate && <Text style={styles.detailDate}>{t('issued')}: {new Date(viewing.issueDate).toLocaleDateString()}</Text>}
-              {viewing.expiryDate && <Text style={styles.detailDate}>{t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
+              <Text style={[styles.detailTitle, { color: colors.text }]}>{viewing.title}</Text>
+              {viewing.issueDate && <Text style={[styles.detailDate, { color: colors.textSecondary }]}>{t('issued')}: {new Date(viewing.issueDate).toLocaleDateString()}</Text>}
+              {viewing.expiryDate && <Text style={[styles.detailDate, { color: colors.textSecondary }]}>{t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
 
-              {viewing.fileUrl ? (
-                <TouchableOpacity style={styles.pdfThumbnail} onPress={() => setShowPhotoViewer(true)}>
+              {viewing.type === 'drivers_license' && viewing.fileUrlBack ? (
+                <View style={{ gap: 10, marginTop: 20 }}>
+                  <View>
+                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{t('frontPhoto')}</Text>
+                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewingPhoto('front'); setShowPhotoViewer(true); }}>
+                      <Text style={styles.pdfIcon}>📄</Text>
+                      <Text style={[styles.pdfName, { color: colors.text }]}>{viewing.title} — {t('frontPhoto')}</Text>
+                      <Text style={[styles.pdfHint, { color: colors.textMuted }]}>{t('tapToView')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View>
+                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{t('backPhoto')}</Text>
+                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewingPhoto('back'); setShowPhotoViewer(true); }}>
+                      <Text style={styles.pdfIcon}>📄</Text>
+                      <Text style={[styles.pdfName, { color: colors.text }]}>{viewing.title} — {t('backPhoto')}</Text>
+                      <Text style={[styles.pdfHint, { color: colors.textMuted }]}>{t('tapToView')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : viewing.fileUrl ? (
+                <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewingPhoto('front'); setShowPhotoViewer(true); }}>
                   <Text style={styles.pdfIcon}>📄</Text>
-                  <Text style={styles.pdfName}>{viewing.title}.pdf</Text>
-                  <Text style={styles.pdfHint}>{t('tapToView')}</Text>
+                  <Text style={[styles.pdfName, { color: colors.text }]}>{viewing.title}.pdf</Text>
+                  <Text style={[styles.pdfHint, { color: colors.textMuted }]}>{t('tapToView')}</Text>
                 </TouchableOpacity>
               ) : (
-                <View style={styles.noPhoto}>
-                  <Text style={styles.noPhotoText}>{t('noDocumentAttached')}</Text>
+                <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
+                  <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
                 </View>
               )}
             </ScrollView>
@@ -345,14 +512,18 @@ export default function DocumentsScreen() {
             <Text style={styles.photoViewerCloseText}>✕</Text>
           </TouchableOpacity>
           {viewing?.fileUrl && (
-            <Image source={{ uri: viewing.fileUrl }} style={styles.photoViewerImage} resizeMode="contain" />
+            <Image
+              source={{ uri: viewingPhoto === 'back' && viewing.fileUrlBack ? viewing.fileUrlBack : viewing.fileUrl }}
+              style={styles.photoViewerImage}
+              resizeMode="contain"
+            />
           )}
           <View style={styles.photoViewerActions}>
-            <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleSaveAsPDF(viewing)}>
+            <TouchableOpacity style={[styles.photoViewerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]} onPress={() => viewing && handleSaveAsPDF(viewing)}>
               <Ionicons name="download-outline" size={20} color="#fff" />
               <Text style={styles.photoViewerBtnText}>{t('download')}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.photoViewerBtn} onPress={() => viewing && handleShare(viewing)}>
+            <TouchableOpacity style={[styles.photoViewerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]} onPress={() => viewing && handleShare(viewing)}>
               <Text style={styles.photoViewerBtnText}>↗ {t('share')}</Text>
             </TouchableOpacity>
           </View>
@@ -362,93 +533,140 @@ export default function DocumentsScreen() {
       {/* Create/Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
-          </View>
+          <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
+              <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+            </View>
 
-          <TouchableOpacity style={styles.photoBtn} onPress={showImageOptions}>
-            {form.fileUrl ? (
-              <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+            {/* Photo section */}
+            {form.type === 'drivers_license' ? (
+              <View style={{ gap: 10, marginBottom: 12 }}>
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
+                  {form.fileUrl ? (
+                    <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
+                      <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                      <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('frontPhoto')}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('back')}>
+                  {form.fileUrlBack ? (
+                    <Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
+                      <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                      <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('backPhoto')}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
             ) : (
-              <View style={styles.photoPlaceholder}>
-                <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                <Text style={styles.photoPlaceholderText}>{t('tapToAddPhoto')}</Text>
+              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
+                {form.fileUrl ? (
+                  <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
+                    <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                    <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('tapToAddPhoto')}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+            {errors.fileUrl ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.fileUrl}</Text> : null}
+
+            {/* Title: editable for technical_review and fines, read-only for others */}
+            {isTitleEditable ? (
+              <TextInput
+                style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+                placeholder={t('title')}
+                placeholderTextColor={colors.textMuted}
+                value={form.title}
+                onChangeText={(text) => setForm((p) => ({ ...p, title: text }))}
+              />
+            ) : (
+              <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                <Text style={{ fontSize: 15, color: colors.text }}>{form.title}</Text>
               </View>
             )}
-          </TouchableOpacity>
-          {errors.fileUrl ? <Text style={styles.errorText}>{errors.fileUrl}</Text> : null}
 
-          <TextInput style={styles.input} placeholder="Title *" value={form.title} onChangeText={(t) => { setForm((p) => ({ ...p, title: t })); setErrors((p) => ({ ...p, title: '' })); }} />
-          {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
+            <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowIssueDatePicker(true)}>
+              <Text style={{ fontSize: 15, color: form.issueDate ? colors.text : colors.textMuted }}>
+                {form.issueDate || t('issueDate')}
+              </Text>
+            </TouchableOpacity>
+            {showIssueDatePicker && (
+              <DateTimePicker
+                value={form.issueDate ? new Date(form.issueDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  setShowIssueDatePicker(false);
+                  if (event.type === 'set' && date) {
+                    const iso = date.toISOString().split('T')[0];
+                    setForm((p) => ({ ...p, issueDate: iso }));
+                    // Clear expiry error if we now have issue date
+                    if (form.expiryDate && new Date(form.expiryDate) >= date) {
+                      setErrors((p) => ({ ...p, expiryDate: '' }));
+                    }
+                  }
+                }}
+              />
+            )}
 
-          <TouchableOpacity style={styles.input} onPress={() => setShowIssueDatePicker(true)}>
-            <Text style={form.issueDate ? styles.dateText : styles.datePlaceholder}>
-              {form.issueDate || t('issueDate')}
-            </Text>
-          </TouchableOpacity>
-          {showIssueDatePicker && (
-            <DateTimePicker
-              value={form.issueDate ? new Date(form.issueDate) : new Date()}
-              mode="date"
-              display="default"
-              onValueChange={(date) => {
-                setShowIssueDatePicker(false);
-                if (date) {
-                  const iso = date.toISOString().split('T')[0];
-                  setForm((p) => ({ ...p, issueDate: iso }));
-                }
-              }}
-              onDismiss={() => setShowIssueDatePicker(false)}
-            />
-          )}
+            <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
+              <Text style={{ fontSize: 15, color: form.expiryDate ? colors.text : colors.textMuted }}>
+                {form.expiryDate || t('expiryDate')}
+              </Text>
+            </TouchableOpacity>
+            {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.expiryDate}</Text> : null}
+            {showExpiryDatePicker && (
+              <DateTimePicker
+                value={form.expiryDate ? new Date(form.expiryDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  setShowExpiryDatePicker(false);
+                  if (event.type === 'set' && date) {
+                    const iso = date.toISOString().split('T')[0];
+                    setForm((p) => ({ ...p, expiryDate: iso }));
+                    // Validate expiry >= issue
+                    if (form.issueDate && date < new Date(form.issueDate)) {
+                      setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') }));
+                    } else {
+                      setErrors((p) => ({ ...p, expiryDate: '' }));
+                    }
+                  }
+                }}
+              />
+            )}
 
-          <TouchableOpacity style={styles.input} onPress={() => setShowExpiryDatePicker(true)}>
-            <Text style={form.expiryDate ? styles.dateText : styles.datePlaceholder}>
-              {form.expiryDate || t('expiryDate')}
-            </Text>
-          </TouchableOpacity>
-          {showExpiryDatePicker && (
-            <DateTimePicker
-              value={form.expiryDate ? new Date(form.expiryDate) : new Date()}
-              mode="date"
-              display="default"
-              onValueChange={(date) => {
-                setShowExpiryDatePicker(false);
-                if (date) {
-                  const iso = date.toISOString().split('T')[0];
-                  setForm((p) => ({ ...p, expiryDate: iso }));
-                }
-              }}
-              onDismiss={() => setShowExpiryDatePicker(false)}
-            />
-          )}
+            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>}
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
-          </TouchableOpacity>
-
-          {/* Inline photo picker overlay inside modal */}
-          {showPhotoModal && (
-            <View style={styles.photoOverlay}>
-              <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
-              <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
-                <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}>
-                  <Ionicons name="close" size={24} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
-                <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}>
-                  <Ionicons name="camera" size={20} color="#fff" />
-                  <Text style={styles.photoOverlayBtnText}>{t('takePhoto')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}>
-                  <Ionicons name="images" size={20} color="#fff" />
-                  <Text style={styles.photoOverlayBtnText}>{t('chooseFromGallery')}</Text>
-                </TouchableOpacity>
+            {/* Inline photo picker overlay */}
+            {showPhotoModal && (
+              <View style={styles.photoOverlay}>
+                <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
+                <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
+                  <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}>
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                  <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
+                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}>
+                    <Ionicons name="camera" size={20} color={colors.primaryText} />
+                    <Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('takePhoto')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}>
+                    <Ionicons name="images" size={20} color={colors.primaryText} />
+                    <Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('chooseFromGallery')}</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          )}
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -467,90 +685,82 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bulkBtn: { backgroundColor: '#34C759', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
-  bulkBtnText: { color: '#fff', fontWeight: '600', fontSize: 13 },
-  bulkFab: {
-    position: 'absolute',
-    bottom: 92,
-    right: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#34C759',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3,
+  categoryList: { padding: 16 },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
   },
-  addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  addBtnText: { color: '#fff', fontWeight: '600' },
-  empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  infoBannerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
+  },
+  categoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  categoryIcon: { fontSize: 20, marginRight: 12 },
+  categoryText: { fontSize: 16, fontWeight: '500' },
+  categoryCount: { fontSize: 13, marginTop: 2 },
+  arrow: { fontSize: 20 },
+  empty: { textAlign: 'center', marginTop: 40 },
   emptyContainer: { alignItems: 'center' },
   emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptySub: { fontSize: 13, color: '#ccc', marginTop: 4 },
-  card: { padding: 14, marginHorizontal: 16, marginTop: 8, backgroundColor: '#f8f8f8', borderRadius: 8 },
+  emptySub: { fontSize: 13, marginTop: 4 },
+  card: { padding: 14, marginHorizontal: 16, marginTop: 8, borderRadius: 8 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardType: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize' },
-  cardStatus: { fontSize: 12, color: '#34C759', fontWeight: '500' },
-  expired: { color: '#FF3B30' },
-  cardTitle: { fontSize: 15, marginTop: 4 },
-  cardDate: { fontSize: 13, color: '#666', marginTop: 2 },
+  cardTitle: { fontSize: 15, flex: 1 },
+  cardStatus: { fontSize: 12, fontWeight: '500' },
+  cardDate: { fontSize: 13, marginTop: 2 },
   // Detail Modal
-  detailContainer: { flex: 1, backgroundColor: '#fff' },
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#eee' },
-  done: { color: '#007AFF', fontSize: 16 },
+  detailContainer: { flex: 1 },
+  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
   detailActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   editBtn: { padding: 8 },
   deleteBtn: { padding: 8 },
-  editBtnText: { color: '#fff', fontWeight: '600' },
-  deleteBtnText: { color: '#FF3B30', fontSize: 14 },
   detailContent: { padding: 20 },
-  detailType: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize', color: '#666' },
   detailTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 4 },
-  detailDate: { fontSize: 15, color: '#666', marginTop: 8 },
+  detailDate: { fontSize: 15, marginTop: 8 },
   pdfThumbnail: {
     marginTop: 20,
     padding: 24,
-    backgroundColor: '#f5f5f5',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
     borderStyle: 'dashed',
     alignItems: 'center',
   },
   pdfIcon: { fontSize: 48, marginBottom: 8 },
-  pdfName: { fontSize: 14, fontWeight: '600', color: '#333' },
-  pdfHint: { fontSize: 12, color: '#999', marginTop: 4 },
-  noPhoto: { height: 150, borderRadius: 10, marginTop: 16, backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' },
-  noPhotoText: { color: '#999' },
+  pdfName: { fontSize: 14, fontWeight: '600' },
+  pdfHint: { fontSize: 12, marginTop: 4 },
+  noPhoto: { height: 150, borderRadius: 10, marginTop: 16, justifyContent: 'center', alignItems: 'center' },
   // Photo Viewer
   photoViewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   photoViewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },
   photoViewerCloseText: { color: '#fff', fontSize: 24 },
   photoViewerImage: { width: '90%', height: '70%' },
   photoViewerActions: { flexDirection: 'row', gap: 20, marginTop: 20 },
-  photoViewerBtn: { backgroundColor: 'rgba(255,255,255,0.2)', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, gap: 8 },
+  photoViewerBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, gap: 8 },
   photoViewerBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   // Create/Edit Modal
   modal: { flex: 1, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  cancel: { color: '#007AFF', fontSize: 16 },
   photoBtn: {
     width: '100%',
     height: 140,
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 12,
-    backgroundColor: '#f0f0f0',
   },
   photoPreview: { width: '100%', height: '100%' },
   photoPlaceholder: {
@@ -558,18 +768,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#ddd',
     borderStyle: 'dashed',
     borderRadius: 10,
   },
   photoPlaceholderIcon: { fontSize: 32, marginBottom: 6 },
-  photoPlaceholderText: { color: '#999', fontSize: 14 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
-  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
-  dateText: { fontSize: 15, color: '#333' },
-  datePlaceholder: { fontSize: 15, color: '#999' },
-  saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  photoPlaceholderText: { fontSize: 14 },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10 },
+  errorText: { fontSize: 12, marginBottom: 8, marginTop: -6 },
+  saveBtn: { borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtnText: { fontSize: 16, fontWeight: '600' },
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -577,7 +784,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
@@ -586,7 +792,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-  fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
+  fabText: { fontSize: 28, fontWeight: '300', marginTop: -2 },
+  bulkFab: {
+    position: 'absolute',
+    bottom: 92,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+  },
   photoOverlay: {
     position: 'absolute',
     top: 0,
@@ -634,7 +855,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   photoOverlayBtnText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

@@ -153,6 +153,7 @@ export interface Document {
   type: string;
   title: string;
   fileUrl: string;
+  fileUrlBack?: string;
   issueDate?: string;
   expiryDate?: string;
   status: string;
@@ -164,7 +165,7 @@ export async function listDocuments(motorcycleId: string): Promise<Document[]> {
 
 export async function createDocument(
   motorcycleId: string,
-  data: { type: string; title: string; fileUrl: string; issueDate?: string; expiryDate?: string }
+  data: { type: string; title: string; fileUrl: string; fileUrlBack?: string; issueDate?: string; expiryDate?: string }
 ): Promise<Document> {
   return api<Document>(`/api/motorcycles/${motorcycleId}/documents`, { method: 'POST', body: data });
 }
@@ -172,7 +173,7 @@ export async function createDocument(
 export async function updateDocument(
   motorcycleId: string,
   docId: string,
-  data: { type?: string; title?: string; fileUrl?: string; issueDate?: string | null; expiryDate?: string | null; notes?: string | null; status?: string | null }
+  data: { type?: string; title?: string; fileUrl?: string; fileUrlBack?: string | null; issueDate?: string | null; expiryDate?: string | null; notes?: string | null; status?: string | null }
 ): Promise<Document> {
   return api<Document>(`/api/motorcycles/${motorcycleId}/documents/${docId}`, { method: 'PUT', body: data });
 }

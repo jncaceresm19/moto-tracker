@@ -50,9 +50,10 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
 export const documents = sqliteTable('documents', {
   id: text('id').primaryKey(),
   motorcycleId: text('motorcycle_id').notNull().references(() => motorcycles.id),
-  type: text('type').notNull(), // 'circulation_permit', 'technical_review', 'insurance', 'registration', 'other'
+  type: text('type').notNull(), // 'circulation_permit', 'technical_review', 'insurance', 'padron', 'drivers_license', 'fines'
   title: text('title').notNull(),
   fileUrl: text('file_url').notNull(),
+  fileUrlBack: text('file_url_back'), // For driver's license back photo
   issueDate: integer('issue_date', { mode: 'timestamp' }),
   expiryDate: integer('expiry_date', { mode: 'timestamp' }),
   notes: text('notes'),
