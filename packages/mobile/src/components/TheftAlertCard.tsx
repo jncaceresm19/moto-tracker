@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme-context';
 import { useAuth } from '../auth-context';
@@ -68,38 +68,49 @@ export function TheftAlertCard({
       <Text style={[styles.metadata, { color: colors.inkFaint }]}>{metadata}</Text>
       <Text style={[styles.time, { color: colors.inkFaint }]}>{timeAgo}</Text>
 
-      {/* Share buttons */}
-      <View style={styles.shareRow}>
-        <TouchableOpacity style={styles.shareBtn} onPress={onWhatsApp}>
-          <Ionicons name="logo-whatsapp" size={22} color="#25D366" />
-          <Text style={styles.shareLabel}>WhatsApp</Text>
+      {/* Action row: share + comments */}
+      <View style={[styles.actionRow, { borderTopColor: colors.border }]}>
+        <TouchableOpacity style={styles.actionBtn} onPress={onWhatsApp}>
+          <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.shareBtn} onPress={onInstagram}>
-          <Ionicons name="logo-instagram" size={22} color="#E4405F" />
-          <Text style={styles.shareLabel}>Instagram</Text>
+        <TouchableOpacity style={styles.actionBtn} onPress={onInstagram}>
+          <Ionicons name="logo-instagram" size={20} color="#E4405F" />
+        </TouchableOpacity>
+        
+        <View style={styles.actionSpacer} />
+        
+        <TouchableOpacity 
+          style={styles.actionBtn}
+          onPress={() => setShowComments(!showComments)}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={colors.inkSoft} />
+          {responses.length > 0 && (
+            <View style={[styles.countBadge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.countBadgeText}>{responses.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.actionBtn}
+          onPress={() => setShowComments(!showComments)}
+        >
+          <Ionicons 
+            name={showComments ? "chevron-up" : "chevron-down"} 
+            size={20} 
+            color={colors.inkFaint} 
+          />
         </TouchableOpacity>
       </View>
-
-      {/* Comments toggle */}
-      <TouchableOpacity 
-        style={[styles.commentsToggle, { borderTopColor: colors.border }]}
-        onPress={() => setShowComments(!showComments)}
-      >
-        <Ionicons name="chatbubble-outline" size={18} color={colors.inkSoft} />
-        <Text style={[styles.commentsToggleText, { color: colors.inkSoft }]}>
-          {responses.length > 0 ? `${responses.length} comentario${responses.length > 1 ? 's' : ''}` : 'Comentar'}
-        </Text>
-        <Ionicons 
-          name={showComments ? "chevron-up" : "chevron-down"} 
-          size={16} 
-          color={colors.inkFaint} 
-        />
-      </TouchableOpacity>
 
       {/* Comments section */}
       {showComments && (
         <View style={[styles.commentsSection, { borderTopColor: colors.border }]}>
           {/* Comments list */}
+          {responses.length === 0 && (
+            <Text style={[styles.noComments, { color: colors.inkFaint }]}>
+              Sé el primero en comentar
+            </Text>
+          )}
           {responses.map((comment) => (
             <View key={comment.id} style={[styles.comment, { borderBottomColor: colors.borderLight }]}>
               <View style={[styles.commentAvatar, { backgroundColor: colors.brandBlue }]}>
@@ -153,12 +164,13 @@ const styles = StyleSheet.create({
   title: { fontSize: 16, fontWeight: '700', marginHorizontal: 14, marginTop: 10 },
   metadata: { fontSize: 13, marginHorizontal: 14, marginTop: 4 },
   time: { fontSize: 12, marginHorizontal: 14, marginTop: 2, fontStyle: 'italic' },
-  shareRow: { flexDirection: 'row', justifyContent: 'center', gap: 32, marginTop: 14, paddingHorizontal: 14, paddingBottom: 14 },
-  shareBtn: { alignItems: 'center', gap: 4 },
-  shareLabel: { fontSize: 11, color: '#5A6478' },
-  commentsToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: 1 },
-  commentsToggleText: { fontSize: 13, flex: 1 },
+  actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, marginTop: 10 },
+  actionBtn: { padding: 8, position: 'relative' },
+  actionSpacer: { flex: 1 },
+  countBadge: { position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  countBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   commentsSection: { borderTopWidth: 1 },
+  noComments: { textAlign: 'center', paddingVertical: 16, fontSize: 13, fontStyle: 'italic' },
   comment: { flexDirection: 'row', gap: 10, paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1 },
   commentAvatar: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   commentAvatarText: { color: '#fff', fontSize: 14, fontWeight: '700' },

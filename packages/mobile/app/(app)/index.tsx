@@ -21,6 +21,7 @@ export default function HomeScreen() {
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [gasStations, setGasStations] = useState<GasStation[]>([]);
   const [theftAlerts, setTheftAlerts] = useState<TheftAlert[]>([]);
+  const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; text: string; timeAgo: string }[]>>({});
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -200,24 +201,58 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           {hasAlerts ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
-              {theftAlerts.map((alert) => (
-                <TheftAlertCard
-                  key={alert.id}
-                  title={`${alert.brand} ${alert.model} - ROBADA`}
-                  metadata={alert.lastLocationName || 'Ubicación desconocida'}
-                  timeAgo={formatTimeAgo(alert.createdAt)}
-                  photoUrl={alert.photoUrl}
-                  responses={[]}
-                  onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
-                  onInstagram={() => shareToSpecificPlatform(alert, 'instagram')}
-                  onComment={(text) => {
-                    console.log('Comment:', text);
-                    // TODO: Save comment to backend
-                  }}
-                />
-              ))}
-            </ScrollView>
+            theftAlerts.length === 1 ? (
+              <TheftAlertCard
+                key={theftAlerts[0].id}
+                title={`${theftAlerts[0].brand} ${theftAlerts[0].model} - ROBADA`}
+                metadata={theftAlerts[0].lastLocationName || 'Ubicación desconocida'}
+                timeAgo={formatTimeAgo(theftAlerts[0].createdAt)}
+                photoUrl={theftAlerts[0].photoUrl}
+                responses={theftComments[theftAlerts[0].id] || []}
+                onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp')}
+                onInstagram={() => shareToSpecificPlatform(theftAlerts[0], 'instagram')}
+                onComment={(text) => {
+                  const alertId = theftAlerts[0].id;
+                  const newComment = {
+                    id: `comment-${Date.now()}`,
+                    userName: user?.email?.split('@')[0] || 'Usuario',
+                    text,
+                    timeAgo: 'ahora mismo',
+                  };
+                  setTheftComments(prev => ({
+                    ...prev,
+                    [alertId]: [...(prev[alertId] || []), newComment],
+                  }));
+                }}
+              />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+                {theftAlerts.map((alert) => (
+                  <TheftAlertCard
+                    key={alert.id}
+                    title={`${alert.brand} ${alert.model} - ROBADA`}
+                    metadata={alert.lastLocationName || 'Ubicación desconocida'}
+                    timeAgo={formatTimeAgo(alert.createdAt)}
+                    photoUrl={alert.photoUrl}
+                    responses={theftComments[alert.id] || []}
+                    onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
+                    onInstagram={() => shareToSpecificPlatform(alert, 'instagram')}
+                    onComment={(text) => {
+                      const newComment = {
+                        id: `comment-${Date.now()}`,
+                        userName: user?.email?.split('@')[0] || 'Usuario',
+                        text,
+                        timeAgo: 'ahora mismo',
+                      };
+                      setTheftComments(prev => ({
+                        ...prev,
+                        [alert.id]: [...(prev[alert.id] || []), newComment],
+                      }));
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            )
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={styles.emptyCardIcon}>🛡️</Text>
