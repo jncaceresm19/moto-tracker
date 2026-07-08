@@ -39,19 +39,12 @@ async function searchGooglePlaces(
   keyword: string,
   radius: number
 ): Promise<any[]> {
-  // Use rankby=distance for taller/vulca to get closest first
-  const useDistanceRank = (type === 'motorcycle_repair' || type === 'tire_repair' || (!type && keyword));
-
+  // Use radius-based search (not rankby=distance) to get ALL places, with or without rating
   let url =
     'https://maps.googleapis.com/maps/api/place/nearbysearch/json' +
     '?location=' + lat + ',' + lon +
+    '&radius=' + radius +
     '&key=' + GOOGLE_API_KEY;
-
-  if (useDistanceRank) {
-    url += '&rankby=distance';
-  } else {
-    url += '&radius=' + radius;
-  }
 
   // Add type if provided
   if (type) {
@@ -63,7 +56,7 @@ async function searchGooglePlaces(
     url += '&keyword=' + encodeURIComponent(keyword);
   }
 
-  console.log('[NEARBY] Google:', keyword || type, '|', useDistanceRank ? 'distance' : radius + 'm');
+  console.log('[NEARBY] Google:', keyword || type, '|', radius + 'm');
   try {
     const response = await fetch(url);
     const data = await response.json();
@@ -110,16 +103,25 @@ export async function getNearbyPlaces(
 
   // Search queries - focused on motorcycle needs only
   const searches: { category: NearbyPlace['category']; type: string; keyword: string }[] = [
-    // TALLERES - motorcycle repair
+    // TALLERES - motorcycle repair (multiple types to catch all)
     { category: 'taller', type: 'motorcycle_repair', keyword: '' },
     { category: 'taller', type: 'motorcycle_repair', keyword: 'taller' },
     { category: 'taller', type: 'motorcycle_repair', keyword: 'reparación' },
+    { category: 'taller', type: 'motorcycle_repair', keyword: 'motos' },
+    { category: 'taller', type: 'repair', keyword: 'motos' },
+    { category: 'taller', type: 'repair', keyword: 'taller' },
+    { category: 'taller', type: 'store', keyword: 'repuesto motos' },
+    { category: 'taller', type: 'store', keyword: 'accesorios motos' },
     { category: 'taller', type: '', keyword: 'taller motos' },
     { category: 'taller', type: '', keyword: 'taller mecánico motos' },
+    { category: 'taller', type: '', keyword: 'reparación motos' },
     // VULCANIZACIÓN - tire repair
     { category: 'vulcanizacion', type: 'tire_repair', keyword: '' },
+    { category: 'vulcanizacion', type: 'tire_repair', keyword: 'motos' },
+    { category: 'vulcanizacion', type: 'store', keyword: 'neumáticos' },
+    { category: 'vulcanizacion', type: 'store', keyword: 'llantas' },
     { category: 'vulcanizacion', type: '', keyword: 'vulcanización' },
-    { category: 'vulcanizacion', type: '', keyword: 'neumáticos' },
+    { category: 'vulcanizacion', type: '', keyword: 'gomería' },
     // HOSPITALES
     { category: 'medico', type: 'hospital', keyword: '' },
     // COMISARÍAS
