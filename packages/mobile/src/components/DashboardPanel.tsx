@@ -93,7 +93,7 @@ export function DashboardPanel({
         <View style={styles.addressRow}>
           <Ionicons name="location-outline" size={13} color={isActive ? '#22C55E' : colors.inkFaint} />
           <Text style={[styles.addressText, { color: isActive ? '#22C55E' : colors.inkFaint }]} numberOfLines={1}>
-            {isActive ? (activationAddress ? `${t('parkedAt')} ${activationAddress}` : t('parkedAt')) : `${t('parkedAt')} ... - ${t('lastLocation')} --:--`}
+            {isActive ? (activationAddress ? `${t('parkedAt')} ${activationAddress}` : t('parkedAt')) : `${t('parkedAt')} ...`}
           </Text>
         </View>
 
