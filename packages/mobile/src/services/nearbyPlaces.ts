@@ -101,30 +101,25 @@ export async function getNearbyPlaces(
 
   const radiusMeters = radiusKm * 1000;
 
-  // Search queries - focused on motorcycle needs only
+  // Search queries - NO TYPE RESTRICTION, filter by name keywords only
   const searches: { category: NearbyPlace['category']; type: string; keyword: string }[] = [
-    // TALLERES - motorcycle repair (multiple types to catch all)
-    { category: 'taller', type: 'motorcycle_repair', keyword: '' },
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'taller' },
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'reparación' },
-    { category: 'taller', type: 'repair', keyword: '' },
+    // TALLERES - keyword-only searches (no type filter)
     { category: 'taller', type: '', keyword: 'taller motos' },
     { category: 'taller', type: '', keyword: 'reparación motos' },
     { category: 'taller', type: '', keyword: 'mecánico motos' },
-    // VULCANIZACIÓN - tire repair
-    { category: 'vulcanizacion', type: 'tire_repair', keyword: '' },
+    { category: 'taller', type: '', keyword: 'taller mecánico' },
+    { category: 'taller', type: '', keyword: 'reparación' },
+    { category: 'taller', type: '', keyword: 'dilan motos' },
+    { category: 'taller', type: '', keyword: 'HMR multiservicios' },
+    // VULCANIZACIÓN - keyword-only searches
     { category: 'vulcanizacion', type: '', keyword: 'vulcanización' },
     { category: 'vulcanizacion', type: '', keyword: 'neumáticos' },
     { category: 'vulcanizacion', type: '', keyword: 'llantas' },
+    { category: 'vulcanizacion', type: '', keyword: 'gomería' },
     // HOSPITALES
     { category: 'medico', type: 'hospital', keyword: '' },
     // COMISARÍAS
     { category: 'carabineros', type: 'police', keyword: '' },
-    // BROAD SEARCHES - catch ALL motorcycle-related places
-    { category: 'taller', type: 'establishment', keyword: 'motos' },
-    { category: 'taller', type: 'point_of_interest', keyword: 'motos' },
-    { category: 'taller', type: '', keyword: 'dilan motos' },
-    { category: 'taller', type: '', keyword: 'HMR multiservicios' },
   ];
 
   const allPlaces: NearbyPlace[] = [];
@@ -164,7 +159,7 @@ export async function getNearbyPlaces(
         const isRepuesto = combined.includes('repuesto') || combined.includes('accesorio');
         const isMultiservicio = combined.includes('multiservicio');
         accepted = isTaller || isMoto || isRepair || isRepuesto || isMultiservicio;
-        if (!accepted) console.log('[NEARBY] ✗ Skip taller:', r.name);
+        console.log('[NEARBY] ' + (accepted ? '✓' : '✗') + ' taller:', r.name, '|', 'moto:' + isMoto, 'taller:' + isTaller);
       }
 
       if (category === 'vulcanizacion') {
