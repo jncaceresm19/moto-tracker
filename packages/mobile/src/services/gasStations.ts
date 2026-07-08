@@ -89,18 +89,8 @@ export async function getLastUpdateLabel(): Promise<string | null> {
   const lastUpdate = await getLastUpdateTime();
   if (!lastUpdate) return null;
   
-  const now = new Date();
-  const hoursSinceUpdate = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60));
-  
-  if (hoursSinceUpdate < 1) return 'hace menos de 1 hora';
-  if (hoursSinceUpdate === 1) return 'hace 1 hora';
-  if (hoursSinceUpdate < 24) return `hace ${hoursSinceUpdate} horas`;
-  
-  const daysSinceUpdate = Math.floor(hoursSinceUpdate / 24);
-  if (daysSinceUpdate === 1) return 'hace 1 día';
-  if (daysSinceUpdate < 7) return `hace ${daysSinceUpdate} días`;
-  
-  return `hace más de ${daysSinceUpdate} días`;
+  // For Chile: show MEPCO message
+  return 'Precios según mecanismo MEPCO (actualización semanal)';
 }
 
 // CNE API credentials
