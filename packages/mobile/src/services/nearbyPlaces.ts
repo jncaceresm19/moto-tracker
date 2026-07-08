@@ -115,6 +115,10 @@ export async function getNearbyPlaces(
     { category: 'taller', type: '', keyword: 'taller motos' },
     { category: 'taller', type: '', keyword: 'taller mecánico motos' },
     { category: 'taller', type: '', keyword: 'reparación motos' },
+    // TALLERES - additional searches to catch "especial de motos" type places
+    { category: 'taller', type: '', keyword: 'especial motos' },
+    { category: 'taller', type: '', keyword: 'dilan motos' },
+    { category: 'taller', type: '', keyword: 'multiservicios motos' },
     // VULCANIZACIÓN - tire repair
     { category: 'vulcanizacion', type: 'tire_repair', keyword: '' },
     { category: 'vulcanizacion', type: 'tire_repair', keyword: 'motos' },
