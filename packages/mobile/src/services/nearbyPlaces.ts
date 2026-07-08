@@ -39,28 +39,41 @@ async function searchGooglePlaces(
   keyword: string,
   radius: number
 ): Promise<any[]> {
-  const url =
+  // Use rankby=distance for taller/vulca to get closest first
+  const useDistanceRank = (type === 'motorcycle_repair' || type === 'tire_repair' || (!type && keyword));
+
+  let url =
     'https://maps.googleapis.com/maps/api/place/nearbysearch/json' +
     '?location=' + lat + ',' + lon +
-    '&radius=' + radius +
-    '&type=' + type +
-    '&keyword=' + encodeURIComponent(keyword) +
     '&key=' + GOOGLE_API_KEY;
 
-  console.log('[NEARBY] Google search:', keyword, '| type:', type);
+  if (useDistanceRank) {
+    url += '&rankby=distance';
+  } else {
+    url += '&radius=' + radius;
+  }
+
+  // Add type if provided
+  if (type) {
+    url += '&type=' + type;
+  }
+
+  // Add keyword if provided
+  if (keyword) {
+    url += '&keyword=' + encodeURIComponent(keyword);
+  }
+
+  console.log('[NEARBY] Google:', keyword || type, '|', useDistanceRank ? 'distance' : radius + 'm');
   try {
     const response = await fetch(url);
     const data = await response.json();
-    console.log('[NEARBY] Google status:', data.status);
+    console.log('[NEARBY] Status:', data.status, '| results:', data.results?.length || 0);
     if (data.error_message) {
-      console.log('[NEARBY] Google ERROR:', data.error_message);
-    }
-    if (data.results) {
-      console.log('[NEARBY] Google results:', data.results.length);
+      console.log('[NEARBY] ERROR:', data.error_message);
     }
     return data.results || [];
   } catch (e) {
-    console.log('[NEARBY] Google fetch error:', (e as Error).message);
+    console.log('[NEARBY] Fetch error:', (e as Error).message);
     return [];
   }
 }
@@ -98,24 +111,23 @@ export async function getNearbyPlaces(
   // Search queries - Google Places API by type + keyword
   // Multiple queries per category to catch more results
   const searches: { category: NearbyPlace['category']; type: string; keyword: string }[] = [
-    // TALLERES - main focus (many queries to catch all)
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'taller mecánico motos' },
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'taller motos' },
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'mecánico motocicleta' },
+    // TALLERES - main focus (broad searches)
     { category: 'taller', type: 'motorcycle_repair', keyword: '' },
-    { category: 'taller', type: 'repair', keyword: 'taller mecánico' },
-    { category: 'taller', type: 'repair', keyword: 'reparación motos' },
-    { category: 'taller', type: 'store', keyword: 'repuesto motos' },
-    { category: 'taller', type: 'store', keyword: 'accesorios motos' },
+    { category: 'taller', type: 'motorcycle_repair', keyword: 'taller' },
+    { category: 'taller', type: 'motorcycle_repair', keyword: 'motos' },
+    { category: 'taller', type: 'motorcycle_repair', keyword: 'reparación' },
+    { category: 'taller', type: 'repair', keyword: 'motos' },
+    { category: 'taller', type: 'repair', keyword: 'mecánico' },
+    { category: 'taller', type: '', keyword: 'taller motos' },
+    { category: 'taller', type: '', keyword: 'taller mecánico motos' },
     // VULCANIZACIÓN - main focus
-    { category: 'vulcanizacion', type: 'tire_repair', keyword: 'vulcanización' },
     { category: 'vulcanizacion', type: 'tire_repair', keyword: '' },
+    { category: 'vulcanizacion', type: 'tire_repair', keyword: 'motos' },
     { category: 'vulcanizacion', type: 'store', keyword: 'neumáticos' },
     { category: 'vulcanizacion', type: 'store', keyword: 'llantas' },
-    { category: 'vulcanizacion', type: 'store', keyword: 'gomería' },
+    { category: 'vulcanizacion', type: '', keyword: 'vulcanización' },
     // HOSPITALES - secondary
     { category: 'medico', type: 'hospital', keyword: '' },
-    { category: 'medico', type: 'clinic', keyword: 'urgencia' },
     // COMISARÍAS - secondary
     { category: 'carabineros', type: 'police', keyword: '' },
   ];
@@ -141,16 +153,20 @@ export async function getNearbyPlaces(
       const vic = (r.vicinity || '').toLowerCase();
       const combined = name + ' ' + vic;
 
+      // Filter by distance (max 10km for results)
+      if (dist > 10) {
+        console.log('[NEARBY] ✗ Too far:', r.name, dist.toFixed(1), 'km');
+        continue;
+      }
+
       let accepted = false;
 
       if (category === 'taller') {
-        // Accept anything that could be a motorcycle/mechanical shop
-        accepted = true; // Accept all from this category, filter later if needed
+        accepted = true;
         console.log('[NEARBY] ✓ taller:', r.name, '|', dist.toFixed(1), 'km');
       }
 
       if (category === 'vulcanizacion') {
-        // Accept anything that could be tire/vulcanization related
         accepted = true;
         console.log('[NEARBY] ✓ vulca:', r.name, '|', dist.toFixed(1), 'km');
       }
