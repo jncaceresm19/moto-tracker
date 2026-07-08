@@ -107,29 +107,24 @@ export async function getNearbyPlaces(
     { category: 'taller', type: 'motorcycle_repair', keyword: '' },
     { category: 'taller', type: 'motorcycle_repair', keyword: 'taller' },
     { category: 'taller', type: 'motorcycle_repair', keyword: 'reparación' },
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'motos' },
-    { category: 'taller', type: 'repair', keyword: 'motos' },
-    { category: 'taller', type: 'repair', keyword: 'taller' },
-    { category: 'taller', type: 'store', keyword: 'repuesto motos' },
-    { category: 'taller', type: 'store', keyword: 'accesorios motos' },
+    { category: 'taller', type: 'repair', keyword: '' },
     { category: 'taller', type: '', keyword: 'taller motos' },
-    { category: 'taller', type: '', keyword: 'taller mecánico motos' },
     { category: 'taller', type: '', keyword: 'reparación motos' },
-    // TALLERES - additional searches to catch "especial de motos" type places
-    { category: 'taller', type: '', keyword: 'especial motos' },
-    { category: 'taller', type: '', keyword: 'dilan motos' },
-    { category: 'taller', type: '', keyword: 'multiservicios motos' },
+    { category: 'taller', type: '', keyword: 'mecánico motos' },
     // VULCANIZACIÓN - tire repair
     { category: 'vulcanizacion', type: 'tire_repair', keyword: '' },
-    { category: 'vulcanizacion', type: 'tire_repair', keyword: 'motos' },
-    { category: 'vulcanizacion', type: 'store', keyword: 'neumáticos' },
-    { category: 'vulcanizacion', type: 'store', keyword: 'llantas' },
     { category: 'vulcanizacion', type: '', keyword: 'vulcanización' },
-    { category: 'vulcanizacion', type: '', keyword: 'gomería' },
+    { category: 'vulcanizacion', type: '', keyword: 'neumáticos' },
+    { category: 'vulcanizacion', type: '', keyword: 'llantas' },
     // HOSPITALES
     { category: 'medico', type: 'hospital', keyword: '' },
     // COMISARÍAS
     { category: 'carabineros', type: 'police', keyword: '' },
+    // BROAD SEARCHES - catch ALL motorcycle-related places
+    { category: 'taller', type: 'establishment', keyword: 'motos' },
+    { category: 'taller', type: 'point_of_interest', keyword: 'motos' },
+    { category: 'taller', type: '', keyword: 'dilan motos' },
+    { category: 'taller', type: '', keyword: 'HMR multiservicios' },
   ];
 
   const allPlaces: NearbyPlace[] = [];
@@ -167,7 +162,8 @@ export async function getNearbyPlaces(
         const isMoto = combined.includes('moto') || combined.includes('motocicleta');
         const isRepair = combined.includes('repair') || combined.includes('reparación') || combined.includes('reparacion');
         const isRepuesto = combined.includes('repuesto') || combined.includes('accesorio');
-        accepted = isTaller || isMoto || isRepair || isRepuesto;
+        const isMultiservicio = combined.includes('multiservicio');
+        accepted = isTaller || isMoto || isRepair || isRepuesto || isMultiservicio;
         if (!accepted) console.log('[NEARBY] ✗ Skip taller:', r.name);
       }
 
