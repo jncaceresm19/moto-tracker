@@ -14,6 +14,8 @@ import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
 import { TheftAlert, getTheftAlerts, closeAlert } from '../../src/services/theftAlertService';
 import { shareToSpecificPlatform } from '../../src/services/shareService';
+import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
+import { PlaceCard } from '../../src/components/PlaceCard';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -24,6 +26,7 @@ export default function HomeScreen() {
   const [theftAlerts, setTheftAlerts] = useState<TheftAlert[]>([]);
   const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; userAvatar?: string; text: string; timeAgo: string }[]>>({});
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
+  const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -96,12 +99,34 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadNearbyPlaces = useCallback(async () => {
+    console.log('[NEARBY] === START loadNearbyPlaces ===');
+    try {
+      console.log('[NEARBY] Requesting location...');
+      const loc = await getCurrentLocation();
+      console.log('[NEARBY] Location OK:', loc.lat, loc.lon);
+      console.log('[NEARBY] Calling getNearbyPlaces...');
+      const places = await getNearbyPlaces(loc.lat, loc.lon);
+      console.log('[NEARBY] Places result:', places.length, 'places');
+      if (places.length > 0) {
+        console.log('[NEARBY] First place:', places[0].name, places[0].category);
+      }
+      setNearbyPlaces(places);
+    } catch (e: any) {
+      console.log('[NEARBY] === ERROR ===', e?.message || String(e));
+      console.log('[NEARBY] Error name:', e?.name);
+      console.log('[NEARBY] Error stack:', e?.stack?.substring(0, 200));
+    }
+  }, []);
+
   useEffect(() => {
+    console.log('[NEARBY] useEffect fired');
     // Load cached gas stations immediately on mount (no await - runs in background)
     loadGasStations();
     loadMotorcycles();
     loadTheftAlerts();
-  }, [loadMotorcycles, loadGasStations, loadTheftAlerts]);
+    loadNearbyPlaces();
+  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces]);
 
   // Refresh theft alerts when returning from other screens (e.g. manual publication)
   useFocusEffect(
@@ -112,7 +137,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts()]);
+    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts(), loadNearbyPlaces()]);
     setRefreshing(false);
   };
 
@@ -331,6 +356,26 @@ export default function HomeScreen() {
               <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyOffers')}</Text>
               <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
                 {t('saveOnRouteEmpty')}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Section: Servicios cercanos */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('nearbyServices')}</Text>
+          {nearbyPlaces.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+              {nearbyPlaces.map((place) => (
+                <PlaceCard key={place.id} place={place} />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={styles.emptyCardIcon}>🔧</Text>
+              <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyServicesEmpty')}</Text>
+              <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
+                {t('loadingPlaces')}
               </Text>
             </View>
           )}

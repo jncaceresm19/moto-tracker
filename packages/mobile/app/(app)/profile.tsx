@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Switch, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Switch, Image, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
@@ -223,14 +223,6 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'Tracker feature coming soon.', [{ text: 'OK' }], 'information-circle', '#007AFF')}>
-          <View style={styles.rowLeft}>
-            <Ionicons name="locate-outline" size={20} color={colors.text} />
-            <Text style={dynamicStyles.rowText}>{t('protocolTraker')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </TouchableOpacity>
-
         <View style={dynamicStyles.row}>
           <View style={styles.rowLeft}>
             <Ionicons name="color-palette-outline" size={20} color={colors.text} />
@@ -289,6 +281,28 @@ export default function ProfileScreen() {
           <View style={styles.rowLeft}>
             <Ionicons name="play-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('appTutorial')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={dynamicStyles.row}
+          onPress={() =>
+            showAlert(
+              t('protocolTraker'),
+              t('protocolTrakerInfo'),
+              [
+                { text: t('cancel'), style: 'cancel' },
+                { text: t('viewExample'), onPress: () => Linking.openURL('https://es.aliexpress.com/item/1005006121921125.html') },
+              ],
+              'locate',
+              '#007AFF'
+            )
+          }
+        >
+          <View style={styles.rowLeft}>
+            <Ionicons name="locate-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('protocolTraker')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>

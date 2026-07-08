@@ -66,15 +66,6 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="motos"
-        options={{
-          title: t('tabMotos'),
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bicycle" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="manual-publication"
         options={{
           title: t('tabManualPublication'),
@@ -85,6 +76,15 @@ export default function AppLayout() {
             fontSize: 12,
             fontWeight: '700',
           },
+        }}
+      />
+      <Tabs.Screen
+        name="motos"
+        options={{
+          title: t('tabMotos'),
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="bicycle" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen

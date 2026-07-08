@@ -42,7 +42,7 @@ export default function MyPublicationsScreen() {
   const handleClose = (alertId: string, currentStatus: string) => {
     const newStatus = currentStatus === 'active' ? 'recovered' : 'closed';
     const statusText = newStatus === 'recovered' ? 'recuperada' : 'cerrada';
-    
+
     setAlertTitle(`Marcar como ${statusText}`);
     setAlertMessage(`¿Deseas marcar esta alerta como ${statusText}?`);
     setAlertButtons([
@@ -87,7 +87,7 @@ export default function MyPublicationsScreen() {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    
+
     if (minutes < 1) return 'ahora mismo';
     if (minutes < 60) return `hace ${minutes} min`;
     if (hours < 24) return `hace ${hours}h`;
@@ -147,14 +147,14 @@ export default function MyPublicationsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <FlatList
         data={publications}
         renderItem={renderItem}

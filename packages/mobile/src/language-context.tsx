@@ -24,6 +24,10 @@ const translations = {
     publishConfirm: 'Are you sure you want to publish this theft alert?',
     publicationSuccess: 'Alert published successfully',
     publicationError: 'Failed to publish alert',
+    // Nearby Services
+    nearbyServices: 'Nearby Services',
+    nearbyServicesEmpty: 'Workshops, medical centers and more near you',
+    loadingPlaces: 'Searching nearby...',
     // Home
     homeTitle: 'Welcome to Moto Tracker',
     homeSubtitle: 'Track your motorcycle maintenance and documents',
@@ -89,6 +93,8 @@ const translations = {
     appSettings: 'App Settings',
     notifications: 'Notifications',
     protocolTraker: 'Open Protocol Tracker',
+    protocolTrakerInfo: 'To register your motorcycle you need a GPS tracker with open protocol (e.g. GT06, JT808). We recommend 4G models — 2G/3G-only devices are losing coverage in Chile.',
+    viewExample: 'View example',
     theme: 'Theme',
     language: 'Language',
     support: 'Support',
@@ -265,6 +271,10 @@ const translations = {
     publishConfirm: '¿Estás seguro de que quieres publicar esta alerta de robo?',
     publicationSuccess: 'Alerta publicada exitosamente',
     publicationError: 'Error al publicar alerta',
+    // Nearby Services
+    nearbyServices: 'Servicios cercanos',
+    nearbyServicesEmpty: 'Talleres, centros médicos y más cerca de ti',
+    loadingPlaces: 'Buscando cercanos...',
     // Home
     homeTitle: 'Bienvenido a Moto Tracker',
     homeSubtitle: 'Seguimiento del mantenimiento y documentos de tu moto',
@@ -330,6 +340,8 @@ const translations = {
     appSettings: 'Configuración',
     notifications: 'Notificaciones',
     protocolTraker: 'Rastreador de Protocolo Abierto',
+    protocolTrakerInfo: 'Para registrar tu moto necesitas un rastreador GPS de protocolo abierto (ej. GT06, JT808). Recomendamos modelos 4G — los de solo 2G/3G están quedando fuera de cobertura en Chile.',
+    viewExample: 'Ver ejemplo',
     theme: 'Tema',
     language: 'Idioma',
     support: 'Soporte',

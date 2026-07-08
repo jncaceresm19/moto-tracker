@@ -48,6 +48,13 @@ export default function ManualPublicationScreen() {
   const [photoPickerVisible, setPhotoPickerVisible] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
+  const resetForm = () => {
+    setSelectedMoto(null);
+    setLocationName('');
+    setNotes('');
+    setPhotoUri(null);
+  };
+
   const loadMotorcycles = useCallback(async () => {
     try {
       const data = await listMotorcycles();
@@ -134,7 +141,7 @@ export default function ManualPublicationScreen() {
               {
                 text: 'OK',
                 onPress: () => {
-                  router.back();
+                  resetForm();
                 },
               },
             ]);
@@ -156,14 +163,14 @@ export default function ManualPublicationScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
