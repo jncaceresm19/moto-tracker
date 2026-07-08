@@ -302,6 +302,7 @@ export default function HomeScreen() {
           onClose={() => setShowActiveMotoModal(false)}
           motorcycles={motorcycles}
           activeMoto={activeMoto}
+          activationAddress={activationAddress || undefined}
           onActivate={handleActivateMoto}
           onDeactivate={handleDeactivateMoto}
           onReportTheft={handleReportTheft}

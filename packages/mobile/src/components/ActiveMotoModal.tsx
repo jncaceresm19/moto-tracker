@@ -11,6 +11,7 @@ interface ActiveMotoModalProps {
   onClose: () => void;
   motorcycles: Motorcycle[];
   activeMoto: ActiveMoto | null;
+  activationAddress?: string;
   onActivate: (motorcycleId: string) => void;
   onDeactivate: () => void;
   onReportTheft: () => void;
@@ -21,6 +22,7 @@ export function ActiveMotoModal({
   onClose,
   motorcycles,
   activeMoto,
+  activationAddress,
   onActivate,
   onDeactivate,
   onReportTheft,
@@ -77,9 +79,9 @@ export function ActiveMotoModal({
                   {t('activeSince')} {formatActivationTime(activeMoto.activatedAt)}
                 </Text>
                 {activeMoto.activationLat && activeMoto.activationLon && (
-                  <Text style={[styles.location, { color: colors.inkFaint }]}>
-                    📍 {t('parkedAt')} ({activeMoto.activationLat.toFixed(4)}, {activeMoto.activationLon.toFixed(4)})
-                  </Text>
+                <Text style={[styles.location, { color: colors.inkFaint }]}>
+                  {t('parkedAt')} {activationAddress || `${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`}
+                </Text>
                 )}
               </View>
 

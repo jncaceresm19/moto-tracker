@@ -75,47 +75,23 @@ export function DashboardPanel({
           </View>
           <View style={[styles.statusPill, { backgroundColor: statusColor + '20', borderColor: statusColor }]}>
             <Animated.View style={[styles.statusDot, { backgroundColor: statusColor, opacity: pulseAnim }]} />
-            <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
+            <Text style={[styles.statusText, { color: statusColor }]}>{isActive ? 'EN USO' : statusText}</Text>
           </View>
         </View>
 
-        {/* Active moto info */}
-        {isActive && activatedAt && (
-          <View style={styles.activeInfo}>
-            <View style={styles.activeRow}>
-              <Ionicons name="time-outline" size={14} color="#22C55E" />
-              <Text style={styles.activeText}>
-                {t('activeSince')} {timeAgo}
-              </Text>
-            </View>
-            {activationAddress && (
-              <View style={styles.activeRow}>
-                <Ionicons name="location-outline" size={14} color="#22C55E" />
-                <Text style={styles.activeText} numberOfLines={1}>
-                  {t('parkedAt')} {activationAddress}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
         {/* Odometer time inline with label */}
-        {!isActive && (
-          <View style={styles.odometerSection}>
-            <Text style={styles.odometerTime}>{lastLocationTime}</Text>
-            <Text style={styles.odometerLabel}>{t('lastLocation')}</Text>
-          </View>
-        )}
+        <View style={styles.odometerSection}>
+          <Text style={styles.odometerTime}>{lastLocationTime}</Text>
+          <Text style={styles.odometerLabel}>{isActive ? t('activeSince') : t('lastLocation')}</Text>
+        </View>
 
         {/* Address line */}
-        {!isActive && (
-          <View style={styles.addressRow}>
-            <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
-            <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
-              {hasGps ? t('parkedAtLocation') : t('enableGpsToTrack')}
-            </Text>
-          </View>
-        )}
+        <View style={styles.addressRow}>
+          <Ionicons name="location-outline" size={13} color={isActive ? '#22C55E' : colors.inkFaint} />
+          <Text style={[styles.addressText, { color: isActive ? '#22C55E' : colors.inkFaint }]} numberOfLines={1}>
+            {isActive ? (activationAddress ? `${t('parkedAt')} ${activationAddress}` : t('parkedAt')) : (hasGps ? t('parkedAtLocation') : t('enableGpsToTrack'))}
+          </Text>
+        </View>
 
         {/* Long press hint */}
         <View style={styles.hintRow}>
@@ -219,20 +195,6 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 13,
     flex: 1,
-  },
-  activeInfo: {
-    marginTop: 16,
-    gap: 6,
-  },
-  activeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  activeText: {
-    fontSize: 13,
-    color: '#22C55E',
-    fontWeight: '500',
   },
   hintRow: {
     marginTop: 12,
