@@ -54,7 +54,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
       {place.address ? (
         <View style={styles.infoRow}>
           <Ionicons name="location-outline" size={12} color={colors.inkFaint} />
-          <Text style={[styles.infoText, { color: colors.inkFaint }]} numberOfLines={1}>{place.address}</Text>
+          <Text style={[styles.infoText, { color: colors.inkFaint }]} numberOfLines={2}>{place.address}</Text>
         </View>
       ) : null}
 
