@@ -294,7 +294,8 @@ export default function HomeScreen() {
               motorcycleName={displayMoto ? `${displayMoto.brand} ${displayMoto.model}` : ''}
               plate={displayMoto?.licensePlate}
               status={activeMoto ? 'safe' : 'safe'}
-              lastLocationTime={activeMoto ? formatActivationTime(activeMoto.activatedAt) : (hasGps ? new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--')}
+              lastLocationTime={activeMoto ? new Date(activeMoto.activatedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : (hasGps ? new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--')}
+              activationTimeAgo={activeMoto ? formatActivationTime(activeMoto.activatedAt) : undefined}
               address=""
               timeAgo=""
               hasGps={hasGps}

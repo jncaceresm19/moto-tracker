@@ -9,6 +9,7 @@ interface DashboardPanelProps {
   plate?: string;
   status?: 'safe' | 'alert';
   lastLocationTime?: string;
+  activationTimeAgo?: string;
   address?: string;
   timeAgo?: string;
   hasGps?: boolean;
@@ -23,6 +24,7 @@ export function DashboardPanel({
   plate = '',
   status = 'safe',
   lastLocationTime = '--:--',
+  activationTimeAgo,
   address = '',
   timeAgo = '',
   hasGps = false,
@@ -82,7 +84,9 @@ export function DashboardPanel({
         {/* Odometer time inline with label */}
         <View style={styles.odometerSection}>
           <Text style={styles.odometerTime}>{lastLocationTime}</Text>
-          <Text style={styles.odometerLabel}>{isActive ? t('activeSince') : t('lastLocation')}</Text>
+          <Text style={styles.odometerLabel}>
+            {isActive ? (activationTimeAgo ? `Activa hace ${activationTimeAgo}` : t('activeSince')) : t('lastLocation')}
+          </Text>
         </View>
 
         {/* Address line */}
