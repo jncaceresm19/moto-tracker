@@ -184,43 +184,42 @@ export default function HomeScreen() {
 
   const handleActivateMoto = async (motorcycleId: string) => {
     try {
-      let lat: number | undefined;
-      let lon: number | undefined;
-      
-      // Get location first (fast)
-      try {
-        const loc = await getCurrentLocation();
-        lat = loc.lat;
-        lon = loc.lon;
-      } catch (e) {
-        console.log('[ACTIVE_MOTO] Location error, activating without location');
-      }
-      
-      // OPTIMISTIC UPDATE - show active state immediately
+      // OPTIMISTIC UPDATE - show active state IMMEDIATELY
       const optimisticActive: ActiveMoto = {
         id: `temp-${Date.now()}`,
         motorcycleId,
         activatedAt: new Date(),
-        activationLat: lat,
-        activationLon: lon,
+        activationLat: undefined,
+        activationLon: undefined,
       };
       setActiveMoto(optimisticActive);
       
-      // Get address in background (don't block UI)
-      if (lat && lon) {
-        reverseGeocode(lat, lon).then(address => {
+      // Get location in background (don't block UI at all)
+      getCurrentLocation().then(loc => {
+        // Update with location
+        setActiveMoto(prev => prev ? { ...prev, activationLat: loc.lat, activationLon: loc.lon } : prev);
+        
+        // Get address
+        reverseGeocode(loc.lat, loc.lon).then(address => {
           setActivationAddress(address);
         }).catch(e => {
           console.log('[ACTIVE_MOTO] Geocoding error:', e);
         });
-      }
-      
-      // Sync with server in background (don't await)
-      activateMoto(motorcycleId, lat, lon).then(serverResult => {
-        // Update with server response (has real ID)
-        setActiveMoto(serverResult);
+        
+        // Sync with server
+        activateMoto(motorcycleId, loc.lat, loc.lon).then(serverResult => {
+          setActiveMoto(serverResult);
+        }).catch(e => {
+          console.log('[ACTIVE_MOTO] Server sync error:', e);
+        });
       }).catch(e => {
-        console.log('[ACTIVE_MOTO] Server sync error:', e);
+        console.log('[ACTIVE_MOTO] Location error:', e);
+        // Still sync with server without location
+        activateMoto(motorcycleId).then(serverResult => {
+          setActiveMoto(serverResult);
+        }).catch(e => {
+          console.log('[ACTIVE_MOTO] Server sync error:', e);
+        });
       });
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error activating:', e?.message);
