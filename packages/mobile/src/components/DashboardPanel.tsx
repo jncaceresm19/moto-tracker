@@ -92,7 +92,7 @@ export function DashboardPanel({
               <View style={styles.activeRow}>
                 <Ionicons name="location-outline" size={14} color="#22C55E" />
                 <Text style={styles.activeText} numberOfLines={1}>
-                  📍 {t('parkedAt')} {activationAddress}
+                  {t('parkedAt')} {activationAddress}
                 </Text>
               </View>
             )}

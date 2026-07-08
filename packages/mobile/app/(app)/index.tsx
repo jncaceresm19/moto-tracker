@@ -18,6 +18,7 @@ import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { ActiveMoto, getActiveMoto, activateMoto, deactivateMoto, formatActivationTime } from '../../src/services/activeMoto';
 import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
+import { reverseGeocode } from '../../src/services/geocoding';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -31,6 +32,7 @@ export default function HomeScreen() {
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [activeMoto, setActiveMoto] = useState<ActiveMoto | null>(null);
   const [showActiveMotoModal, setShowActiveMotoModal] = useState(false);
+  const [activationAddress, setActivationAddress] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -127,6 +129,12 @@ export default function HomeScreen() {
     try {
       const active = await getActiveMoto();
       setActiveMoto(active);
+      
+      // Load address if we have coordinates
+      if (active?.activationLat && active?.activationLon) {
+        const address = await reverseGeocode(active.activationLat, active.activationLon);
+        setActivationAddress(address);
+      }
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error:', e?.message || 'Unknown');
     }
@@ -180,6 +188,10 @@ export default function HomeScreen() {
         const loc = await getCurrentLocation();
         lat = loc.lat;
         lon = loc.lon;
+        
+        // Get address from coordinates
+        const address = await reverseGeocode(lat, lon);
+        setActivationAddress(address);
       } catch (e) {
         console.log('[ACTIVE_MOTO] Location error, activating without location');
       }
@@ -195,6 +207,7 @@ export default function HomeScreen() {
     try {
       await deactivateMoto();
       setActiveMoto(null);
+      setActivationAddress(null);
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error deactivating:', e?.message);
     }
@@ -277,7 +290,7 @@ export default function HomeScreen() {
               hasGps={hasGps}
               isActive={!!activeMoto}
               activatedAt={activeMoto?.activatedAt}
-              activationAddress={activeMoto?.activationLat && activeMoto?.activationLon ? `${activeMoto.activationLat.toFixed(4)}, ${activeMoto.activationLon.toFixed(4)}` : undefined}
+              activationAddress={activationAddress || undefined}
               onLongPress={() => setShowActiveMotoModal(true)}
             />
           );
