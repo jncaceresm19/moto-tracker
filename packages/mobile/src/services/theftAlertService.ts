@@ -91,5 +91,5 @@ export async function closeAlert(
 
 // Get user's publications
 export async function getMyPublications(): Promise<TheftAlert[]> {
-  return api<TheftAlert[]>('/api/my-theft-alerts');
+  return api<TheftAlert[]>('/api/theft-alerts/my');
 }

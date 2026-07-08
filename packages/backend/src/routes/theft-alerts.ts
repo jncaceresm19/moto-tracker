@@ -169,6 +169,45 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
+// --- GET /api/theft-alerts/my --- (MUST be before /:id to avoid conflicts)
+router.get('/my', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const alerts = await db
+      .select({
+        id: theftAlerts.id,
+        motorcycleId: theftAlerts.motorcycleId,
+        brand: theftAlerts.brand,
+        model: theftAlerts.model,
+        licensePlate: theftAlerts.licensePlate,
+        photoUrl: theftAlerts.photoUrl,
+        status: theftAlerts.status,
+        createdAt: theftAlerts.createdAt,
+        closedAt: theftAlerts.closedAt,
+        responseCount: count(theftAlertResponses.id),
+      })
+      .from(theftAlerts)
+      .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))
+      .where(eq(theftAlerts.userId, userId))
+      .groupBy(theftAlerts.id)
+      .orderBy(desc(theftAlerts.createdAt));
+
+    res.json({
+      success: true,
+      data: alerts.map((a) => ({
+        ...a,
+        createdAt: new Date(a.createdAt),
+        closedAt: a.closedAt ? new Date(a.closedAt) : null,
+      })),
+    });
+  } catch (err) {
+    console.error('List my theft alerts error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to fetch your theft alerts');
+    res.status(500).json(error);
+  }
+});
+
 // --- GET /api/theft-alerts/:id ---
 router.get('/:id', validateParams(alertIdParam), async (req: Request, res: Response) => {
   try {
@@ -330,45 +369,6 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
   } catch (err) {
     console.error('Close theft alert error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to close theft alert');
-    res.status(500).json(error);
-  }
-});
-
-// --- GET /api/my-theft-alerts ---
-router.get('/my', async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-
-    const alerts = await db
-      .select({
-        id: theftAlerts.id,
-        motorcycleId: theftAlerts.motorcycleId,
-        brand: theftAlerts.brand,
-        model: theftAlerts.model,
-        licensePlate: theftAlerts.licensePlate,
-        photoUrl: theftAlerts.photoUrl,
-        status: theftAlerts.status,
-        createdAt: theftAlerts.createdAt,
-        closedAt: theftAlerts.closedAt,
-        responseCount: count(theftAlertResponses.id),
-      })
-      .from(theftAlerts)
-      .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))
-      .where(eq(theftAlerts.userId, userId))
-      .groupBy(theftAlerts.id)
-      .orderBy(desc(theftAlerts.createdAt));
-
-    res.json({
-      success: true,
-      data: alerts.map((a) => ({
-        ...a,
-        createdAt: new Date(a.createdAt),
-        closedAt: a.closedAt ? new Date(a.closedAt) : null,
-      })),
-    });
-  } catch (err) {
-    console.error('List my theft alerts error:', err);
-    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to fetch your theft alerts');
     res.status(500).json(error);
   }
 });
