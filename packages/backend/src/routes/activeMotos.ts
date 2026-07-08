@@ -2,14 +2,17 @@ import { Router } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { activeMotos, motorcycles } from '../db/schema';
-import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { authenticate, AuthPayload } from '../middleware/auth';
 
 const router = Router();
 
 // Get user's active motorcycle
-router.get('/', authMiddleware, async (req: AuthRequest, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     
     const [active] = await db
       .select()
@@ -35,9 +38,13 @@ router.get('/', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // Activate a motorcycle
-router.post('/', authMiddleware, async (req: AuthRequest, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
     const { motorcycleId, activationLat, activationLon } = req.body;
 
     if (!motorcycleId) {
@@ -92,9 +99,12 @@ router.post('/', authMiddleware, async (req: AuthRequest, res) => {
 });
 
 // Deactivate user's active motorcycle
-router.delete('/', authMiddleware, async (req: AuthRequest, res) => {
+router.delete('/', authenticate, async (req, res) => {
   try {
-    const userId = req.userId!;
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
     
     await db
       .delete(activeMotos)

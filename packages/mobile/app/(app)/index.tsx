@@ -157,7 +157,7 @@ export default function HomeScreen() {
 
   // Prioritize motorcycle with GPS enabled
   const motoWithGps = motorcycles.find(m => m.gpsTracker);
-  const activeMoto = motoWithGps || motorcycles[0];
+  const defaultMoto = motoWithGps || motorcycles[0];
   const hasGps = !!motoWithGps;
   const hasAlerts = theftAlerts.length > 0;
 
@@ -260,13 +260,16 @@ export default function HomeScreen() {
       >
         {/* Dashboard Panel */}
         {(() => {
-          const activeMotoMoto = activeMoto ? motorcycles.find(m => m.id === activeMoto.motorcycleId) : null;
-          const motoName = activeMotoMoto ? `${activeMotoMoto.brand} ${activeMotoMoto.model}` : (activeMoto ? 'Moto activa' : (activeMoto ? `${activeMoto?.motorcycleId}` : (activeMoto ? `${activeMoto?.motorcycleId}` : (activeMoto ? `${activeMoto?.motorcycleId}` : (activeMoto ? `${activeMoto?.motorcycleId}` : '')))))
-          const motoPlate = activeMotoMoto?.licensePlate || '';
+          // If there's an active moto, show its info
+          const activeMotoMotorcycle = activeMoto ? motorcycles.find(m => m.id === activeMoto.motorcycleId) : null;
+          
+          // Otherwise show the default moto (with GPS or first one)
+          const displayMoto = activeMotoMotorcycle || defaultMoto;
+          
           return (
             <DashboardPanel
-              motorcycleName={motoName}
-              plate={motoPlate}
+              motorcycleName={displayMoto ? `${displayMoto.brand} ${displayMoto.model}` : ''}
+              plate={displayMoto?.licensePlate}
               status={activeMoto ? 'safe' : 'safe'}
               lastLocationTime={activeMoto ? formatActivationTime(activeMoto.activatedAt) : (hasGps ? new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--')}
               address=""
@@ -314,13 +317,16 @@ export default function HomeScreen() {
             <TouchableOpacity 
               style={[styles.testBtn, { backgroundColor: colors.alertRed }]}
               onPress={() => {
-                const moto = activeMoto;
+                const moto = defaultMoto;
                 const fakeAlert: TheftAlert = {
                   id: `test-${Date.now()}`,
+                  motorcycleId: moto?.id || '',
                   brand: moto?.brand || 'Honda',
                   model: moto?.model || 'CB 500F',
                   licensePlate: moto?.licensePlate || 'AB-12-34',
                   lastLocationName: 'Av. Providencia 1234, Santiago',
+                  lastLatitude: -33.4489,
+                  lastLongitude: -70.6693,
                   createdAt: new Date(),
                   status: 'active',
                   userId: user?.id || '',
