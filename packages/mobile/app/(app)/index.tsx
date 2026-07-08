@@ -130,10 +130,13 @@ export default function HomeScreen() {
       const active = await getActiveMoto();
       setActiveMoto(active);
       
-      // Load address if we have coordinates
+      // Load address in background if we have coordinates
       if (active?.activationLat && active?.activationLon) {
-        const address = await reverseGeocode(active.activationLat, active.activationLon);
-        setActivationAddress(address);
+        reverseGeocode(active.activationLat, active.activationLon).then(address => {
+          setActivationAddress(address);
+        }).catch(e => {
+          console.log('[ACTIVE_MOTO] Geocoding error:', e);
+        });
       }
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error:', e?.message || 'Unknown');
@@ -184,20 +187,27 @@ export default function HomeScreen() {
       let lat: number | undefined;
       let lon: number | undefined;
       
+      // Get location first (fast)
       try {
         const loc = await getCurrentLocation();
         lat = loc.lat;
         lon = loc.lon;
-        
-        // Get address from coordinates
-        const address = await reverseGeocode(lat, lon);
-        setActivationAddress(address);
       } catch (e) {
         console.log('[ACTIVE_MOTO] Location error, activating without location');
       }
       
+      // Activate immediately (no await for geocoding)
       const active = await activateMoto(motorcycleId, lat, lon);
       setActiveMoto(active);
+      
+      // Get address in background (slow - don't block UI)
+      if (lat && lon) {
+        reverseGeocode(lat, lon).then(address => {
+          setActivationAddress(address);
+        }).catch(e => {
+          console.log('[ACTIVE_MOTO] Geocoding error:', e);
+        });
+      }
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error activating:', e?.message);
     }

@@ -77,7 +77,7 @@ export function formatActivationTime(activatedAt: Date): string {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
   
-  if (minutes < 1) return 'ahora mismo';
+  if (minutes < 1) return 'hace 1 min';
   if (minutes < 60) return `hace ${minutes} min`;
   if (hours < 24) return `hace ${hours}h`;
   return `hace ${days}d`;
