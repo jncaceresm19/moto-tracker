@@ -51,8 +51,8 @@ export function DashboardPanel({
   }, [status, pulseAnim]);
 
   const isAlert = status === 'alert';
-  const statusColor = isAlert ? colors.alertRed : hasGps ? colors.green : '#6B7280';
-  const statusText = isAlert ? t('outOfZone') : hasGps ? t('inSafeZone') : t('noData');
+  const statusColor = isAlert ? colors.alertRed : isActive ? '#22C55E' : '#6B7280';
+  const statusText = isAlert ? t('outOfZone') : isActive ? 'EN USO' : 'DESACTIVADA';
 
   return (
     <TouchableOpacity
@@ -93,7 +93,7 @@ export function DashboardPanel({
         <View style={styles.addressRow}>
           <Ionicons name="location-outline" size={13} color={isActive ? '#22C55E' : colors.inkFaint} />
           <Text style={[styles.addressText, { color: isActive ? '#22C55E' : colors.inkFaint }]} numberOfLines={1}>
-            {isActive ? (activationAddress ? `${t('parkedAt')} ${activationAddress}` : t('parkedAt')) : (hasGps ? t('parkedAtLocation') : t('enableGpsToTrack'))}
+            {isActive ? (activationAddress ? `${t('parkedAt')} ${activationAddress}` : t('parkedAt')) : `${t('parkedAt')} ... - ${t('lastLocation')} --:--`}
           </Text>
         </View>
 
