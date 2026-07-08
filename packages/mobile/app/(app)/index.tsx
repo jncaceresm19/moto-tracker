@@ -196,11 +196,17 @@ export default function HomeScreen() {
         console.log('[ACTIVE_MOTO] Location error, activating without location');
       }
       
-      // Activate immediately (no await for geocoding)
-      const active = await activateMoto(motorcycleId, lat, lon);
-      setActiveMoto(active);
+      // OPTIMISTIC UPDATE - show active state immediately
+      const optimisticActive: ActiveMoto = {
+        id: `temp-${Date.now()}`,
+        motorcycleId,
+        activatedAt: new Date(),
+        activationLat: lat,
+        activationLon: lon,
+      };
+      setActiveMoto(optimisticActive);
       
-      // Get address in background (slow - don't block UI)
+      // Get address in background (don't block UI)
       if (lat && lon) {
         reverseGeocode(lat, lon).then(address => {
           setActivationAddress(address);
@@ -208,6 +214,14 @@ export default function HomeScreen() {
           console.log('[ACTIVE_MOTO] Geocoding error:', e);
         });
       }
+      
+      // Sync with server in background (don't await)
+      activateMoto(motorcycleId, lat, lon).then(serverResult => {
+        // Update with server response (has real ID)
+        setActiveMoto(serverResult);
+      }).catch(e => {
+        console.log('[ACTIVE_MOTO] Server sync error:', e);
+      });
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error activating:', e?.message);
     }
@@ -215,9 +229,14 @@ export default function HomeScreen() {
 
   const handleDeactivateMoto = async () => {
     try {
-      await deactivateMoto();
+      // OPTIMISTIC UPDATE - clear state immediately
       setActiveMoto(null);
       setActivationAddress(null);
+      
+      // Sync with server in background (don't await)
+      deactivateMoto().catch(e => {
+        console.log('[ACTIVE_MOTO] Server sync error:', e);
+      });
     } catch (e: any) {
       console.log('[ACTIVE_MOTO] Error deactivating:', e?.message);
     }
