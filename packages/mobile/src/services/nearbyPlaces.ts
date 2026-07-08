@@ -74,7 +74,7 @@ async function searchGooglePlaces(
 export async function getNearbyPlaces(
   lat: number,
   lon: number,
-  radiusKm = 8
+  radiusKm = 3
 ): Promise<NearbyPlace[]> {
   console.log('[NEARBY] === Google Places Search ===');
 
