@@ -235,7 +235,7 @@ export default function HomeScreen() {
         motorcycleId: moto.id,
         lastLatitude: activeMoto.activationLat || 0,
         lastLongitude: activeMoto.activationLon || 0,
-        lastLocationName: `Estacionada en ${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`,
+        lastLocationName: activationAddress || `Estacionada en ${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`,
       });
       
       // Deactivate after reporting
