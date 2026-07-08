@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { eq, and, desc, count } from 'drizzle-orm';
+import { eq, and, desc, count, or, gte } from 'drizzle-orm';
 import { db } from '../db';
 import { theftAlerts, theftAlertResponses, motorcycles, users } from '../db/schema';
 import { authenticate } from '../middleware/auth';
@@ -16,8 +16,8 @@ router.use(authenticate);
 
 const createTheftAlertSchema = z.object({
   motorcycleId: z.string().uuid('Invalid motorcycle ID'),
-  lastLatitude: z.number().min(-90).max(90),
-  lastLongitude: z.number().min(-180).max(180),
+  lastLatitude: z.number().min(-90).max(90).optional(),
+  lastLongitude: z.number().min(-180).max(180).optional(),
   lastLocationName: z.string().max(200).optional(),
 });
 
@@ -38,6 +38,10 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
   try {
     const userId = req.user!.userId;
     const { motorcycleId, lastLatitude, lastLongitude, lastLocationName } = req.body;
+
+    // For manual publications without GPS, use null coordinates
+    const latitude = lastLatitude ?? null;
+    const longitude = lastLongitude ?? null;
 
     // Verify motorcycle belongs to user
     const motorcycle = await db
@@ -82,8 +86,8 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
       model: motorcycle.model,
       licensePlate: motorcycle.licensePlate,
       photoUrl: motorcycle.imageUrl,
-      lastLatitude,
-      lastLongitude,
+      lastLatitude: latitude,
+      lastLongitude: longitude,
       lastLocationName: lastLocationName ?? null,
       status: 'active',
       createdAt: now,
@@ -112,7 +116,10 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
 // --- GET /api/theft-alerts ---
 router.get('/', async (req: Request, res: Response) => {
   try {
-    // Get active theft alerts with response count
+    // Get active alerts + recovered today (keep green card on home until end of day)
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
     const alerts = await db
       .select({
         id: theftAlerts.id,
@@ -128,11 +135,20 @@ router.get('/', async (req: Request, res: Response) => {
         status: theftAlerts.status,
         createdAt: theftAlerts.createdAt,
         closedAt: theftAlerts.closedAt,
+        recoveredAt: theftAlerts.recoveredAt,
         responseCount: count(theftAlertResponses.id),
       })
       .from(theftAlerts)
       .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))
-      .where(eq(theftAlerts.status, 'active'))
+      .where(
+        or(
+          eq(theftAlerts.status, 'active'),
+          and(
+            eq(theftAlerts.status, 'recovered'),
+            gte(theftAlerts.recoveredAt, startOfDay)
+          )
+        )
+      )
       .groupBy(theftAlerts.id)
       .orderBy(desc(theftAlerts.createdAt))
       .limit(20);
@@ -143,6 +159,7 @@ router.get('/', async (req: Request, res: Response) => {
         ...a,
         createdAt: new Date(a.createdAt),
         closedAt: a.closedAt ? new Date(a.closedAt) : null,
+        recoveredAt: a.recoveredAt ? new Date(a.recoveredAt) : null,
       })),
     });
   } catch (err) {
@@ -281,12 +298,18 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
 
     const now = new Date();
 
+    // If marking as recovered, set recoveredAt so it stays green on home until end of day
+    const updateData: Record<string, any> = {
+      status,
+      closedAt: now,
+    };
+    if (status === 'recovered') {
+      updateData.recoveredAt = now;
+    }
+
     await db
       .update(theftAlerts)
-      .set({
-        status,
-        closedAt: now,
-      })
+      .set(updateData)
       .where(eq(theftAlerts.id, id));
 
     const updated = await db
@@ -301,6 +324,7 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
         ...updated!,
         createdAt: new Date(updated!.createdAt),
         closedAt: updated!.closedAt ? new Date(updated!.closedAt) : null,
+        recoveredAt: updated!.recoveredAt ? new Date(updated!.recoveredAt) : null,
       },
     });
   } catch (err) {

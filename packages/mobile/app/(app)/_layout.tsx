@@ -75,6 +75,19 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="manual-publication"
+        options={{
+          title: t('tabManualPublication'),
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="add-circle" size={size + 8} color={color} />
+          ),
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '700',
+          },
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: t('tabProfile'),

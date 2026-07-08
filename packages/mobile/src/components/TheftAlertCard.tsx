@@ -17,10 +17,14 @@ interface TheftAlertCardProps {
   metadata: string;
   timeAgo: string;
   photoUrl?: string;
+  status?: 'active' | 'recovered' | 'closed';
+  recoveredAt?: Date | null;
+  alertOwnerId?: string;
   responses?: Comment[];
   onWhatsApp?: () => void;
   onInstagram?: () => void;
   onComment?: (text: string) => void;
+  onMarkAsFound?: () => void;
 }
 
 export function TheftAlertCard({
@@ -28,15 +32,23 @@ export function TheftAlertCard({
   metadata,
   timeAgo,
   photoUrl,
+  status = 'active',
+  recoveredAt,
+  alertOwnerId,
   responses = [],
   onWhatsApp,
   onInstagram,
   onComment,
+  onMarkAsFound,
 }: TheftAlertCardProps) {
   const { colors } = useTheme();
   const { user } = useAuth();
   const [commentText, setCommentText] = useState('');
   const [showComments, setShowComments] = useState(false);
+
+  const isOwner = user && alertOwnerId && user.id === alertOwnerId;
+  // Card is green if recoveredAt is set (stays green until end of day)
+  const isRecovered = !!recoveredAt;
 
   const handleSubmitComment = () => {
     if (commentText.trim() && onComment) {
@@ -56,18 +68,44 @@ export function TheftAlertCard({
     );
   };
 
+  const cardBg = isRecovered ? colors.green + '15' : colors.alertRedBg;
+  const cardBorder = isRecovered ? colors.green : colors.alertRedBorder;
+
   return (
-    <View style={[styles.card, { backgroundColor: colors.alertRedBg, borderColor: colors.alertRedBorder }]}>
+    <View style={[styles.card, { backgroundColor: cardBg, borderColor: cardBorder }]}>
       {/* Danger tape bar */}
-      <View style={styles.tapeBar}>
+      <View style={[styles.tapeBar, isRecovered && { opacity: 0.4 }]}>
         {Array.from({ length: 30 }).map((_, i) => (
-          <View key={i} style={[styles.tapeStripe, i % 2 === 0 ? styles.tapeRed : styles.tapeWhite]} />
+          <View key={i} style={[styles.tapeStripe, i % 2 === 0 ? (isRecovered ? styles.tapeGreen : styles.tapeRed) : styles.tapeWhite]} />
         ))}
       </View>
 
-      {/* Active label */}
-      <View style={[styles.activeLabel, { backgroundColor: colors.alertRed }]}>
-        <Text style={styles.activeLabelText}>ALERTA DE ROBO · ACTIVA</Text>
+      {/* Active / Recovered label + owner button */}
+      <View style={styles.labelRow}>
+        <View style={[styles.activeLabel, { backgroundColor: isRecovered ? colors.green : colors.alertRed }]}>
+          <Text style={styles.activeLabelText}>
+            {isRecovered ? 'ENCONTRADA · CERRADA' : 'ALERTA DE ROBO · ACTIVA'}
+          </Text>
+        </View>
+
+        <View style={styles.labelSpacer} />
+
+        {isOwner && isRecovered && (
+          <View style={[styles.recoveredBadge, { backgroundColor: colors.green }]}>
+            <Ionicons name="checkmark-circle" size={12} color="#fff" />
+            <Text style={styles.recoveredBadgeText}>Recuperada</Text>
+          </View>
+        )}
+
+        {isOwner && !isRecovered && onMarkAsFound && (
+          <TouchableOpacity
+            style={[styles.foundBtn, { backgroundColor: colors.green }]}
+            onPress={onMarkAsFound}
+          >
+            <Ionicons name="checkmark-circle" size={14} color="#fff" />
+            <Text style={styles.foundBtnText}>Encontrada</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Photo */}
@@ -160,9 +198,16 @@ const styles = StyleSheet.create({
   tapeBar: { flexDirection: 'row', height: 6 },
   tapeStripe: { width: 12, height: 6 },
   tapeRed: { backgroundColor: '#E14336' },
+  tapeGreen: { backgroundColor: '#16A34A' },
   tapeWhite: { backgroundColor: '#FFFFFF' },
-  activeLabel: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, marginHorizontal: 14, marginTop: 10, borderRadius: 6 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 14, marginTop: 10 },
+  labelSpacer: { flex: 1 },
+  activeLabel: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
   activeLabelText: { color: '#fff', fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  foundBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  foundBtnText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  recoveredBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  recoveredBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
   photo: { width: '100%', height: 180, marginTop: 10 },
   title: { fontSize: 16, fontWeight: '700', marginHorizontal: 14, marginTop: 10 },
   metadata: { fontSize: 13, marginHorizontal: 14, marginTop: 4 },

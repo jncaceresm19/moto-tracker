@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { useAuth } from '../../src/auth-context';
@@ -11,7 +12,7 @@ import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
-import { TheftAlert, getTheftAlerts } from '../../src/services/theftAlertService';
+import { TheftAlert, getTheftAlerts, closeAlert } from '../../src/services/theftAlertService';
 import { shareToSpecificPlatform } from '../../src/services/shareService';
 
 export default function HomeScreen() {
@@ -102,6 +103,13 @@ export default function HomeScreen() {
     loadTheftAlerts();
   }, [loadMotorcycles, loadGasStations, loadTheftAlerts]);
 
+  // Refresh theft alerts when returning from other screens (e.g. manual publication)
+  useFocusEffect(
+    useCallback(() => {
+      loadTheftAlerts();
+    }, [loadTheftAlerts])
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts()]);
@@ -113,6 +121,16 @@ export default function HomeScreen() {
   const activeMoto = motoWithGps || motorcycles[0];
   const hasGps = !!motoWithGps;
   const hasAlerts = theftAlerts.length > 0;
+
+  const handleMarkAsFound = async (alertId: string) => {
+    try {
+      await closeAlert(alertId, 'recovered');
+      // Refresh alerts — recovered alerts won't show in active list
+      await loadTheftAlerts();
+    } catch (e: any) {
+      console.log('[THEFT] Error marking as found:', e?.message);
+    }
+  };
 
   if (loading) {
     return (
@@ -208,9 +226,13 @@ export default function HomeScreen() {
                 metadata={theftAlerts[0].lastLocationName || 'Ubicación desconocida'}
                 timeAgo={formatTimeAgo(theftAlerts[0].createdAt)}
                 photoUrl={theftAlerts[0].photoUrl}
+                status={theftAlerts[0].status as 'active' | 'recovered' | 'closed'}
+                recoveredAt={theftAlerts[0].recoveredAt}
+                alertOwnerId={theftAlerts[0].userId}
                 responses={theftComments[theftAlerts[0].id] || []}
                 onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp')}
                 onInstagram={() => shareToSpecificPlatform(theftAlerts[0], 'instagram')}
+                onMarkAsFound={() => handleMarkAsFound(theftAlerts[0].id)}
                 onComment={(text) => {
                   const alertId = theftAlerts[0].id;
                   const newComment = {
@@ -227,31 +249,43 @@ export default function HomeScreen() {
                 }}
               />
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
+              <ScrollView
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={Dimensions.get('window').width - 56}
+                decelerationRate="fast"
+                contentContainerStyle={styles.horizontalScroll}
+              >
                 {theftAlerts.map((alert) => (
-                  <TheftAlertCard
-                    key={alert.id}
-                    title={`${alert.brand} ${alert.model} - ROBADA`}
-                    metadata={alert.lastLocationName || 'Ubicación desconocida'}
-                    timeAgo={formatTimeAgo(alert.createdAt)}
-                    photoUrl={alert.photoUrl}
-                    responses={theftComments[alert.id] || []}
-                    onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
-                    onInstagram={() => shareToSpecificPlatform(alert, 'instagram')}
-                    onComment={(text) => {
-                      const newComment = {
-                        id: `comment-${Date.now()}`,
-                        userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
-                        userAvatar: user?.avatarUrl,
-                        text,
-                        timeAgo: 'ahora mismo',
-                      };
-                      setTheftComments(prev => ({
-                        ...prev,
-                        [alert.id]: [...(prev[alert.id] || []), newComment],
-                      }));
-                    }}
-                  />
+                  <View key={alert.id} style={{ width: Dimensions.get('window').width - 56, marginRight: 12 }}>
+                    <TheftAlertCard
+                      title={`${alert.brand} ${alert.model} - ROBADA`}
+                      metadata={alert.lastLocationName || 'Ubicación desconocida'}
+                      timeAgo={formatTimeAgo(alert.createdAt)}
+                      photoUrl={alert.photoUrl}
+                      status={alert.status as 'active' | 'recovered' | 'closed'}
+                      recoveredAt={alert.recoveredAt}
+                      alertOwnerId={alert.userId}
+                      responses={theftComments[alert.id] || []}
+                      onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
+                      onInstagram={() => shareToSpecificPlatform(alert, 'instagram')}
+                      onMarkAsFound={() => handleMarkAsFound(alert.id)}
+                      onComment={(text) => {
+                        const newComment = {
+                          id: `comment-${Date.now()}`,
+                          userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
+                          userAvatar: user?.avatarUrl,
+                          text,
+                          timeAgo: 'ahora mismo',
+                        };
+                        setTheftComments(prev => ({
+                          ...prev,
+                          [alert.id]: [...(prev[alert.id] || []), newComment],
+                        }));
+                      }}
+                    />
+                  </View>
                 ))}
               </ScrollView>
             )
@@ -354,5 +388,6 @@ const styles = StyleSheet.create({
   emptyCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },
   emptyCardText: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   offersScroll: { paddingRight: 16 },
+  horizontalScroll: { paddingRight: 16 },
   lastUpdateText: { fontSize: 11, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
 });

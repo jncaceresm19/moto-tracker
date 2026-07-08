@@ -14,6 +14,7 @@ export interface TheftAlert {
   status: 'active' | 'closed' | 'recovered';
   createdAt: Date;
   closedAt?: Date;
+  recoveredAt?: Date; // when owner marked as found (card stays green until end of day)
   responseCount?: number;
 }
 
@@ -30,11 +31,24 @@ export interface TheftAlertDetail extends TheftAlert {
   responses: TheftAlertResponse[];
 }
 
-// Create theft alert
+// Create theft alert (automatic - with GPS)
 export async function createTheftAlert(data: {
   motorcycleId: string;
   lastLatitude: number;
   lastLongitude: number;
+  lastLocationName?: string;
+}): Promise<TheftAlert> {
+  return api<TheftAlert>('/api/theft-alerts', {
+    method: 'POST',
+    body: data,
+  });
+}
+
+// Create manual theft alert (without GPS - for emergencies)
+export async function createManualPublication(data: {
+  motorcycleId: string;
+  lastLatitude?: number;
+  lastLongitude?: number;
   lastLocationName?: string;
 }): Promise<TheftAlert> {
   return api<TheftAlert>('/api/theft-alerts', {

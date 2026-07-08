@@ -25,11 +25,11 @@ export default function LoginScreen() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
-  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -40,7 +40,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      showAlert(t('error'), t('fillAllFields'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('fillAllFields'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
       return;
     }
 
@@ -53,7 +53,7 @@ export default function LoginScreen() {
       showAlert(
         t('error'),
         err instanceof Error ? err.message : t('loginFailed'),
-        [{text: 'OK'}],
+        [{ text: 'OK' }],
         'close-circle',
         '#FF3B30'
       );
@@ -139,7 +139,7 @@ export default function LoginScreen() {
     <View style={dynamicStyles.container}>
       <View style={styles.brandBlock}>
         <Image
-          source={require('../../assets/logo.jpeg')}
+          source={require('../../assets/icon.png')}
           style={styles.icon}
           resizeMode="contain"
         />
@@ -194,7 +194,7 @@ export default function LoginScreen() {
           showAlert(
             'Coming Soon',
             'Google Sign-In will be available in a future update.',
-            [{text: 'OK'}],
+            [{ text: 'OK' }],
             'information-circle',
             '#007AFF'
           )

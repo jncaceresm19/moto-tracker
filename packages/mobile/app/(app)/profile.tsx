@@ -28,12 +28,12 @@ export default function ProfileScreen() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
 
-  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -54,11 +54,11 @@ export default function ProfileScreen() {
     setSaving(true);
     try {
       await changePassword(passwords.current, passwords.newPass);
-      showAlert(t('success'), t('passwordChanged'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('passwordChanged'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
       setShowChangePassword(false);
       setPasswords({ current: '', newPass: '', confirm: '' });
     } catch (e: any) {
-      showAlert(t('error'), e?.message || 'Failed to change password', [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), e?.message || 'Failed to change password', [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -88,10 +88,10 @@ export default function ProfileScreen() {
 
       await updateProfile(updateData);
       await refreshUser();
-      showAlert(t('success'), t('profileUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('profileUpdated'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
       setShowEditProfile(false);
     } catch (e: any) {
-      showAlert(t('error'), e?.message || 'Failed to update profile', [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), e?.message || 'Failed to update profile', [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setSavingProfile(false);
     }
@@ -104,7 +104,7 @@ export default function ProfileScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showAlert(t('error'), t('cameraPermission'), [{text: 'OK'}], 'lock-closed', '#FF9500');
+      showAlert(t('error'), t('cameraPermission'), [{ text: 'OK' }], 'lock-closed', '#FF9500');
       return;
     }
 
@@ -215,10 +215,18 @@ export default function ProfileScreen() {
       {/* App Settings Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('appSettings')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'Notifications settings coming soon.', [{text: 'OK'}], 'information-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'Notifications settings coming soon.', [{ text: 'OK' }], 'information-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="notifications-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('notifications')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'Tracker feature coming soon.', [{ text: 'OK' }], 'information-circle', '#007AFF')}>
+          <View style={styles.rowLeft}>
+            <Ionicons name="locate-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('protocolTraker')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
@@ -261,7 +269,7 @@ export default function ProfileScreen() {
       {/* Support Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('support')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('helpTitle'), t('helpMessage'), [{text: 'OK'}], 'help-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('helpTitle'), t('helpMessage'), [{ text: 'OK' }], 'help-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="help-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('helpSupport')}</Text>
@@ -269,10 +277,18 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`, [{text: 'OK'}], 'information-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`, [{ text: 'OK' }], 'information-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="information-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('about')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'App tutorial coming soon.', [{ text: 'OK' }], 'information-circle', '#007AFF')}>
+          <View style={styles.rowLeft}>
+            <Ionicons name="play-circle-outline" size={20} color={colors.text} />
+            <Text style={dynamicStyles.rowText}>{t('appTutorial')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>

@@ -135,12 +135,13 @@ export const theftAlerts = sqliteTable('theft_alerts', {
   model: text('model').notNull(),
   licensePlate: text('license_plate').notNull(),
   photoUrl: text('photo_url'),
-  lastLatitude: real('last_latitude').notNull(),
-  lastLongitude: real('last_longitude').notNull(),
+  lastLatitude: real('last_latitude'), // nullable for manual publications without GPS
+  lastLongitude: real('last_longitude'), // nullable for manual publications without GPS
   lastLocationName: text('last_location_name'),
   status: text('status').notNull().default('active'), // 'active', 'closed', 'recovered'
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   closedAt: integer('closed_at', { mode: 'timestamp' }),
+  recoveredAt: integer('recovered_at', { mode: 'timestamp' }), // when owner marked as found (card stays green until end of day)
 });
 
 // Theft Alert Responses table
