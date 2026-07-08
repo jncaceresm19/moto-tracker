@@ -167,3 +167,18 @@ export const idxTheftAlertsUserId = index('idx_theft_alerts_user_id').on(theftAl
 export const idxTheftAlertsStatus = index('idx_theft_alerts_status').on(theftAlerts.status);
 export const idxTheftAlertsMotorcycleId = index('idx_theft_alerts_motorcycle_id').on(theftAlerts.motorcycleId);
 export const idxTheftAlertResponsesAlertId = index('idx_theft_alert_responses_alert_id').on(theftAlertResponses.theftAlertId);
+
+// Active Motorcycles table (for "moto en uso" feature)
+export const activeMotos = sqliteTable('active_motos', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  motorcycleId: text('motorcycle_id').notNull().references(() => motorcycles.id),
+  activatedAt: integer('activated_at', { mode: 'timestamp' }).notNull(),
+  activationLat: real('activation_lat'),
+  activationLon: real('activation_lon'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const idxActiveMotosUserId = index('idx_active_motos_user_id').on(activeMotos.userId);
+export const idxActiveMotosUserUnique = uniqueIndex('idx_active_motos_user_unique').on(activeMotos.userId);

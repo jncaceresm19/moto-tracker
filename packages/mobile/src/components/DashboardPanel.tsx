@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme-context';
 import { useLanguage } from '../language-context';
@@ -12,6 +12,10 @@ interface DashboardPanelProps {
   address?: string;
   timeAgo?: string;
   hasGps?: boolean;
+  isActive?: boolean;
+  activatedAt?: Date;
+  activationAddress?: string;
+  onLongPress?: () => void;
 }
 
 export function DashboardPanel({
@@ -22,6 +26,10 @@ export function DashboardPanel({
   address = '',
   timeAgo = '',
   hasGps = false,
+  isActive = false,
+  activatedAt,
+  activationAddress,
+  onLongPress,
 }: DashboardPanelProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -45,7 +53,12 @@ export function DashboardPanel({
   const statusText = isAlert ? t('outOfZone') : hasGps ? t('inSafeZone') : t('noData');
 
   return (
-    <View style={styles.container}>
+    <TouchableOpacity
+      style={styles.container}
+      onLongPress={onLongPress}
+      delayLongPress={500}
+      activeOpacity={0.9}
+    >
       {/* Vertical line texture */}
       <View style={styles.textureOverlay}>
         {Array.from({ length: 20 }).map((_, i) => (
@@ -66,21 +79,52 @@ export function DashboardPanel({
           </View>
         </View>
 
+        {/* Active moto info */}
+        {isActive && activatedAt && (
+          <View style={styles.activeInfo}>
+            <View style={styles.activeRow}>
+              <Ionicons name="time-outline" size={14} color="#22C55E" />
+              <Text style={styles.activeText}>
+                {t('activeSince')} {timeAgo}
+              </Text>
+            </View>
+            {activationAddress && (
+              <View style={styles.activeRow}>
+                <Ionicons name="location-outline" size={14} color="#22C55E" />
+                <Text style={styles.activeText} numberOfLines={1}>
+                  📍 {t('parkedAt')} {activationAddress}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Odometer time inline with label */}
-        <View style={styles.odometerSection}>
-          <Text style={styles.odometerTime}>{lastLocationTime}</Text>
-          <Text style={styles.odometerLabel}>{t('lastLocation')}</Text>
-        </View>
+        {!isActive && (
+          <View style={styles.odometerSection}>
+            <Text style={styles.odometerTime}>{lastLocationTime}</Text>
+            <Text style={styles.odometerLabel}>{t('lastLocation')}</Text>
+          </View>
+        )}
 
         {/* Address line */}
-        <View style={styles.addressRow}>
-          <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
-          <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
-            {hasGps ? t('parkedAtLocation') : t('enableGpsToTrack')}
+        {!isActive && (
+          <View style={styles.addressRow}>
+            <Ionicons name="location-outline" size={13} color={colors.inkFaint} />
+            <Text style={[styles.addressText, { color: colors.inkFaint }]} numberOfLines={1}>
+              {hasGps ? t('parkedAtLocation') : t('enableGpsToTrack')}
+            </Text>
+          </View>
+        )}
+
+        {/* Long press hint */}
+        <View style={styles.hintRow}>
+          <Text style={[styles.hintText, { color: colors.inkFaint }]}>
+            {isActive ? t('longPressForActions') : t('longPressToActivate')}
           </Text>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -175,5 +219,27 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 13,
     flex: 1,
+  },
+  activeInfo: {
+    marginTop: 16,
+    gap: 6,
+  },
+  activeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  activeText: {
+    fontSize: 13,
+    color: '#22C55E',
+    fontWeight: '500',
+  },
+  hintRow: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  hintText: {
+    fontSize: 11,
+    fontStyle: 'italic',
   },
 });

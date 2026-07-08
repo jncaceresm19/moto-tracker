@@ -12,10 +12,12 @@ import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
-import { TheftAlert, getTheftAlerts, closeAlert } from '../../src/services/theftAlertService';
+import { TheftAlert, getTheftAlerts, closeAlert, createTheftAlert } from '../../src/services/theftAlertService';
 import { shareToSpecificPlatform } from '../../src/services/shareService';
 import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
 import { PlaceCard } from '../../src/components/PlaceCard';
+import { ActiveMoto, getActiveMoto, activateMoto, deactivateMoto, formatActivationTime } from '../../src/services/activeMoto';
+import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -27,6 +29,8 @@ export default function HomeScreen() {
   const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; userAvatar?: string; text: string; timeAgo: string }[]>>({});
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const [activeMoto, setActiveMoto] = useState<ActiveMoto | null>(null);
+  const [showActiveMotoModal, setShowActiveMotoModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -119,6 +123,15 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadActiveMoto = useCallback(async () => {
+    try {
+      const active = await getActiveMoto();
+      setActiveMoto(active);
+    } catch (e: any) {
+      console.log('[ACTIVE_MOTO] Error:', e?.message || 'Unknown');
+    }
+  }, []);
+
   useEffect(() => {
     console.log('[NEARBY] useEffect fired');
     // Load cached gas stations immediately on mount (no await - runs in background)
@@ -126,7 +139,8 @@ export default function HomeScreen() {
     loadMotorcycles();
     loadTheftAlerts();
     loadNearbyPlaces();
-  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces]);
+    loadActiveMoto();
+  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces, loadActiveMoto]);
 
   // Refresh theft alerts when returning from other screens (e.g. manual publication)
   useFocusEffect(
@@ -137,7 +151,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts(), loadNearbyPlaces()]);
+    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts(), loadNearbyPlaces(), loadActiveMoto()]);
     setRefreshing(false);
   };
 
@@ -154,6 +168,60 @@ export default function HomeScreen() {
       await loadTheftAlerts();
     } catch (e: any) {
       console.log('[THEFT] Error marking as found:', e?.message);
+    }
+  };
+
+  const handleActivateMoto = async (motorcycleId: string) => {
+    try {
+      let lat: number | undefined;
+      let lon: number | undefined;
+      
+      try {
+        const loc = await getCurrentLocation();
+        lat = loc.lat;
+        lon = loc.lon;
+      } catch (e) {
+        console.log('[ACTIVE_MOTO] Location error, activating without location');
+      }
+      
+      const active = await activateMoto(motorcycleId, lat, lon);
+      setActiveMoto(active);
+    } catch (e: any) {
+      console.log('[ACTIVE_MOTO] Error activating:', e?.message);
+    }
+  };
+
+  const handleDeactivateMoto = async () => {
+    try {
+      await deactivateMoto();
+      setActiveMoto(null);
+    } catch (e: any) {
+      console.log('[ACTIVE_MOTO] Error deactivating:', e?.message);
+    }
+  };
+
+  const handleReportTheft = async () => {
+    if (!activeMoto) return;
+    
+    const moto = motorcycles.find(m => m.id === activeMoto.motorcycleId);
+    if (!moto) return;
+    
+    try {
+      // Create theft alert with activation location
+      await createTheftAlert({
+        motorcycleId: moto.id,
+        lastLatitude: activeMoto.activationLat || 0,
+        lastLongitude: activeMoto.activationLon || 0,
+        lastLocationName: `Estacionada en ${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`,
+      });
+      
+      // Deactivate after reporting
+      await handleDeactivateMoto();
+      
+      // Refresh alerts
+      await loadTheftAlerts();
+    } catch (e: any) {
+      console.log('[THEFT] Error reporting theft:', e?.message);
     }
   };
 
@@ -191,14 +259,36 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {/* Dashboard Panel */}
-        <DashboardPanel
-          motorcycleName={activeMoto ? `${activeMoto.brand} ${activeMoto.model}` : ''}
-          plate={activeMoto?.licensePlate}
-          status="safe"
-          lastLocationTime={hasGps ? new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
-          address=""
-          timeAgo=""
-          hasGps={hasGps}
+        {(() => {
+          const activeMotoMoto = activeMoto ? motorcycles.find(m => m.id === activeMoto.motorcycleId) : null;
+          const motoName = activeMotoMoto ? `${activeMotoMoto.brand} ${activeMotoMoto.model}` : (activeMoto ? 'Moto activa' : (activeMoto ? `${activeMoto?.motorcycleId}` : (activeMoto ? `${activeMoto?.motorcycleId}` : (activeMoto ? `${activeMoto?.motorcycleId}` : (activeMoto ? `${activeMoto?.motorcycleId}` : '')))))
+          const motoPlate = activeMotoMoto?.licensePlate || '';
+          return (
+            <DashboardPanel
+              motorcycleName={motoName}
+              plate={motoPlate}
+              status={activeMoto ? 'safe' : 'safe'}
+              lastLocationTime={activeMoto ? formatActivationTime(activeMoto.activatedAt) : (hasGps ? new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--')}
+              address=""
+              timeAgo=""
+              hasGps={hasGps}
+              isActive={!!activeMoto}
+              activatedAt={activeMoto?.activatedAt}
+              activationAddress={activeMoto?.activationLat && activeMoto?.activationLon ? `${activeMoto.activationLat.toFixed(4)}, ${activeMoto.activationLon.toFixed(4)}` : undefined}
+              onLongPress={() => setShowActiveMotoModal(true)}
+            />
+          );
+        })()}
+
+        {/* Active Moto Modal */}
+        <ActiveMotoModal
+          visible={showActiveMotoModal}
+          onClose={() => setShowActiveMotoModal(false)}
+          motorcycles={motorcycles}
+          activeMoto={activeMoto}
+          onActivate={handleActivateMoto}
+          onDeactivate={handleDeactivateMoto}
+          onReportTheft={handleReportTheft}
         />
 
         {/* Multiple motorcycles indicator */}
