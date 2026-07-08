@@ -108,27 +108,21 @@ export async function getNearbyPlaces(
 
   const radiusMeters = radiusKm * 1000;
 
-  // Search queries - Google Places API by type + keyword
-  // Multiple queries per category to catch more results
+  // Search queries - focused on motorcycle needs only
   const searches: { category: NearbyPlace['category']; type: string; keyword: string }[] = [
-    // TALLERES - main focus (broad searches)
+    // TALLERES - motorcycle repair
     { category: 'taller', type: 'motorcycle_repair', keyword: '' },
     { category: 'taller', type: 'motorcycle_repair', keyword: 'taller' },
-    { category: 'taller', type: 'motorcycle_repair', keyword: 'motos' },
     { category: 'taller', type: 'motorcycle_repair', keyword: 'reparación' },
-    { category: 'taller', type: 'repair', keyword: 'motos' },
-    { category: 'taller', type: 'repair', keyword: 'mecánico' },
     { category: 'taller', type: '', keyword: 'taller motos' },
     { category: 'taller', type: '', keyword: 'taller mecánico motos' },
-    // VULCANIZACIÓN - main focus
+    // VULCANIZACIÓN - tire repair
     { category: 'vulcanizacion', type: 'tire_repair', keyword: '' },
-    { category: 'vulcanizacion', type: 'tire_repair', keyword: 'motos' },
-    { category: 'vulcanizacion', type: 'store', keyword: 'neumáticos' },
-    { category: 'vulcanizacion', type: 'store', keyword: 'llantas' },
     { category: 'vulcanizacion', type: '', keyword: 'vulcanización' },
-    // HOSPITALES - secondary
+    { category: 'vulcanizacion', type: '', keyword: 'neumáticos' },
+    // HOSPITALES
     { category: 'medico', type: 'hospital', keyword: '' },
-    // COMISARÍAS - secondary
+    // COMISARÍAS
     { category: 'carabineros', type: 'police', keyword: '' },
   ];
 
@@ -162,13 +156,24 @@ export async function getNearbyPlaces(
       let accepted = false;
 
       if (category === 'taller') {
-        accepted = true;
-        console.log('[NEARBY] ✓ taller:', r.name, '|', dist.toFixed(1), 'km');
+        // Only accept places related to motorcycle/mechanical repair
+        const isTaller = combined.includes('taller') || combined.includes('mecánico') || combined.includes('mecanico');
+        const isMoto = combined.includes('moto') || combined.includes('motocicleta');
+        const isRepair = combined.includes('repair') || combined.includes('reparación') || combined.includes('reparacion');
+        const isRepuesto = combined.includes('repuesto') || combined.includes('accesorio');
+        accepted = isTaller || isMoto || isRepair || isRepuesto;
+        if (!accepted) console.log('[NEARBY] ✗ Skip taller:', r.name);
       }
 
       if (category === 'vulcanizacion') {
-        accepted = true;
-        console.log('[NEARBY] ✓ vulca:', r.name, '|', dist.toFixed(1), 'km');
+        // Only accept tire/vulcanization related places
+        const isVulca = combined.includes('vulcanización') || combined.includes('vulcanizacion');
+        const isNeumatico = combined.includes('neumático') || combined.includes('neumatico') || combined.includes('neumáticos');
+        const isLlanta = combined.includes('llanta');
+        const isGomeria = combined.includes('gomería') || combined.includes('gomeria');
+        const isTire = combined.includes('tire');
+        accepted = isVulca || isNeumatico || isLlanta || isGomeria || isTire;
+        if (!accepted) console.log('[NEARBY] ✗ Skip vulca:', r.name);
       }
 
       if (category === 'medico') {
