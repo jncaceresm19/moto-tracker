@@ -140,7 +140,8 @@ export default function AppLayout() {
         name="my-publications"
         options={{
           href: null,
-          headerShown: false,
+          title: t('myPublications'),
+          headerLeft: () => <BackButton />,
         }}
       />
     </Tabs>

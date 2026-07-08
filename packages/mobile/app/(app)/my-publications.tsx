@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { TheftAlert, getMyPublications, closeAlert } from '../../src/services/theftAlertService';
@@ -11,7 +10,6 @@ import { CustomAlert } from '../../src/components/CustomAlert';
 export default function MyPublicationsScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const router = useRouter();
   const [publications, setPublications] = useState<TheftAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -157,15 +155,6 @@ export default function MyPublicationsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('myPublications')}</Text>
-        <View style={styles.headerSpacer} />
-      </View>
-
       <FlatList
         data={publications}
         renderItem={renderItem}
@@ -199,10 +188,6 @@ export default function MyPublicationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, borderBottomWidth: 1 },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 20, fontWeight: '600', flex: 1, textAlign: 'center' },
-  headerSpacer: { width: 34 },
   list: { padding: 16 },
   listEmpty: { flexGrow: 1 },
   card: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 12 },
