@@ -231,6 +231,7 @@ export async function getProfile(): Promise<UserProfile> {
 export async function updateProfile(data: {
   name?: string;
   email?: string;
+  phone?: string;
   avatarUrl?: string;
 }): Promise<UserProfile> {
   return api<UserProfile>('/api/profile', { method: 'PUT', body: data });

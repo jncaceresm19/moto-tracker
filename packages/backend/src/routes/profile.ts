@@ -14,6 +14,7 @@ const router = Router();
 const updateProfileSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100).optional(),
   email: z.string().email('Invalid email format').optional(),
+  phone: z.string().optional(),
   avatarUrl: z.string().max(10000000).optional(), // Base64 data URI (up to ~10MB)
 });
 
@@ -21,7 +22,7 @@ const updateProfileSchema = z.object({
 router.put('/', authenticate, validateBody(updateProfileSchema), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { name, email, avatarUrl } = req.body;
+    const { name, email, phone, avatarUrl } = req.body;
 
     // Check if user exists
     const user = await db.select().from(users).where(eq(users.id, userId)).get();
@@ -45,6 +46,7 @@ router.put('/', authenticate, validateBody(updateProfileSchema), async (req: Req
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) updates.name = name;
     if (email !== undefined) updates.email = email;
+    if (phone !== undefined) updates.phone = phone;
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
 
     // Update user
@@ -59,6 +61,7 @@ router.put('/', authenticate, validateBody(updateProfileSchema), async (req: Req
         id: updated!.id,
         email: updated!.email,
         name: updated!.name,
+        phone: updated!.phone,
         avatarUrl: updated!.avatarUrl,
         createdAt: new Date(updated!.createdAt),
         updatedAt: new Date(updated!.updatedAt),

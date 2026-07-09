@@ -25,11 +25,18 @@ function generateShareUrl(alert: TheftAlert): string {
   return `https://mototracker.app/theft-alert/${alert.id}`;
 }
 
-export async function shareToWhatsApp(text: string): Promise<void> {
+export async function shareToWhatsApp(text: string, ownerPhone?: string): Promise<void> {
   try {
     const Linking = require('expo-linking');
     const encoded = encodeURIComponent(text);
-    await Linking.openURL(`whatsapp://send?text=${encoded}`);
+    // If owner has phone, open direct chat with them
+    if (ownerPhone) {
+      // Clean phone number (remove spaces, dashes, etc.)
+      const cleanPhone = ownerPhone.replace(/[\s\-\(\)]/g, '');
+      await Linking.openURL(`whatsapp://send?phone=${cleanPhone}&text=${encoded}`);
+    } else {
+      await Linking.openURL(`whatsapp://send?text=${encoded}`);
+    }
   } catch (e) {
     // Return error for CustomAlert handling
     throw new Error('No se pudo abrir WhatsApp');
@@ -91,7 +98,7 @@ export async function shareToSpecificPlatform(
 ): Promise<void> {
   switch (platform) {
     case 'whatsapp':
-      await shareToWhatsApp(generateShareText(alert));
+      await shareToWhatsApp(generateShareText(alert), alert.ownerPhone);
       break;
     case 'instagram':
       await shareToInstagram(alert);

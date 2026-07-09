@@ -147,9 +147,11 @@ router.get('/', async (req: Request, res: Response) => {
         closedAt: theftAlerts.closedAt,
         recoveredAt: theftAlerts.recoveredAt,
         responseCount: count(theftAlertResponses.id),
+        ownerPhone: users.phone,
       })
       .from(theftAlerts)
       .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))
+      .leftJoin(users, eq(theftAlerts.userId, users.id))
       .where(
         or(
           eq(theftAlerts.status, 'active'),

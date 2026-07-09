@@ -67,7 +67,7 @@ export default function RegisterScreen() {
       fontSize: 16,
       color: colors.textSecondary,
       textAlign: 'center',
-      marginBottom: 32,
+      marginBottom: 5,
     },
     input: {
       borderWidth: 1,

@@ -18,7 +18,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
-  const [profileForm, setProfileForm] = useState({ name: user?.email?.split('@')[0] || '', email: user?.email || '' });
+  const [profileForm, setProfileForm] = useState({ name: user?.email?.split('@')[0] || '', email: user?.email || '', phone: (user as any)?.phone || '' });
   const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
   const [savingProfile, setSavingProfile] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -74,10 +74,14 @@ export default function ProfileScreen() {
     setProfileErrors({});
     setSavingProfile(true);
     try {
-      const updateData: { name: string; email: string; avatarUrl?: string } = {
+      const updateData: { name: string; email: string; phone?: string; avatarUrl?: string } = {
         name: profileForm.name.trim(),
         email: profileForm.email.trim(),
       };
+
+      if (profileForm.phone.trim()) {
+        updateData.phone = profileForm.phone.trim();
+      }
 
       // Convert avatar to base64 if picked
       if (avatarUri) {
@@ -407,6 +411,16 @@ export default function ProfileScreen() {
             autoCapitalize="none"
           />
           {profileErrors.email ? <Text style={dynamicStyles.errorText}>{profileErrors.email}</Text> : null}
+
+          {/* Phone Input */}
+          <TextInput
+            style={dynamicStyles.input}
+            placeholder={t('phone')}
+            placeholderTextColor={colors.textMuted}
+            value={profileForm.phone}
+            onChangeText={(v) => { setProfileForm(p => ({ ...p, phone: v })); }}
+            keyboardType="phone-pad"
+          />
 
           <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleSaveProfile} disabled={savingProfile}>
             {savingProfile ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
