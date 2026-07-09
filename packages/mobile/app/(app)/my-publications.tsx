@@ -188,7 +188,7 @@ export default function MyPublicationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list: { padding: 16 },
+  list: { padding: 16, paddingBottom: 0 },
   listEmpty: { flexGrow: 1 },
   card: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 12 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
