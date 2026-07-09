@@ -10,7 +10,7 @@ import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
-import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric, resetBiometricPreference } from '../../src/services/biometric';
+import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric, resetBiometricPreference, authenticateWithBiometrics } from '../../src/services/biometric';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -51,8 +51,12 @@ export default function ProfileScreen() {
   const toggleBiometric = async () => {
     console.log('[BIOMETRIC] Toggle pressed, current state:', biometricEnabled);
     if (biometricEnabled) {
-      await disableBiometric();
-      setBiometricEnabled(false);
+      // Confirm disabling with biometric
+      const authenticated = await authenticateWithBiometrics();
+      if (authenticated) {
+        await disableBiometric();
+        setBiometricEnabled(false);
+      }
     } else {
       // Check if device has biometric hardware
       const hasHardware = await hasBiometricHardware();
@@ -66,7 +70,6 @@ export default function ProfileScreen() {
       const enrolled = await isBiometricEnrolled();
       console.log('[BIOMETRIC] Enrolled:', enrolled);
       if (!enrolled) {
-        // Show option to open device settings
         showAlert(
           t('biometricSetupTitle'),
           t('biometricSetupMessage'),
@@ -80,8 +83,12 @@ export default function ProfileScreen() {
         return;
       }
       
-      await enableBiometric();
-      setBiometricEnabled(true);
+      // Ask for biometric confirmation before enabling
+      const authenticated = await authenticateWithBiometrics();
+      if (authenticated) {
+        await enableBiometric();
+        setBiometricEnabled(true);
+      }
     }
   };
 

@@ -77,13 +77,16 @@ export async function resetBiometricPreference(): Promise<void> {
 // Authenticate with biometrics
 export async function authenticateWithBiometrics(): Promise<boolean> {
   try {
+    console.log('[BIOMETRIC] Calling authenticateAsync...');
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: 'Autenticar con huella digital',
       cancelLabel: 'Cancelar',
       disableDeviceFallback: false,
     });
+    console.log('[BIOMETRIC] authenticateAsync result:', JSON.stringify(result));
     return result.success;
-  } catch {
+  } catch (error) {
+    console.log('[BIOMETRIC] authenticateAsync error:', error);
     return false;
   }
 }
