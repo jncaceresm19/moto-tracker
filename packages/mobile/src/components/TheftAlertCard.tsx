@@ -120,11 +120,27 @@ export function TheftAlertCard({
 
       {/* Action row: share + comments */}
       <View style={[styles.actionRow, { borderTopColor: colors.border }]}>
-        <TouchableOpacity style={styles.actionBtn} onPress={onWhatsApp}>
-          <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+        <TouchableOpacity 
+          style={styles.actionBtn} 
+          onPress={onWhatsApp}
+          disabled={status === 'recovered'}
+        >
+          <Ionicons 
+            name="logo-whatsapp" 
+            size={20} 
+            color={status === 'recovered' ? colors.inkFaint : '#25D366'} 
+          />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={onInstagram}>
-          <Ionicons name="logo-instagram" size={20} color="#E4405F" />
+        <TouchableOpacity 
+          style={styles.actionBtn} 
+          onPress={onInstagram}
+          disabled={status === 'recovered'}
+        >
+          <Ionicons 
+            name="logo-instagram" 
+            size={20} 
+            color={status === 'recovered' ? colors.inkFaint : '#E4405F'} 
+          />
         </TouchableOpacity>
         
         <View style={styles.actionSpacer} />

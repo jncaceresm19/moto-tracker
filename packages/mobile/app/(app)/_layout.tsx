@@ -150,6 +150,7 @@ export default function AppLayout() {
           href: null,
           title: t('notifications'),
           headerLeft: () => <BackButton />,
+          headerStyle: { height: 50 },
         }}
       />
     </Tabs>

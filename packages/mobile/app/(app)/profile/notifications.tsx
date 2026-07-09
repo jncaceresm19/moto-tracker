@@ -50,7 +50,7 @@ export default function NotificationsScreen() {
     if (!notification.isRead) {
       try {
         await markAsRead(notification.id);
-        setNotifications(prev => 
+        setNotifications(prev =>
           prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
         );
       } catch (e) {
@@ -108,14 +108,14 @@ export default function NotificationsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['top']}>
+      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['bottom']}>
       {/* Notifications list */}
       {notifications.length === 0 ? (
         <View style={styles.emptyState}>
@@ -127,6 +127,7 @@ export default function NotificationsScreen() {
         <FlatList
           data={notifications}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 16 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -138,10 +139,10 @@ export default function NotificationsScreen() {
               onPress={() => handleNotificationPress(item)}
             >
               <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
-                <Ionicons 
-                  name={getNotificationIcon(item.type) as any} 
-                  size={20} 
-                  color={getNotificationColor(item.type)} 
+                <Ionicons
+                  name={getNotificationIcon(item.type) as any}
+                  size={20}
+                  color={getNotificationColor(item.type)}
                 />
               </View>
               <View style={styles.notificationContent}>
