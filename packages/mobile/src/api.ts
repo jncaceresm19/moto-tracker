@@ -49,10 +49,10 @@ export async function login(email: string, password: string) {
   return data;
 }
 
-export async function register(email: string, password: string, name: string) {
+export async function register(email: string, password: string, name: string, phone?: string) {
   const data = await api<{ user: { id: string; email: string }; accessToken: string }>(
     '/api/auth/register',
-    { method: 'POST', body: { email, password, name } }
+    { method: 'POST', body: { email, password, name, phone } }
   );
   await AsyncStorage.setItem('accessToken', data.accessToken);
   return data;

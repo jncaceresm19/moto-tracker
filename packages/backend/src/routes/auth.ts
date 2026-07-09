@@ -16,6 +16,7 @@ const registerSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(1, 'Name is required').max(100),
+  phone: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -35,7 +36,7 @@ const changePasswordSchema = z.object({
 // --- POST /api/auth/register ---
 router.post('/register', validateBody(registerSchema), async (req: Request, res: Response) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, phone } = req.body;
 
     // Check if user already exists
     const existingUser = await db.select().from(users).where(eq(users.email, email)).get();
@@ -58,6 +59,7 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
       email,
       passwordHash,
       name,
+      phone: phone || null,
       createdAt: now,
       updatedAt: now,
     });
@@ -68,7 +70,7 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
     res.status(201).json({
       success: true,
       data: {
-        user: { id: userId, email, name, createdAt: now, updatedAt: now },
+        user: { id: userId, email, name, phone: phone || null, createdAt: now, updatedAt: now },
         ...tokens,
       },
     });

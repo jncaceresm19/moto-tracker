@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
@@ -13,16 +13,17 @@ export default function RegisterScreen() {
   const { t } = useLanguage();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
-  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -33,16 +34,16 @@ export default function RegisterScreen() {
 
   const handleRegister = async () => {
     if (!name || !email || !password) {
-      showAlert(t('error'), t('fillAllFields'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('fillAllFields'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
       return;
     }
 
     setLoading(true);
     try {
-      await signUp(email, password, name);
+      await signUp(email, password, name, phone || undefined);
       router.replace('/(app)');
     } catch (err) {
-      showAlert(t('error'), err instanceof Error ? err.message : t('registrationFailed'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), err instanceof Error ? err.message : t('registrationFailed'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setLoading(false);
     }
@@ -101,8 +102,19 @@ export default function RegisterScreen() {
 
   return (
     <View style={dynamicStyles.container}>
-      <Text style={dynamicStyles.title}>{t('signUpTitle')}</Text>
-      <Text style={dynamicStyles.subtitle}>{t('signUpSubtitle')}</Text>
+      <View style={styles.brandBlock}>
+        <Image
+          source={require('../../assets/icon.png')}
+          style={styles.icon}
+          resizeMode="contain"
+        />
+        <Image
+          source={require('../../assets/nombre.jpeg')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <Text style={dynamicStyles.subtitle}>{t('signUpSubtitle')}</Text>
+      </View>
 
       <TextInput
         style={dynamicStyles.input}
@@ -120,6 +132,15 @@ export default function RegisterScreen() {
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
+      />
+
+      <TextInput
+        style={dynamicStyles.input}
+        placeholder={t('phone')}
+        placeholderTextColor={colors.textMuted}
+        value={phone}
+        onChangeText={setPhone}
+        keyboardType="phone-pad"
       />
 
       <TextInput
@@ -157,3 +178,20 @@ export default function RegisterScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  brandBlock: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  icon: {
+    width: 80,
+    height: 80,
+    marginBottom: -60,
+  },
+  logo: {
+    width: 500,
+    height: 180,
+    marginBottom: -60,
+  },
+});

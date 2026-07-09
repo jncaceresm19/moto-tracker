@@ -1,72 +1,49 @@
 import { Router, Request, Response } from 'express';
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
 
 const router = Router();
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || 'AIzaSyAhtFaikZpXvYPWiZVItv12D520Nno_xqk';
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
-// Initialize cache table
-async function initCacheTable() {
-  try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS google_cache (
-        key TEXT PRIMARY KEY,
-        data TEXT NOT NULL,
-        expires_at INTEGER NOT NULL
-      )
-    `);
-  } catch (error) {
-    console.error('[CACHE] Error creating table:', error);
-  }
+// Simple in-memory cache
+interface CacheEntry {
+  data: any;
+  expiresAt: number;
 }
 
+const cache = new Map<string, CacheEntry>();
+
 // Get from cache
-async function getCache(key: string): Promise<any | null> {
-  try {
-    const result = await db.execute(sql`
-      SELECT data FROM google_cache 
-      WHERE key = ${key} AND expires_at > ${Date.now()}
-    `);
-    const row = (result as any).rows?.[0];
-    if (row) {
-      console.log('[CACHE] Hit:', key.substring(0, 50));
-      return JSON.parse(row.data);
-    }
-  } catch (error) {
-    console.error('[CACHE] Get error:', error);
+function getCache(key: string): any | null {
+  const entry = cache.get(key);
+  if (entry && entry.expiresAt > Date.now()) {
+    console.log('[CACHE] Hit:', key.substring(0, 50));
+    return entry.data;
+  }
+  if (entry) {
+    cache.delete(key); // Remove expired
   }
   return null;
 }
 
 // Set cache
-async function setCache(key: string, data: any): Promise<void> {
-  try {
-    await db.execute(sql`
-      INSERT OR REPLACE INTO google_cache (key, data, expires_at)
-      VALUES (${key}, ${JSON.stringify(data)}, ${Date.now() + CACHE_TTL})
-    `);
-    console.log('[CACHE] Set:', key.substring(0, 50));
-  } catch (error) {
-    console.error('[CACHE] Set error:', error);
-  }
+function setCache(key: string, data: any): void {
+  cache.set(key, {
+    data,
+    expiresAt: Date.now() + CACHE_TTL,
+  });
+  console.log('[CACHE] Set:', key.substring(0, 50));
 }
 
-// Clean expired cache entries (run periodically)
-async function cleanExpiredCache() {
-  try {
-    await db.execute(sql`
-      DELETE FROM google_cache WHERE expires_at < ${Date.now()}
-    `);
-  } catch (error) {
-    console.error('[CACHE] Clean error:', error);
+// Clean expired entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of cache.entries()) {
+    if (entry.expiresAt < now) {
+      cache.delete(key);
+    }
   }
-}
-
-// Initialize on module load
-initCacheTable();
-setInterval(cleanExpiredCache, 60 * 60 * 1000); // Clean every hour
+}, 60 * 60 * 1000); // Every hour
 
 // Proxy to Google Places API (Basic tier - free 10,000 requests/month)
 router.get('/places', async (req: Request, res: Response) => {
@@ -81,7 +58,7 @@ router.get('/places', async (req: Request, res: Response) => {
     const cacheKey = `places:${lat}:${lon}:${keyword || ''}:${type || ''}:${radius || 3000}`;
     
     // Check cache first
-    const cached = await getCache(cacheKey);
+    const cached = getCache(cacheKey);
     if (cached) {
       return res.json(cached);
     }
@@ -101,7 +78,7 @@ router.get('/places', async (req: Request, res: Response) => {
     
     // Cache successful responses
     if (data.status === 'OK') {
-      await setCache(cacheKey, data);
+      setCache(cacheKey, data);
     }
     
     res.json(data);
@@ -126,7 +103,7 @@ router.get('/geocode', async (req: Request, res: Response) => {
     const cacheKey = `geocode:${roundedLat}:${roundedLon}`;
     
     // Check cache first
-    const cached = await getCache(cacheKey);
+    const cached = getCache(cacheKey);
     if (cached) {
       return res.json(cached);
     }
@@ -142,7 +119,7 @@ router.get('/geocode', async (req: Request, res: Response) => {
     
     // Cache successful responses
     if (data.status === 'OK') {
-      await setCache(cacheKey, data);
+      setCache(cacheKey, data);
     }
     
     res.json(data);

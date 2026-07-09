@@ -6,6 +6,7 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   name: text('name').notNull(),
+  phone: text('phone'),
   googleId: text('google_id').unique(),
   avatarUrl: text('avatar_url'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
