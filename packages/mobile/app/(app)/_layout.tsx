@@ -1,6 +1,6 @@
 import { Tabs, useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, Text } from 'react-native';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 

@@ -116,19 +116,6 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.headerTintColor} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('notifications')}</Text>
-        {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAllRead} style={styles.markAllBtn}>
-            <Text style={[styles.markAllText, { color: colors.primary }]}>{t('markAllRead')}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
       {/* Notifications list */}
       {notifications.length === 0 ? (
         <View style={styles.emptyState}>
@@ -182,18 +169,6 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: 17, fontWeight: '700' },
-  markAllBtn: { padding: 4 },
-  markAllText: { fontSize: 14, fontWeight: '600' },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
