@@ -177,7 +177,7 @@ export default function ProfileScreen() {
       <Text style={dynamicStyles.sectionTitle}>{t('account')}</Text>
       <View style={dynamicStyles.section}>
         <TouchableOpacity style={dynamicStyles.row} onPress={() => {
-          setProfileForm({ name: user?.name || user?.email?.split('@')[0] || '', email: user?.email || '' });
+          setProfileForm({ name: user?.name || user?.email?.split('@')[0] || '', email: user?.email || '', phone: (user as any)?.phone || '' });
           setAvatarUri(null);
           setProfileErrors({});
           setShowEditProfile(true);
