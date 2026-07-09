@@ -116,10 +116,10 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['bottom']}>
-      {/* Custom header */}
+      {/* Custom header matching app style */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={22} color={colors.headerTintColor} />
+          <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('notifications')}</Text>
         <View style={styles.headerBtn} />
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
+  headerTitle: { fontSize: 20, fontWeight: '600' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyState: {
     flex: 1,
