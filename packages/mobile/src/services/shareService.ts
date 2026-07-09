@@ -25,16 +25,21 @@ function generateShareUrl(alert: TheftAlert): string {
   return `https://mototracker.app/theft-alert/${alert.id}`;
 }
 
-export async function shareToWhatsApp(text: string, ownerPhone?: string): Promise<void> {
+export async function shareToWhatsApp(text: string, ownerPhone?: string, isOwner?: boolean): Promise<void> {
   try {
     const Linking = require('expo-linking');
     const encoded = encodeURIComponent(text);
-    // If owner has phone, open direct chat with them
-    if (ownerPhone) {
-      // Clean phone number (remove spaces, dashes, etc.)
+    
+    if (isOwner) {
+      // Owner shares the alert (no phone, just share data)
+      await Linking.openURL(`whatsapp://send?text=${encoded}`);
+    } else if (ownerPhone) {
+      // Other user sends message to owner
       const cleanPhone = ownerPhone.replace(/[\s\-\(\)]/g, '');
-      await Linking.openURL(`whatsapp://send?phone=${cleanPhone}&text=${encoded}`);
+      const contactMessage = encodeURIComponent(`Hola, vi tu publicación de robo en Moto Tracker. ¿Puedo ayudarte?`);
+      await Linking.openURL(`whatsapp://send?phone=${cleanPhone}&text=${contactMessage}`);
     } else {
+      // Other user but no phone available
       await Linking.openURL(`whatsapp://send?text=${encoded}`);
     }
   } catch (e) {
@@ -94,11 +99,14 @@ export async function shareTheftAlert(alert: TheftAlert): Promise<void> {
 
 export async function shareToSpecificPlatform(
   alert: TheftAlert,
-  platform: 'whatsapp' | 'instagram'
+  platform: 'whatsapp' | 'instagram',
+  currentUserId?: string
 ): Promise<void> {
+  const isOwner = currentUserId === alert.userId;
+  
   switch (platform) {
     case 'whatsapp':
-      await shareToWhatsApp(generateShareText(alert), alert.ownerPhone);
+      await shareToWhatsApp(generateShareText(alert), alert.ownerPhone, isOwner);
       break;
     case 'instagram':
       await shareToInstagram(alert);

@@ -432,7 +432,7 @@ export default function HomeScreen() {
                 recoveredAt={theftAlerts[0].recoveredAt}
                 alertOwnerId={theftAlerts[0].userId}
                 responses={theftComments[theftAlerts[0].id] || []}
-                onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp')}
+                onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp', user?.id)}
                 onInstagram={() => handleInstagramShare(theftAlerts[0])}
                 onMarkAsFound={() => handleMarkAsFound(theftAlerts[0].id)}
                 onComment={(text) => {
@@ -470,7 +470,7 @@ export default function HomeScreen() {
                       recoveredAt={alert.recoveredAt}
                       alertOwnerId={alert.userId}
                       responses={theftComments[alert.id] || []}
-                      onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
+                      onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp', user?.id)}
                       onInstagram={() => handleInstagramShare(alert)}
                       onMarkAsFound={() => handleMarkAsFound(alert.id)}
                       onComment={(text) => {
