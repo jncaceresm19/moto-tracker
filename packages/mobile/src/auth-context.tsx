@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  phone?: string;
   avatarUrl?: string;
 }
 
@@ -42,9 +43,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const profile = await getProfile();
-      setUser(prev => prev ? { ...prev, name: profile.name, avatarUrl: profile.avatarUrl, email: profile.email } : prev);
+      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl, email: profile.email } : prev);
     } catch {
-      // Profile fetch failed, keep existing user state
+      // Keep current user data
     }
   };
 
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Fetch full profile in background
           try {
             const profile = await getProfile();
-            setUser({ id: decoded.id, email: profile.email, name: profile.name, avatarUrl: profile.avatarUrl });
+              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl });
           } catch {
             // Keep decoded token data
           }
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch full profile
     try {
       const profile = await getProfile();
-      setUser({ id: data.user.id, email: profile.email, name: profile.name, avatarUrl: profile.avatarUrl });
+      setUser({ id: data.user.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl });
     } catch {
       // Keep login data
     }
