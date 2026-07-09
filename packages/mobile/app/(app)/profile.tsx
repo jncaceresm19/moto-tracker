@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Switch, Image, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,6 +10,7 @@ import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
+import { isBiometricAvailable, isBiometricEnabled, enableBiometric, disableBiometric } from '../../src/services/biometric';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -32,6 +33,29 @@ export default function ProfileScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+
+  useEffect(() => {
+    loadBiometricStatus();
+  }, []);
+
+  const loadBiometricStatus = async () => {
+    const available = await isBiometricAvailable();
+    const enabled = await isBiometricEnabled();
+    setBiometricAvailable(available);
+    setBiometricEnabled(enabled);
+  };
+
+  const toggleBiometric = async () => {
+    if (biometricEnabled) {
+      await disableBiometric();
+      setBiometricEnabled(false);
+    } else {
+      await enableBiometric();
+      setBiometricEnabled(true);
+    }
+  };
 
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -260,6 +284,21 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {biometricAvailable && (
+          <View style={dynamicStyles.row}>
+            <View style={styles.rowLeft}>
+              <Ionicons name="finger-print-outline" size={20} color={colors.text} />
+              <Text style={dynamicStyles.rowText}>{t('biometric')}</Text>
+            </View>
+            <Switch
+              value={biometricEnabled}
+              onValueChange={toggleBiometric}
+              trackColor={{ false: colors.inputBorder, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+        )}
       </View>
 
       {/* Support Section */}

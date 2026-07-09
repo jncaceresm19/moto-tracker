@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import { shareToSpecificPlatform } from '../../src/services/shareService';
 import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { ActiveMoto, getActiveMoto, activateMoto, deactivateMoto, formatActivationTime } from '../../src/services/activeMoto';
+import { isBiometricAvailable, hasBeenPrompted, markAsPrompted, enableBiometric } from '../../src/services/biometric';
 import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 import { reverseGeocode } from '../../src/services/geocoding';
 import { getUnreadCount } from '../../src/services/notificationService';
@@ -41,6 +42,31 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [instagramAlertVisible, setInstagramAlertVisible] = useState(false);
+  const [biometricPromptVisible, setBiometricPromptVisible] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+
+  // Check for biometric prompt on first load
+  useEffect(() => {
+    checkBiometricPrompt();
+  }, []);
+
+  const checkBiometricPrompt = async () => {
+    const available = await isBiometricAvailable();
+    const prompted = await hasBeenPrompted();
+    setBiometricAvailable(available);
+    
+    if (available && !prompted) {
+      setBiometricPromptVisible(true);
+    }
+  };
+
+  const handleBiometricResponse = async (enable: boolean) => {
+    if (enable) {
+      await enableBiometric();
+    }
+    await markAsPrompted();
+    setBiometricPromptVisible(false);
+  };
 
   const formatTimeAgo = (date: Date): string => {
     const now = new Date();
@@ -583,6 +609,33 @@ export default function HomeScreen() {
         ]}
         onClose={() => setInstagramAlertVisible(false)}
       />
+
+      {/* Biometric Prompt Modal */}
+      <Modal visible={biometricPromptVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalIcon, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="finger-print" size={40} color={colors.primary} />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.ink }]}>{t('biometricPromptTitle')}</Text>
+            <Text style={[styles.modalMessage, { color: colors.inkSoft }]}>{t('biometricPromptMessage')}</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+                onPress={() => handleBiometricResponse(true)}
+              >
+                <Text style={styles.modalBtnText}>Activar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalBtn, { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }]}
+                onPress={() => handleBiometricResponse(false)}
+              >
+                <Text style={[styles.modalBtnText, { color: colors.text }]}>{t('no')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -643,4 +696,12 @@ const styles = StyleSheet.create({
   offersScroll: { paddingRight: 16 },
   horizontalScroll: { paddingRight: 16 },
   lastUpdateText: { fontSize: 11, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', borderRadius: 20, padding: 24, alignItems: 'center' },
+  modalIcon: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  modalMessage: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  modalButtons: { width: '100%', gap: 12 },
+  modalBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
 });
