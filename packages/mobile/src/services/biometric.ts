@@ -4,7 +4,25 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const BIOMETRIC_ENABLED_KEY = '@biometric_enabled';
 const BIOMETRIC_PROMPTED_KEY = '@biometric_prompted';
 
-// Check if device supports biometrics
+// Check if device has biometric hardware
+export async function hasBiometricHardware(): Promise<boolean> {
+  try {
+    return await LocalAuthentication.hasHardwareAsync();
+  } catch {
+    return false;
+  }
+}
+
+// Check if user has enrolled biometrics
+export async function isBiometricEnrolled(): Promise<boolean> {
+  try {
+    return await LocalAuthentication.isEnrolledAsync();
+  } catch {
+    return false;
+  }
+}
+
+// Check if device supports biometrics (hardware + enrolled)
 export async function isBiometricAvailable(): Promise<boolean> {
   try {
     const compatible = await LocalAuthentication.hasHardwareAsync();

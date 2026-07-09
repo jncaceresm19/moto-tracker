@@ -10,7 +10,7 @@ import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
-import { isBiometricAvailable, isBiometricEnabled, enableBiometric, disableBiometric } from '../../src/services/biometric';
+import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric } from '../../src/services/biometric';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -52,14 +52,45 @@ export default function ProfileScreen() {
       await disableBiometric();
       setBiometricEnabled(false);
     } else {
-      // Verify device has enrolled biometrics before enabling
-      const available = await isBiometricAvailable();
-      if (!available) {
-        showAlert(t('error'), t('noBiometricsRegistered'), [{ text: 'OK' }], 'finger-print', '#FF3B30');
+      // Check if device has biometric hardware
+      const hasHardware = await hasBiometricHardware();
+      if (!hasHardware) {
+        showAlert(t('error'), t('noBiometricHardware'), [{ text: 'OK' }], 'finger-print', '#FF3B30');
         return;
       }
+      
+      // Check if user has enrolled biometrics
+      const enrolled = await isBiometricEnrolled();
+      if (!enrolled) {
+        // Show option to open device settings
+        showAlert(
+          t('biometricSetupTitle'),
+          t('biometricSetupMessage'),
+          [
+            { text: t('openSettings'), onPress: () => openDeviceSettings() },
+            { text: t('cancel'), style: 'cancel' },
+          ],
+          'finger-print',
+          '#FF3B30'
+        );
+        return;
+      }
+      
       await enableBiometric();
       setBiometricEnabled(true);
+    }
+  };
+
+  const openDeviceSettings = async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      // Fallback for iOS
+      try {
+        await Linking.openURL('app-settings:');
+      } catch {
+        // Do nothing
+      }
     }
   };
 
