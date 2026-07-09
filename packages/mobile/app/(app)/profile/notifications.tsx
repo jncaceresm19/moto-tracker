@@ -110,7 +110,7 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={[]}>
       {/* Custom header matching app style */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>

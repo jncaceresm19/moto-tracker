@@ -154,7 +154,7 @@ export default function MyPublicationsScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <FlatList
         data={publications}
         renderItem={renderItem}
