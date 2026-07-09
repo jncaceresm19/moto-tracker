@@ -21,6 +21,7 @@ import { ActiveMoto, getActiveMoto, activateMoto, deactivateMoto, formatActivati
 import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 import { reverseGeocode } from '../../src/services/geocoding';
 import { getUnreadCount } from '../../src/services/notificationService';
+import { CustomAlert } from '../../src/components/CustomAlert';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [instagramAlertVisible, setInstagramAlertVisible] = useState(false);
 
   const formatTimeAgo = (date: Date): string => {
     const now = new Date();
@@ -285,6 +287,16 @@ export default function HomeScreen() {
     }
   };
 
+  const handleInstagramShare = async (alert: TheftAlert) => {
+    try {
+      await shareToSpecificPlatform(alert, 'instagram');
+    } catch (e: any) {
+      if (e.message === 'INSTAGRAM_COPIED') {
+        setInstagramAlertVisible(true);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['top']}>
@@ -421,7 +433,7 @@ export default function HomeScreen() {
                 alertOwnerId={theftAlerts[0].userId}
                 responses={theftComments[theftAlerts[0].id] || []}
                 onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp')}
-                onInstagram={() => shareToSpecificPlatform(theftAlerts[0], 'instagram')}
+                onInstagram={() => handleInstagramShare(theftAlerts[0])}
                 onMarkAsFound={() => handleMarkAsFound(theftAlerts[0].id)}
                 onComment={(text) => {
                   const alertId = theftAlerts[0].id;
@@ -459,7 +471,7 @@ export default function HomeScreen() {
                       alertOwnerId={alert.userId}
                       responses={theftComments[alert.id] || []}
                       onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp')}
-                      onInstagram={() => shareToSpecificPlatform(alert, 'instagram')}
+                      onInstagram={() => handleInstagramShare(alert)}
                       onMarkAsFound={() => handleMarkAsFound(alert.id)}
                       onComment={(text) => {
                         const newComment = {
@@ -546,6 +558,27 @@ export default function HomeScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Instagram Share Alert */}
+      <CustomAlert
+        visible={instagramAlertVisible}
+        title="Copiado"
+        message="Texto copiado. Abrí Instagram y pegalo en tu historia o mensaje."
+        icon="logo-instagram"
+        iconColor="#E4405F"
+        buttons={[
+          { text: 'Abrir Instagram', onPress: async () => {
+            const Linking = require('expo-linking');
+            try {
+              await Linking.openURL('instagram://');
+            } catch {
+              await Linking.openURL('https://www.instagram.com');
+            }
+          }},
+          { text: 'Cerrar', style: 'cancel' },
+        ]}
+        onClose={() => setInstagramAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 }

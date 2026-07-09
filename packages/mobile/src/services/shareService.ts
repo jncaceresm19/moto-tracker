@@ -1,11 +1,8 @@
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import { TheftAlert } from './theftAlertService';
 
 function formatTime(date: Date): string {
-  return date.toLocaleString('es-CL', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+  return date.toLocaleTimeString('es-CL', {
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -17,7 +14,7 @@ function generateShareText(alert: TheftAlert): string {
 
 ${alert.brand} ${alert.model}
 Patente: ${alert.licensePlate}
-Ubicación: ${alert.lastLocationName || 'Desconocida'}
+Ultima ubicacion: ${alert.lastLocationName || 'Desconocida'}
 Hora: ${formatTime(alert.createdAt)}
 
 Si ves esta moto, contacta al dueño en Moto Tracker.`;
@@ -33,7 +30,8 @@ export async function shareToWhatsApp(text: string): Promise<void> {
     const encoded = encodeURIComponent(text);
     await Linking.openURL(`whatsapp://send?text=${encoded}`);
   } catch (e) {
-    Alert.alert('Error', 'No se pudo abrir WhatsApp');
+    // Return error for CustomAlert handling
+    throw new Error('No se pudo abrir WhatsApp');
   }
 }
 
@@ -45,23 +43,21 @@ export async function shareToInstagram(alert: TheftAlert): Promise<void> {
     // Copy to clipboard and open Instagram
     const Clipboard = require('expo-clipboard');
     await Clipboard.setStringAsync(text);
-    Alert.alert(
-      'Copiado',
-      'Texto copiado. Abrí Instagram y pegalo en tu historia o mensaje.',
-      [
-        { text: 'Abrir Instagram', onPress: async () => {
-          try {
-            await Linking.openURL('instagram://');
-          } catch {
-            await Linking.openURL('https://www.instagram.com');
-          }
-        }},
-        { text: 'Cancelar', style: 'cancel' },
-      ]
-    );
-  } catch (e) {
-    Alert.alert('Error', 'No se pudo compartir');
+    // Return success for CustomAlert handling
+    throw new Error('INSTAGRAM_COPIED');
+  } catch (e: any) {
+    if (e.message === 'INSTAGRAM_COPIED') {
+      throw e;
+    }
+    throw new Error('No se pudo compartir');
   }
+}
+
+export function getShareAlertData(alert: TheftAlert): { text: string; url: string } {
+  return {
+    text: generateShareText(alert),
+    url: generateShareUrl(alert),
+  };
 }
 
 export async function shareTheftAlert(alert: TheftAlert): Promise<void> {
@@ -84,32 +80,8 @@ export async function shareTheftAlert(alert: TheftAlert): Promise<void> {
     }
   }
 
-  // Fallback to platform-specific sharing
-  showShareOptions(alert);
-}
-
-function showShareOptions(alert: TheftAlert): void {
-  Alert.alert(
-    'Compartir alerta',
-    'Elige cómo compartir:',
-    [
-      {
-        text: 'WhatsApp',
-        onPress: () => {
-          const text = generateShareText(alert);
-          shareToWhatsApp(text);
-        },
-      },
-      {
-        text: 'Instagram',
-        onPress: () => shareToInstagram(alert),
-      },
-      {
-        text: 'Cancelar',
-        style: 'cancel',
-      },
-    ]
-  );
+  // Return data for CustomAlert handling
+  throw new Error('NATIVE_SHARE_UNAVAILABLE');
 }
 
 export async function shareToSpecificPlatform(
