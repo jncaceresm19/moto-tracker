@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const GOOGLE_API_KEY = 'AIzaSyAhtFaikZpXvYPWiZVItv12D520Nno_xqk';
+const API_URL = 'http://192.168.100.9:3001';
 
 // Reverse geocode coordinates to address
 export async function reverseGeocode(lat: number, lon: number): Promise<string> {
@@ -10,7 +10,7 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string> 
     const cached = await AsyncStorage.getItem(cacheKey);
     if (cached) return cached;
 
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${GOOGLE_API_KEY}`;
+    const url = `${API_URL}/api/google/geocode?lat=${lat}&lon=${lon}`;
     const response = await fetch(url);
     const data = await response.json();
 

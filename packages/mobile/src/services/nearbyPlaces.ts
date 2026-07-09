@@ -13,7 +13,7 @@ export interface NearbyPlace {
   openNow?: boolean;
 }
 
-const GOOGLE_API_KEY = 'AIzaSyAhtFaikZpXvYPWiZVItv12D520Nno_xqk';
+const API_URL = 'http://192.168.100.9:3001';
 const CACHE_KEY = 'moto-tracker-nearby-places';
 const CACHE_KEY_TIME = 'moto-tracker-nearby-places-time';
 const CACHE_TTL = 30 * 60 * 1000;
@@ -31,7 +31,7 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Google Places Nearby Search
+// Backend Places API proxy
 async function searchGooglePlaces(
   lat: number,
   lon: number,
@@ -39,22 +39,10 @@ async function searchGooglePlaces(
   keyword: string,
   radius: number
 ): Promise<any[]> {
-  // Use radius-based search (not rankby=distance) to get ALL places, with or without rating
-  let url =
-    'https://maps.googleapis.com/maps/api/place/nearbysearch/json' +
-    '?location=' + lat + ',' + lon +
-    '&radius=' + radius +
-    '&key=' + GOOGLE_API_KEY;
-
-  // Add type if provided
-  if (type) {
-    url += '&type=' + type;
-  }
-
-  // Add keyword if provided
-  if (keyword) {
-    url += '&keyword=' + encodeURIComponent(keyword);
-  }
+  let url = `${API_URL}/api/google/places?lat=${lat}&lon=${lon}&radius=${radius}`;
+  
+  if (type) url += `&type=${type}`;
+  if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
 
   console.log('[NEARBY] Google:', keyword || type, '|', radius + 'm');
   try {
