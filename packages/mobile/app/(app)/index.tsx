@@ -12,6 +12,7 @@ import { DashboardPanel } from '../../src/components/DashboardPanel';
 import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
+import { detectCountry } from '../../src/services/countryDetection';
 import { TheftAlert, getTheftAlerts, closeAlert, createTheftAlert } from '../../src/services/theftAlertService';
 import { shareToSpecificPlatform } from '../../src/services/shareService';
 import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
@@ -77,6 +78,10 @@ export default function HomeScreen() {
       try {
         const { lat, lon } = await getCurrentLocation();
         console.log('[GAS] Location:', lat, lon);
+        
+        // Detect country from location
+        detectCountry(lat, lon).catch(e => console.log('[GAS] Country detection error:', e));
+        
         const stations = await getNearbyGasStations(lat, lon);
         console.log('[GAS] Found:', stations.length, 'stations');
         if (stations.length > 0) {

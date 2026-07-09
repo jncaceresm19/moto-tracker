@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { detectCountry, getStoredCountry, getGasPriceMessage } from './countryDetection';
 
 export interface GasStation {
   id: string;
@@ -89,8 +90,9 @@ export async function getLastUpdateLabel(): Promise<string | null> {
   const lastUpdate = await getLastUpdateTime();
   if (!lastUpdate) return null;
   
-  // For Chile: show MEPCO message
-  return 'Precios según mecanismo MEPCO (actualización semanal)';
+  // Get country and return appropriate message
+  const country = await getStoredCountry();
+  return getGasPriceMessage(country);
 }
 
 // CNE API credentials
