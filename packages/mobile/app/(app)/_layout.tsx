@@ -149,8 +149,7 @@ export default function AppLayout() {
         options={{
           href: null,
           title: t('notifications'),
-          headerLeft: () => <BackButton />,
-          headerStyle: { height: 50 },
+          headerShown: false,
         }}
       />
     </Tabs>

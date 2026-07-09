@@ -175,7 +175,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadTheftAlerts();
-    }, [loadTheftAlerts])
+      loadUnreadCount();
+    }, [loadTheftAlerts, loadUnreadCount])
   );
 
   const onRefresh = async () => {
