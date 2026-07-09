@@ -38,6 +38,12 @@ export default function RegisterScreen() {
       return;
     }
 
+    // Validate phone format if provided (Chilean format: +569XXXXXXXX)
+    if (phone && !/^\+569\d{8}$/.test(phone.replace(/[\s\-\(\)]/g, ''))) {
+      showAlert(t('error'), t('invalidPhone'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
+      return;
+    }
+
     setLoading(true);
     try {
       await signUp(email, password, name, phone || undefined);
@@ -142,6 +148,9 @@ export default function RegisterScreen() {
         onChangeText={setPhone}
         keyboardType="phone-pad"
       />
+      {phone ? null : (
+        <Text style={[styles.phoneHint, { color: colors.textMuted }]}>+569XXXXXXXX</Text>
+      )}
 
       <TextInput
         style={dynamicStyles.input}
@@ -193,5 +202,11 @@ const styles = StyleSheet.create({
     width: 500,
     height: 180,
     marginBottom: -60,
+  },
+  phoneHint: {
+    fontSize: 12,
+    marginTop: -8,
+    marginBottom: 12,
+    marginLeft: 4,
   },
 });

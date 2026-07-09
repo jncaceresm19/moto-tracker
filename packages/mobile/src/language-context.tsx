@@ -265,6 +265,7 @@ const translations = {
     fillAllFields: 'Please fill in all fields',
     loginFailed: 'Login failed',
     registrationFailed: 'Registration failed',
+    invalidPhone: 'Enter a valid phone: +569XXXXXXXX',
     password: 'Password',
   },
   es: {
@@ -527,6 +528,7 @@ const translations = {
     fillAllFields: 'Por favor completa todos los campos',
     loginFailed: 'Error al iniciar sesión',
     registrationFailed: 'Error al registrarse',
+    invalidPhone: 'Ingresa un teléfono válido: +569XXXXXXXX',
     password: 'Contraseña',
   },
 };
