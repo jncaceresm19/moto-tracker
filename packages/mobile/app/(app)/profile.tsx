@@ -52,6 +52,12 @@ export default function ProfileScreen() {
       await disableBiometric();
       setBiometricEnabled(false);
     } else {
+      // Verify device has enrolled biometrics before enabling
+      const available = await isBiometricAvailable();
+      if (!available) {
+        showAlert(t('error'), t('noBiometricsRegistered'), [{ text: 'OK' }], 'finger-print', '#FF3B30');
+        return;
+      }
       await enableBiometric();
       setBiometricEnabled(true);
     }
