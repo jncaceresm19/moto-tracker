@@ -3,9 +3,9 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Act
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../../src/theme-context';
-import { useLanguage } from '../../src/language-context';
-import { Notification, getNotifications, markAsRead, markAllAsRead } from '../../src/services/notificationService';
+import { useTheme } from '../../../src/theme-context';
+import { useLanguage } from '../../../src/language-context';
+import { Notification, getNotifications, markAsRead, markAllAsRead } from '../../../src/services/notificationService';
 
 export default function NotificationsScreen() {
   const { colors } = useTheme();
