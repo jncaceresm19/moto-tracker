@@ -6,6 +6,7 @@ import { theftAlerts, theftAlertResponses, motorcycles, users } from '../db/sche
 import { authenticate } from '../middleware/auth';
 import { validateBody, validateParams } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
+import { createNotification, notifyAllUsers } from './notifications';
 
 const router = Router();
 
@@ -98,6 +99,14 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
       .from(theftAlerts)
       .where(eq(theftAlerts.id, alertId))
       .get();
+
+    // Notify all users about new theft alert
+    notifyAllUsers(userId, {
+      motorcycleId,
+      type: 'theft_alert',
+      title: 'Alerta de robo',
+      message: `${motorcycle.brand} ${motorcycle.model} (${motorcycle.licensePlate}) fue reportada como robada`,
+    }).catch(err => console.error('Error sending notifications:', err));
 
     res.status(201).json({
       success: true,
@@ -301,6 +310,18 @@ router.post('/:id/respond', validateParams(alertIdParam), validateBody(respondSc
       .where(eq(theftAlertResponses.id, responseId))
       .get();
 
+    // Notify alert owner about new response
+    if (alert.userId !== userId) {
+      const responder = await db.select().from(users).where(eq(users.id, userId)).get();
+      createNotification({
+        userId: alert.userId,
+        motorcycleId: alert.motorcycleId,
+        type: 'alert_response',
+        title: 'Nueva respuesta',
+        message: `${responder?.name || 'Alguien'} respondió a tu alerta de robo`,
+      }).catch(err => console.error('Error sending notification:', err));
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -356,6 +377,16 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
       .from(theftAlerts)
       .where(eq(theftAlerts.id, id))
       .get();
+
+    // Notify all users when motorcycle is recovered
+    if (status === 'recovered') {
+      notifyAllUsers(userId, {
+        motorcycleId: alert.motorcycleId,
+        type: 'theft_recovered',
+        title: 'Moto recuperada',
+        message: `${alert.brand} ${alert.model} (${alert.licensePlate}) fue recuperada`,
+      }).catch(err => console.error('Error sending notifications:', err));
+    }
 
     res.json({
       success: true,

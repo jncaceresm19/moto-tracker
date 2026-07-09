@@ -10,6 +10,7 @@ import kilometerRoutes from './routes/kilometers';
 import profileRoutes from './routes/profile';
 import theftAlertRoutes from './routes/theft-alerts';
 import activeMotoRoutes from './routes/activeMotos';
+import notificationRoutes from './routes/notifications';
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use('/api/motorcycles/:id/documents', documentRoutes);
 app.use('/api/motorcycles/:id/kilometers', kilometerRoutes);
 app.use('/api/theft-alerts', theftAlertRoutes);
 app.use('/api/active-motos', activeMotoRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Only listen when not in test environment
 if (process.env.NODE_ENV !== 'test') {

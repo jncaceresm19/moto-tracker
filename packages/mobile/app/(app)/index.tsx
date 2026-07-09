@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, A
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { useAuth } from '../../src/auth-context';
@@ -20,11 +20,13 @@ import { PlaceCard } from '../../src/components/PlaceCard';
 import { ActiveMoto, getActiveMoto, activateMoto, deactivateMoto, formatActivationTime } from '../../src/services/activeMoto';
 import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 import { reverseGeocode } from '../../src/services/geocoding';
+import { getUnreadCount } from '../../src/services/notificationService';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const { user } = useAuth();
+  const router = useRouter();
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [gasStations, setGasStations] = useState<GasStation[]>([]);
   const [theftAlerts, setTheftAlerts] = useState<TheftAlert[]>([]);
@@ -34,6 +36,7 @@ export default function HomeScreen() {
   const [activeMoto, setActiveMoto] = useState<ActiveMoto | null>(null);
   const [showActiveMotoModal, setShowActiveMotoModal] = useState(false);
   const [activationAddress, setActivationAddress] = useState<string | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -148,6 +151,15 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadUnreadCount = useCallback(async () => {
+    try {
+      const count = await getUnreadCount();
+      setUnreadNotifications(count);
+    } catch (e: any) {
+      console.log('[NOTIFICATIONS] Error:', e?.message || 'Unknown');
+    }
+  }, []);
+
   useEffect(() => {
     console.log('[NEARBY] useEffect fired');
     // Load cached gas stations immediately on mount (no await - runs in background)
@@ -156,7 +168,8 @@ export default function HomeScreen() {
     loadTheftAlerts();
     loadNearbyPlaces();
     loadActiveMoto();
-  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces, loadActiveMoto]);
+    loadUnreadCount();
+  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces, loadActiveMoto, loadUnreadCount]);
 
   // Refresh theft alerts when returning from other screens (e.g. manual publication)
   useFocusEffect(
@@ -293,9 +306,16 @@ export default function HomeScreen() {
           />
           <Text style={[styles.brandName, { color: colors.headerTintColor }]}>Moto Tracker</Text>
         </View>
-        <TouchableOpacity style={styles.bellBtn}>
+        <TouchableOpacity 
+          style={styles.bellBtn}
+          onPress={() => router.push('/notifications')}
+        >
           <Ionicons name="notifications-outline" size={19} color={colors.headerTintColor} />
-          {hasAlerts && <View style={styles.bellDot} />}
+          {unreadNotifications > 0 && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.bellBadgeText}>{unreadNotifications > 9 ? '9+' : unreadNotifications}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -550,16 +570,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  bellDot: {
+  bellBadge: {
     position: 'absolute',
-    top: 7,
-    right: 7,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: '#E14336',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   container: { flex: 1 },
   content: { paddingBottom: 32 },

@@ -77,6 +77,11 @@ const translations = {
     selectMoto: 'Select your motorcycle',
     longPressToActivate: 'Long press to activate motorcycle',
     longPressForActions: 'Long press for actions',
+    // Notifications
+    notifications: 'Notifications',
+    markAllRead: 'Mark all read',
+    noNotifications: 'No notifications',
+    noNotificationsText: 'You will see alerts and responses here',
     // Motorcycles
     myMotorcycles: 'My Motorcycles',
     noMotorcycles: 'No motorcycles yet',
@@ -334,6 +339,11 @@ const translations = {
     selectMoto: 'Selecciona tu moto',
     longPressToActivate: 'Mantén presionado para activar moto',
     longPressForActions: 'Mantén presionado para acciones',
+    // Notifications
+    notifications: 'Notificaciones',
+    markAllRead: 'Marcar todo leído',
+    noNotifications: 'Sin notificaciones',
+    noNotificationsText: 'Verás alertas y respuestas aquí',
     // Motorcycles
     myMotorcycles: 'Mis Motos',
     noMotorcycles: 'Aún no hay motos',
