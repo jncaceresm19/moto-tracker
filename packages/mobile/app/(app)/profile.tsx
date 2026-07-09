@@ -215,7 +215,7 @@ export default function ProfileScreen() {
       {/* App Settings Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('appSettings')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'Notifications settings coming soon.', [{ text: 'OK' }], 'information-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => router.push('/profile/notifications')}>
           <View style={styles.rowLeft}>
             <Ionicons name="notifications-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('notifications')}</Text>
