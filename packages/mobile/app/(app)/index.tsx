@@ -485,7 +485,7 @@ export default function HomeScreen() {
               </ScrollView>
               {lastGasUpdate && (
                 <Text style={[styles.lastUpdateText, { color: colors.inkFaint }]}>
-                  Precios {lastGasUpdate}
+                  {lastGasUpdate}
                 </Text>
               )}
             </>
