@@ -144,6 +144,14 @@ export default function AppLayout() {
           headerLeft: () => <BackButton />,
         }}
       />
+      <Tabs.Screen
+        name="profile/notifications"
+        options={{
+          href: null,
+          title: t('notifications'),
+          headerLeft: () => <BackButton />,
+        }}
+      />
     </Tabs>
   );
 }
