@@ -71,7 +71,7 @@ export async function disableBiometric(): Promise<void> {
 // Reset biometric preference (for debugging/testing)
 export async function resetBiometricPreference(): Promise<void> {
   await AsyncStorage.removeItem(BIOMETRIC_ENABLED_KEY);
-  await AsyncStorage.removeItem(BIOMETRIC_PROMPTED_KEY);
+  // DO NOT remove BIOMETRIC_PROMPTED_KEY - user already answered the modal
 }
 
 // Authenticate with biometrics
