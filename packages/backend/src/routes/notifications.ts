@@ -1,10 +1,23 @@
 import { Router } from 'express';
-import { eq, desc, and, sql } from 'drizzle-orm';
+import { eq, desc, and, sql, lt } from 'drizzle-orm';
 import { db } from '../db';
 import { notifications, users } from '../db/schema';
 import { authenticate } from '../middleware/auth';
 
 const router = Router();
+
+// Auto-delete notifications older than 30 days
+async function cleanupOldNotifications() {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    await db.delete(notifications)
+      .where(lt(notifications.createdAt, thirtyDaysAgo));
+  } catch (error) {
+    console.error('Error cleaning old notifications:', error);
+  }
+}
 
 // Get user's notifications
 router.get('/', authenticate, async (req, res) => {
@@ -13,6 +26,9 @@ router.get('/', authenticate, async (req, res) => {
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    // Clean old notifications on each fetch
+    await cleanupOldNotifications();
 
     const userNotifications = await db
       .select({

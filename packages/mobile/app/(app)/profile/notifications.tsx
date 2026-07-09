@@ -57,12 +57,7 @@ export default function NotificationsScreen() {
         console.log('[NOTIFICATIONS] Error marking as read:', e?.message);
       }
     }
-
-    // Navigate based on type
-    if (notification.type === 'theft_alert' || notification.type === 'alert_response') {
-      // Could navigate to alert detail
-      router.back();
-    }
+    // No navigation - stay on notifications page
   };
 
   const getNotificationIcon = (type: string) => {
