@@ -18,7 +18,7 @@ import { shareToSpecificPlatform } from '../../src/services/shareService';
 import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
 import { PlaceCard } from '../../src/components/PlaceCard';
 import { ActiveMoto, getActiveMoto, activateMoto, deactivateMoto, formatActivationTime } from '../../src/services/activeMoto';
-import { isBiometricAvailable, hasBeenPrompted, markAsPrompted, enableBiometric } from '../../src/services/biometric';
+import { hasBiometricHardware, isBiometricEnrolled, hasBeenPrompted, markAsPrompted, enableBiometric } from '../../src/services/biometric';
 import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 import { reverseGeocode } from '../../src/services/geocoding';
 import { getUnreadCount } from '../../src/services/notificationService';
@@ -51,17 +51,27 @@ export default function HomeScreen() {
   }, []);
 
   const checkBiometricPrompt = async () => {
-    const available = await isBiometricAvailable();
+    const hardware = await hasBiometricHardware();
+    const enrolled = await isBiometricEnrolled();
     const prompted = await hasBeenPrompted();
-    setBiometricAvailable(available);
+    setBiometricAvailable(hardware);
     
-    if (available && !prompted) {
+    // Only show prompt if device has hardware AND user hasn't been prompted before
+    if (hardware && !prompted) {
       setBiometricPromptVisible(true);
     }
   };
 
   const handleBiometricResponse = async (enable: boolean) => {
     if (enable) {
+      // Check if device has enrolled biometrics before enabling
+      const enrolled = await isBiometricEnrolled();
+      if (!enrolled) {
+        // Can't enable yet - just mark as prompted
+        await markAsPrompted();
+        setBiometricPromptVisible(false);
+        return;
+      }
       await enableBiometric();
     }
     await markAsPrompted();
