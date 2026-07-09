@@ -43,17 +43,20 @@ export default function ProfileScreen() {
   const loadBiometricStatus = async () => {
     const available = await hasBiometricHardware();
     const enabled = await isBiometricEnabled();
+    console.log('[BIOMETRIC] Hardware:', available, '| Enabled:', enabled);
     setBiometricAvailable(available);
     setBiometricEnabled(enabled);
   };
 
   const toggleBiometric = async () => {
+    console.log('[BIOMETRIC] Toggle pressed, current state:', biometricEnabled);
     if (biometricEnabled) {
       await disableBiometric();
       setBiometricEnabled(false);
     } else {
       // Check if device has biometric hardware
       const hasHardware = await hasBiometricHardware();
+      console.log('[BIOMETRIC] Has hardware:', hasHardware);
       if (!hasHardware) {
         showAlert(t('error'), t('noBiometricHardware'), [{ text: 'OK' }], 'finger-print', '#FF3B30');
         return;
@@ -61,6 +64,7 @@ export default function ProfileScreen() {
       
       // Check if user has enrolled biometrics
       const enrolled = await isBiometricEnrolled();
+      console.log('[BIOMETRIC] Enrolled:', enrolled);
       if (!enrolled) {
         // Show option to open device settings
         showAlert(
