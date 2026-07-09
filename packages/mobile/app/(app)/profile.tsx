@@ -41,7 +41,7 @@ export default function ProfileScreen() {
   }, []);
 
   const loadBiometricStatus = async () => {
-    const available = await isBiometricAvailable();
+    const available = await hasBiometricHardware();
     const enabled = await isBiometricEnabled();
     setBiometricAvailable(available);
     setBiometricEnabled(enabled);
