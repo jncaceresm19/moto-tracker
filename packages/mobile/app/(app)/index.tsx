@@ -171,6 +171,10 @@ export default function HomeScreen() {
     loadNearbyPlaces();
     loadActiveMoto();
     loadUnreadCount();
+
+    // Poll for new notifications every 30 seconds
+    const notificationInterval = setInterval(loadUnreadCount, 30 * 1000);
+    return () => clearInterval(notificationInterval);
   }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces, loadActiveMoto, loadUnreadCount]);
 
   // Refresh theft alerts when returning from other screens (e.g. manual publication)
