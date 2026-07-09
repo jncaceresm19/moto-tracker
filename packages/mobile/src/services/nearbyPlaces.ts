@@ -8,9 +8,7 @@ export interface NearbyPlace {
   longitude: number;
   address: string;
   distance: number;
-  phone?: string;
-  rating?: number;
-  openNow?: boolean;
+  // phone, rating, openNow removed to stay in free tier
 }
 
 const API_URL = 'http://192.168.100.9:3001';
@@ -184,9 +182,7 @@ export async function getNearbyPlaces(
           longitude: placeLon,
           address: r.vicinity || '',
           distance: dist,
-          phone: r.international_phone || r.formatted_phone_number || undefined,
-          rating: r.rating || undefined,
-          openNow: r.opening_hours?.open_now || undefined,
+          // phone and rating removed to stay in free tier
         });
       }
     }

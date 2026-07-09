@@ -32,24 +32,6 @@ export function PlaceCard({ place }: PlaceCardProps) {
       {/* Name */}
       <Text style={[styles.name, { color: colors.ink }]} numberOfLines={1}>{place.name}</Text>
 
-      {/* Rating + Open status */}
-      <View style={styles.metaRow}>
-        {place.rating ? (
-          <View style={styles.metaItem}>
-            <Ionicons name="star" size={12} color="#F59E0B" />
-            <Text style={[styles.metaText, { color: colors.inkFaint }]}>{place.rating}</Text>
-          </View>
-        ) : null}
-        {place.openNow !== undefined ? (
-          <View style={styles.metaItem}>
-            <View style={[styles.dot, { backgroundColor: place.openNow ? '#22C55E' : '#EF4444' }]} />
-            <Text style={[styles.metaText, { color: place.openNow ? '#22C55E' : '#EF4444' }]}>
-              {place.openNow ? 'Abierto' : 'Cerrado'}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
       {/* Address */}
       {place.address ? (
         <View style={styles.infoRow}>
