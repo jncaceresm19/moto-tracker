@@ -10,7 +10,7 @@ import { useLanguage } from '../../src/language-context';
 import { changePassword, updateProfile } from '../../src/api';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
-import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric } from '../../src/services/biometric';
+import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric, resetBiometricPreference } from '../../src/services/biometric';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -323,7 +323,14 @@ export default function ProfileScreen() {
         </View>
 
         {biometricAvailable && (
-          <View style={dynamicStyles.row}>
+          <TouchableOpacity 
+            style={dynamicStyles.row}
+            onLongPress={async () => {
+              await resetBiometricPreference();
+              await loadBiometricStatus();
+              showAlert('Debug', 'Biometric preference reset', [{ text: 'OK' }], 'information-circle', '#007AFF');
+            }}
+          >
             <View style={styles.rowLeft}>
               <Ionicons name="finger-print-outline" size={20} color={colors.text} />
               <Text style={dynamicStyles.rowText}>{t('biometric')}</Text>
@@ -334,7 +341,7 @@ export default function ProfileScreen() {
               trackColor={{ false: colors.inputBorder, true: colors.primary }}
               thumbColor={colors.surface}
             />
-          </View>
+          </TouchableOpacity>
         )}
       </View>
 
