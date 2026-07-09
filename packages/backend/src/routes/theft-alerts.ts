@@ -106,7 +106,8 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
       type: 'theft_alert',
       title: 'Alerta de robo',
       message: `${motorcycle.brand} ${motorcycle.model} (${motorcycle.licensePlate}) fue reportada como robada`,
-    }).catch(err => console.error('Error sending notifications:', err));
+    }).then(count => console.log(`[NOTIFICATIONS] Sent ${count} notifications for theft alert`))
+      .catch(err => console.error('[NOTIFICATIONS] Error sending notifications:', err));
 
     res.status(201).json({
       success: true,

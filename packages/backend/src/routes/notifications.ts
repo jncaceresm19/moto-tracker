@@ -128,7 +128,7 @@ export async function createNotification(data: {
   return created;
 }
 
-// Notify all users except sender
+// Notify all users including sender
 export async function notifyAllUsers(
   senderUserId: string,
   data: {
@@ -138,23 +138,21 @@ export async function notifyAllUsers(
     message: string;
   }
 ) {
-  // Get all users except sender
+  // Get all users
   const allUsers = await db
     .select({ id: users.id })
     .from(users);
 
-  const notificationsToCreate = allUsers
-    .filter(u => u.id !== senderUserId)
-    .map(u => ({
-      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      userId: u.id,
-      motorcycleId: data.motorcycleId || null,
-      type: data.type,
-      title: data.title,
-      message: data.message,
-      isRead: false,
-      createdAt: new Date(),
-    }));
+  const notificationsToCreate = allUsers.map(u => ({
+    id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    userId: u.id,
+    motorcycleId: data.motorcycleId || null,
+    type: data.type,
+    title: data.title,
+    message: data.message,
+    isRead: false,
+    createdAt: new Date(),
+  }));
 
   if (notificationsToCreate.length > 0) {
     await db.insert(notifications).values(notificationsToCreate);
