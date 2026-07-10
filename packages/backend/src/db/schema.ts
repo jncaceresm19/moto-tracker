@@ -9,6 +9,9 @@ export const users = sqliteTable('users', {
   phone: text('phone'),
   googleId: text('google_id').unique(),
   avatarUrl: text('avatar_url'),
+  pushToken: text('push_token'),
+  lastLatitude: real('last_latitude'),
+  lastLongitude: real('last_longitude'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -124,6 +127,7 @@ export const notifications = sqliteTable('notifications', {
   title: text('title').notNull(),
   message: text('message').notNull(),
   isRead: integer('is_read', { mode: 'boolean' }).default(false),
+  showAt: integer('show_at', { mode: 'timestamp' }), // when to show (null = immediately)
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
@@ -139,6 +143,7 @@ export const theftAlerts = sqliteTable('theft_alerts', {
   lastLatitude: real('last_latitude'), // nullable for manual publications without GPS
   lastLongitude: real('last_longitude'), // nullable for manual publications without GPS
   lastLocationName: text('last_location_name'),
+  notes: text('notes'),
   status: text('status').notNull().default('active'), // 'active', 'closed', 'recovered'
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   closedAt: integer('closed_at', { mode: 'timestamp' }),

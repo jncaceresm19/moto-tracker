@@ -20,6 +20,7 @@ const createTheftAlertSchema = z.object({
   lastLatitude: z.number().min(-90).max(90).optional(),
   lastLongitude: z.number().min(-180).max(180).optional(),
   lastLocationName: z.string().max(200).optional(),
+  notes: z.string().max(500).optional(),
 });
 
 const respondSchema = z.object({
@@ -38,7 +39,7 @@ const alertIdParam = z.object({
 router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { motorcycleId, lastLatitude, lastLongitude, lastLocationName } = req.body;
+    const { motorcycleId, lastLatitude, lastLongitude, lastLocationName, notes } = req.body;
 
     // For manual publications without GPS, use null coordinates
     const latitude = lastLatitude ?? null;
@@ -90,6 +91,7 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
       lastLatitude: latitude,
       lastLongitude: longitude,
       lastLocationName: lastLocationName ?? null,
+      notes: notes ?? null,
       status: 'active',
       createdAt: now,
     });
@@ -100,12 +102,14 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
       .where(eq(theftAlerts.id, alertId))
       .get();
 
-    // Notify all users about new theft alert
+    // Notify nearby users about new theft alert
     notifyAllUsers(userId, {
       motorcycleId,
       type: 'theft_alert',
       title: 'Alerta de robo',
       message: `${motorcycle.brand} ${motorcycle.model} (${motorcycle.licensePlate}) fue reportada como robada`,
+      latitude: latitude ?? undefined,
+      longitude: longitude ?? undefined,
     }).then(count => console.log(`[NOTIFICATIONS] Sent ${count} notifications for theft alert`))
       .catch(err => console.error('[NOTIFICATIONS] Error sending notifications:', err));
 
@@ -142,6 +146,7 @@ router.get('/', async (req: Request, res: Response) => {
         lastLatitude: theftAlerts.lastLatitude,
         lastLongitude: theftAlerts.lastLongitude,
         lastLocationName: theftAlerts.lastLocationName,
+        notes: theftAlerts.notes,
         status: theftAlerts.status,
         createdAt: theftAlerts.createdAt,
         closedAt: theftAlerts.closedAt,
@@ -381,13 +386,15 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
       .where(eq(theftAlerts.id, id))
       .get();
 
-    // Notify all users when motorcycle is recovered
+    // Notify nearby users when motorcycle is recovered
     if (status === 'recovered') {
       notifyAllUsers(userId, {
         motorcycleId: alert.motorcycleId,
         type: 'theft_recovered',
         title: 'Moto recuperada',
         message: `${alert.brand} ${alert.model} (${alert.licensePlate}) fue recuperada`,
+        latitude: alert.lastLatitude ?? undefined,
+        longitude: alert.lastLongitude ?? undefined,
       }).catch(err => console.error('Error sending notifications:', err));
     }
 

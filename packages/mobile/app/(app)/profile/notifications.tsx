@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -60,6 +60,19 @@ export default function NotificationsScreen() {
     // No navigation - stay on notifications page
   };
 
+  const formatTime = (date: Date): string => {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (minutes < 1) return 'ahora';
+    if (minutes < 60) return `hace ${minutes}m`;
+    if (hours < 24) return `hace ${hours}h`;
+    return `hace ${days}d`;
+  };
+
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'theft_alert':
@@ -68,6 +81,8 @@ export default function NotificationsScreen() {
         return 'chatbubble';
       case 'theft_recovered':
         return 'checkmark-circle';
+      case 'document_expiring':
+        return 'document-text';
       default:
         return 'notifications';
     }
@@ -81,22 +96,11 @@ export default function NotificationsScreen() {
         return '#3B82F6';
       case 'theft_recovered':
         return '#22C55E';
+      case 'document_expiring':
+        return '#F59E0B';
       default:
         return colors.inkFaint;
     }
-  };
-
-  const formatTime = (date: Date): string => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (minutes < 1) return 'ahora';
-    if (minutes < 60) return `hace ${minutes}m`;
-    if (hours < 24) return `hace ${hours}h`;
-    return `hace ${days}d`;
   };
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -142,17 +146,28 @@ export default function NotificationsScreen() {
               ]}
               onPress={() => handleNotificationPress(item)}
             >
-              <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
-                <Ionicons
-                  name={getNotificationIcon(item.type) as any}
-                  size={20}
-                  color={getNotificationColor(item.type)}
-                />
-              </View>
+              {/* Avatar for comments, icon for theft/recovery */}
+              {item.type === 'alert_response' && item.senderAvatar ? (
+                <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
+              ) : item.type === 'alert_response' ? (
+                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.avatarText}>
+                    {item.senderName ? item.senderName.charAt(0).toUpperCase() : '?'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
+                  <Ionicons
+                    name={getNotificationIcon(item.type) as any}
+                    size={20}
+                    color={getNotificationColor(item.type)}
+                  />
+                </View>
+              )}
               <View style={styles.notificationContent}>
                 <View style={styles.notificationHeader}>
                   <Text style={[styles.notificationTitle, { color: colors.ink }]} numberOfLines={1}>
-                    {item.title}
+                    {item.senderName || item.title}
                   </Text>
                   <Text style={[styles.notificationTime, { color: colors.inkFaint }]}>
                     {formatTime(item.createdAt)}
@@ -198,10 +213,25 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
   },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
+  },
+  avatarPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,

@@ -435,30 +435,6 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
-            <TouchableOpacity 
-              style={[styles.testBtn, { backgroundColor: colors.alertRed }]}
-              onPress={() => {
-                const moto = defaultMoto;
-                const fakeAlert: TheftAlert = {
-                  id: `test-${Date.now()}`,
-                  motorcycleId: moto?.id || '',
-                  brand: moto?.brand || 'Honda',
-                  model: moto?.model || 'CB 500F',
-                  licensePlate: moto?.licensePlate || 'AB-12-34',
-                  lastLocationName: 'Av. Providencia 1234, Santiago',
-                  lastLatitude: -33.4489,
-                  lastLongitude: -70.6693,
-                  createdAt: new Date(),
-                  status: 'active',
-                  userId: user?.id || '',
-                  photoUrl: moto?.imageUrl || undefined,
-                };
-                setTheftAlerts(prev => [fakeAlert, ...prev]);
-              }}
-            >
-              <Ionicons name="add-circle-outline" size={14} color="#fff" />
-              <Text style={styles.testBtnText}>Simular</Text>
-            </TouchableOpacity>
           </View>
           {hasAlerts ? (
             theftAlerts.length === 1 ? (
@@ -468,6 +444,7 @@ export default function HomeScreen() {
                 metadata={theftAlerts[0].lastLocationName || 'Ubicación desconocida'}
                 timeAgo={formatTimeAgo(theftAlerts[0].createdAt)}
                 photoUrl={theftAlerts[0].photoUrl}
+                notes={theftAlerts[0].notes}
                 status={theftAlerts[0].status as 'active' | 'recovered' | 'closed'}
                 recoveredAt={theftAlerts[0].recoveredAt}
                 alertOwnerId={theftAlerts[0].userId}
@@ -506,6 +483,7 @@ export default function HomeScreen() {
                       metadata={alert.lastLocationName || 'Ubicación desconocida'}
                       timeAgo={formatTimeAgo(alert.createdAt)}
                       photoUrl={alert.photoUrl}
+                      notes={alert.notes}
                       status={alert.status as 'active' | 'recovered' | 'closed'}
                       recoveredAt={alert.recoveredAt}
                       alertOwnerId={alert.userId}
@@ -697,8 +675,7 @@ const styles = StyleSheet.create({
   section: { marginTop: 24, paddingHorizontal: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 15, fontWeight: '700' },
-  testBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  testBtnText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 24, alignItems: 'center' },
   emptyCardIcon: { fontSize: 32, marginBottom: 10 },
   emptyCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },

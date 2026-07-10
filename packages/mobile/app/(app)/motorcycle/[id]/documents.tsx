@@ -5,7 +5,6 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
@@ -156,13 +155,10 @@ export default function DocumentsScreen() {
       const manipulated = await ImageManipulator.manipulateAsync(
         result.assets[0].uri,
         [{ resize: { width: 1200 } }],
-        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
-      const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      if (base64) {
-        const dataUri = `data:image/jpeg;base64,${base64}`;
+      if (manipulated.base64) {
+        const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
         if (photoSide === 'back') {
           setForm((p) => ({ ...p, fileUrlBack: dataUri }));
         } else {

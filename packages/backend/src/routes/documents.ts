@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { documents, motorcycles } from '../db/schema';
+import { documents, motorcycles, notifications } from '../db/schema';
 import { authenticate } from '../middleware/auth';
 import { validateBody, validateParams } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
+import { createNotification } from './notifications';
 
 const router = Router({ mergeParams: true });
 
@@ -75,6 +76,38 @@ function getDocId(req: Request): string {
   return (req.params as unknown as DocumentParams).docId!;
 }
 
+// Create scheduled notifications for document expiry (30, 14, 1 day before)
+async function scheduleExpiryNotifications(
+  userId: string,
+  motorcycleId: string,
+  documentTitle: string,
+  expiryDate: Date
+) {
+  const now = new Date();
+  const intervals = [
+    { days: 30, label: '30 días' },
+    { days: 14, label: '2 semanas' },
+    { days: 1, label: '1 día' },
+  ];
+
+  for (const interval of intervals) {
+    const showAt = new Date(expiryDate);
+    showAt.setDate(showAt.getDate() - interval.days);
+
+    // Only create if showAt is in the future
+    if (showAt > now) {
+      await createNotification({
+        userId,
+        motorcycleId,
+        type: 'document_expiring',
+        title: `Documento vence en ${interval.label}`,
+        message: `"${documentTitle}" vence el ${expiryDate.toLocaleDateString('es-CL')}. ¡No olvides renovarlo!`,
+        showAt,
+      });
+    }
+  }
+}
+
 // --- POST /api/motorcycles/:id/documents ---
 router.post('/', validateBody(createDocumentSchema), async (req: Request, res: Response) => {
   try {
@@ -114,6 +147,11 @@ router.post('/', validateBody(createDocumentSchema), async (req: Request, res: R
       createdAt: now,
       updatedAt: now,
     });
+
+    // Schedule expiry notifications if expiryDate is set
+    if (expiryDate) {
+      await scheduleExpiryNotifications(userId, motorcycleId, title, new Date(expiryDate));
+    }
 
     const created = await db
       .select()
@@ -277,6 +315,27 @@ router.put('/:docId', validateParams(docIdParam), validateBody(updateDocumentSch
       .set(updates)
       .where(eq(documents.id, docId));
 
+    // Handle expiry notifications if expiryDate changed
+    if (req.body.expiryDate !== undefined) {
+      // Delete old scheduled notifications for this document
+      await db
+        .delete(notifications)
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.motorcycleId, motorcycleId),
+            eq(notifications.type, 'document_expiring'),
+            sql`${notifications.title} LIKE ${'%' + existing.title + '%'}`
+          )
+        );
+
+      // Create new notifications if expiryDate is set
+      if (req.body.expiryDate) {
+        const docTitle = req.body.title || existing.title;
+        await scheduleExpiryNotifications(userId, motorcycleId, docTitle, new Date(req.body.expiryDate));
+      }
+    }
+
     const updated = await db
       .select()
       .from(documents)
@@ -331,6 +390,18 @@ router.delete('/:docId', validateParams(docIdParam), async (req: Request, res: R
       res.status(404).json(error);
       return;
     }
+
+    // Delete scheduled notifications for this document
+    await db
+      .delete(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.motorcycleId, motorcycleId),
+          eq(notifications.type, 'document_expiring'),
+          sql`${notifications.title} LIKE ${'%' + existing.title + '%'}`
+        )
+      );
 
     await db.delete(documents).where(eq(documents.id, docId));
 

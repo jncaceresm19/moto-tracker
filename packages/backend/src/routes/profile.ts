@@ -105,4 +105,27 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
   }
 });
 
+// --- PUT /api/profile/location ---
+router.put('/location', authenticate, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { latitude, longitude } = req.body;
+
+    if (latitude == null || longitude == null) {
+      res.status(400).json({ error: 'Latitude and longitude are required' });
+      return;
+    }
+
+    await db
+      .update(users)
+      .set({ lastLatitude: latitude, lastLongitude: longitude })
+      .where(eq(users.id, userId));
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update location error:', err);
+    res.status(500).json({ error: 'Failed to update location' });
+  }
+});
+
 export default router;

@@ -17,6 +17,7 @@ interface TheftAlertCardProps {
   metadata: string;
   timeAgo: string;
   photoUrl?: string;
+  notes?: string;
   status?: 'active' | 'recovered' | 'closed';
   recoveredAt?: Date | null;
   alertOwnerId?: string;
@@ -32,6 +33,7 @@ export function TheftAlertCard({
   metadata,
   timeAgo,
   photoUrl,
+  notes,
   status = 'active',
   recoveredAt,
   alertOwnerId,
@@ -47,8 +49,8 @@ export function TheftAlertCard({
   const [showComments, setShowComments] = useState(false);
 
   const isOwner = user && alertOwnerId && user.id === alertOwnerId;
-  // Card is green if recoveredAt is set (stays green until end of day)
-  const isRecovered = !!recoveredAt;
+  // Card is green ONLY when status is 'recovered' (stays green until end of day)
+  const isRecovered = status === 'recovered' && !!recoveredAt;
 
   const handleSubmitComment = () => {
     if (commentText.trim() && onComment) {
@@ -116,6 +118,9 @@ export function TheftAlertCard({
       {/* Content */}
       <Text style={[styles.title, { color: colors.ink }]}>{title}</Text>
       <Text style={[styles.metadata, { color: colors.inkFaint }]}>{metadata}</Text>
+      {notes ? (
+        <Text style={[styles.notes, { color: colors.inkSoft }]}>{notes}</Text>
+      ) : null}
       <Text style={[styles.time, { color: colors.inkFaint }]}>{timeAgo}</Text>
 
       {/* Action row: share + comments */}
@@ -227,6 +232,7 @@ const styles = StyleSheet.create({
   photo: { width: '100%', height: 180, marginTop: 10 },
   title: { fontSize: 16, fontWeight: '700', marginHorizontal: 14, marginTop: 10 },
   metadata: { fontSize: 13, marginHorizontal: 14, marginTop: 4 },
+  notes: { fontSize: 13, marginHorizontal: 14, marginTop: 6, fontStyle: 'italic' },
   time: { fontSize: 12, marginHorizontal: 14, marginTop: 2, fontStyle: 'italic' },
   actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, marginTop: 10 },
   actionBtn: { padding: 8, position: 'relative' },
