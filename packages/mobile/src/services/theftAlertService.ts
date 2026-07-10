@@ -11,6 +11,7 @@ export interface TheftAlert {
   lastLatitude: number;
   lastLongitude: number;
   lastLocationName?: string;
+  notes?: string;
   status: 'active' | 'closed' | 'recovered';
   createdAt: Date;
   closedAt?: Date;
@@ -51,6 +52,7 @@ export async function createManualPublication(data: {
   lastLatitude?: number;
   lastLongitude?: number;
   lastLocationName?: string;
+  notes?: string;
 }): Promise<TheftAlert> {
   return api<TheftAlert>('/api/theft-alerts', {
     method: 'POST',

@@ -43,9 +43,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const profile = await getProfile();
-      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl, email: profile.email } : prev);
-    } catch {
-      // Keep current user data
+      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, email: profile.email } : prev);
+    } catch (e: any) {
+      if (e?.message === 'SESSION_EXPIRED') {
+        await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+        setUser(null);
+      }
+      // Keep current user data for other errors
     }
   };
 
@@ -59,12 +63,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Fetch full profile in background
           try {
             const profile = await getProfile();
-              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl });
-          } catch {
-            // Keep decoded token data
+              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl });
+          } catch (e: any) {
+            if (e?.message === 'SESSION_EXPIRED') {
+              await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+              setUser(null);
+            }
+            // Keep decoded token data for other errors
           }
         } else {
-          await AsyncStorage.removeItem('accessToken');
+          await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
         }
       }
       setIsLoading(false);

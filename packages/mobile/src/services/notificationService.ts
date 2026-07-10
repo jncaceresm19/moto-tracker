@@ -9,6 +9,8 @@ export interface Notification {
   message: string;
   isRead: boolean;
   createdAt: Date;
+  senderName?: string;
+  senderAvatar?: string;
 }
 
 // Get user's notifications

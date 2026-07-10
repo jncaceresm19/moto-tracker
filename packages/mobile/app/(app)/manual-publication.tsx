@@ -133,6 +133,7 @@ export default function ManualPublicationScreen() {
             await createManualPublication({
               motorcycleId: selectedMoto.id,
               lastLocationName: locationName || undefined,
+              notes: notes || undefined,
             });
 
             setAlertTitle(t('success'));
@@ -142,6 +143,7 @@ export default function ManualPublicationScreen() {
                 text: 'OK',
                 onPress: () => {
                   resetForm();
+                  router.replace('/(app)');
                 },
               },
             ]);

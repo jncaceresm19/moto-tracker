@@ -48,6 +48,16 @@ export async function markAsPrompted(): Promise<void> {
   await AsyncStorage.setItem(BIOMETRIC_PROMPTED_KEY, 'true');
 }
 
+// Check if user has answered the biometric prompt (has a stored preference)
+export async function hasBiometricPreference(): Promise<boolean> {
+  try {
+    const pref = await AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY);
+    return pref !== null; // null means never asked
+  } catch {
+    return false;
+  }
+}
+
 // Check if user enabled biometrics
 export async function isBiometricEnabled(): Promise<boolean> {
   try {

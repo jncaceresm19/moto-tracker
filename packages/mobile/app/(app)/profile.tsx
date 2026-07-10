@@ -130,7 +130,7 @@ export default function ProfileScreen() {
       setShowChangePassword(false);
       setPasswords({ current: '', newPass: '', confirm: '' });
     } catch (e: any) {
-      showAlert(t('error'), e?.message || 'Failed to change password', [{ text: 'OK' }], 'close-circle', '#FF3B30');
+      showAlert(t('error'), e?.message || t('failedToChangePassword'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -167,7 +167,7 @@ export default function ProfileScreen() {
       showAlert(t('success'), t('profileUpdated'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
       setShowEditProfile(false);
     } catch (e: any) {
-      showAlert(t('error'), e?.message || 'Failed to update profile', [{ text: 'OK' }], 'close-circle', '#FF3B30');
+      showAlert(t('error'), e?.message || t('failedToUpdateProfile'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setSavingProfile(false);
     }
@@ -339,7 +339,7 @@ export default function ProfileScreen() {
             onLongPress={async () => {
               await resetBiometricPreference();
               await loadBiometricStatus();
-              showAlert('Debug', 'Biometric preference reset', [{ text: 'OK' }], 'information-circle', '#007AFF');
+              showAlert('Debug', t('debugBiometricReset'), [{ text: 'OK' }], 'information-circle', '#007AFF');
             }}
           >
             <View style={styles.rowLeft}>
@@ -375,7 +375,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert('Coming Soon', 'App tutorial coming soon.', [{ text: 'OK' }], 'information-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} onPress={() => showAlert(t('comingSoon'), t('appTutorialComingSoon'), [{ text: 'OK' }], 'information-circle', '#007AFF')}>
           <View style={styles.rowLeft}>
             <Ionicons name="play-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('appTutorial')}</Text>

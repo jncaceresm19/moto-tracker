@@ -18,17 +18,81 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return headers;
 }
 
+// Refresh token helper
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = await AsyncStorage.getItem('refreshToken');
+  if (!refreshToken) throw new Error('No refresh token');
+
+  const res = await fetch(`${API_URL}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken }),
+  });
+
+  if (!res.ok) {
+    // Refresh token also expired → force logout
+    await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+    throw new Error('Session expired');
+  }
+
+  const data = await res.json();
+  const tokens = data.data || data;
+  await AsyncStorage.setItem('accessToken', tokens.accessToken);
+  await AsyncStorage.setItem('refreshToken', tokens.refreshToken);
+  return tokens.accessToken;
+}
+
 export async function api<T = unknown>(
   path: string,
   { method = 'GET', body }: ApiOptions = {}
 ): Promise<T> {
   const headers = await getAuthHeaders();
 
-  const res = await fetch(`${API_URL}${path}`, {
+  let res = await fetch(`${API_URL}${path}`, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  // If 401, try refresh token
+  if (res.status === 401) {
+    const refreshToken = await AsyncStorage.getItem('refreshToken');
+    if (!refreshToken) {
+      // No refresh token stored → user logged in with old code, force re-login
+      await AsyncStorage.removeItem('accessToken');
+      throw new Error('SESSION_EXPIRED');
+    }
+
+    try {
+      // Deduplicate concurrent refresh calls
+      if (!isRefreshing) {
+        isRefreshing = true;
+        refreshPromise = refreshAccessToken();
+      }
+      const newToken = await refreshPromise!;
+      isRefreshing = false;
+      refreshPromise = null;
+
+      // Retry original request with new token
+      headers.Authorization = `Bearer ${newToken}`;
+      res = await fetch(`${API_URL}${path}`, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+    } catch (refreshError) {
+      isRefreshing = false;
+      refreshPromise = null;
+      // If refresh failed with SESSION_EXPIRED, propagate it
+      if (refreshError instanceof Error && refreshError.message === 'Session expired') {
+        throw new Error('SESSION_EXPIRED');
+      }
+      throw new Error('SESSION_EXPIRED');
+    }
+  }
 
   const data = await res.json();
 
@@ -41,25 +105,28 @@ export async function api<T = unknown>(
 
 // Auth
 export async function login(email: string, password: string) {
-  const data = await api<{ user: { id: string; email: string }; accessToken: string }>(
+  const data = await api<{ user: { id: string; email: string }; accessToken: string; refreshToken: string }>(
     '/api/auth/login',
     { method: 'POST', body: { email, password } }
   );
   await AsyncStorage.setItem('accessToken', data.accessToken);
+  await AsyncStorage.setItem('refreshToken', data.refreshToken);
   return data;
 }
 
 export async function register(email: string, password: string, name: string, phone?: string) {
-  const data = await api<{ user: { id: string; email: string }; accessToken: string }>(
+  const data = await api<{ user: { id: string; email: string }; accessToken: string; refreshToken: string }>(
     '/api/auth/register',
     { method: 'POST', body: { email, password, name, phone } }
   );
   await AsyncStorage.setItem('accessToken', data.accessToken);
+  await AsyncStorage.setItem('refreshToken', data.refreshToken);
   return data;
 }
 
 export async function logout() {
   await AsyncStorage.removeItem('accessToken');
+  await AsyncStorage.removeItem('refreshToken');
 }
 
 export async function changePassword(currentPassword: string, newPassword: string) {

@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { users } from '../db/schema';
-import { signTokens, authenticate } from '../middleware/auth';
+import { signTokens, authenticate, JWT_SECRET } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
 
@@ -238,6 +239,49 @@ router.post('/change-password', authenticate, validateBody(changePasswordSchema)
   } catch (err) {
     console.error('Change password error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to change password');
+    res.status(500).json(error);
+  }
+});
+
+// --- POST /api/auth/refresh ---
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      const error = createErrorResponse('UNAUTHORIZED', 'Refresh token required');
+      res.status(401).json(error);
+      return;
+    }
+
+    // Verify refresh token
+    let payload;
+    try {
+      payload = jwt.verify(refreshToken, JWT_SECRET) as { userId: string; email: string };
+    } catch {
+      const error = createErrorResponse('UNAUTHORIZED', 'Invalid or expired refresh token');
+      res.status(401).json(error);
+      return;
+    }
+
+    // Check user still exists
+    const user = await db.select().from(users).where(eq(users.id, payload.userId)).get();
+    if (!user) {
+      const error = createErrorResponse('UNAUTHORIZED', 'User not found');
+      res.status(401).json(error);
+      return;
+    }
+
+    // Generate new tokens
+    const tokens = signTokens({ userId: user.id, email: user.email });
+
+    res.json({
+      success: true,
+      data: tokens,
+    });
+  } catch (err) {
+    console.error('Refresh token error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to refresh token');
     res.status(500).json(error);
   }
 });

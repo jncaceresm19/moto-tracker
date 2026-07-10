@@ -70,7 +70,7 @@ export default function MotorcycleListScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showAlert('Permission needed', `Please grant ${fromCamera ? 'camera' : 'gallery'} permission.`, [{text: 'OK'}], 'lock-closed', '#FF9500');
+      showAlert(t('permissionNeeded'), fromCamera ? t('permissionCamera') : t('permissionGallery'), [{text: 'OK'}], 'lock-closed', '#FF9500');
       return;
     }
 
@@ -126,17 +126,17 @@ export default function MotorcycleListScreen() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    showAlert('Delete', `Delete ${name}?`, [
-      { text: 'Cancel', style: 'cancel' },
+    showAlert(t('deleteMoto'), t('deleteMotoConfirm'), [
+      { text: t('cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             await deleteMotorcycle(id);
             setMotorcycles((prev) => prev.filter((m) => m.id !== id));
           } catch {
-            showAlert('Error', 'Failed to delete', [{text: 'OK'}], 'close-circle', '#FF3B30');
+            showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30');
           }
         },
       },

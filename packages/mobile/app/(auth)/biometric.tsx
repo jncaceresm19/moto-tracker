@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
@@ -19,6 +19,7 @@ export default function BiometricLockScreen({ onSuccess }: Props) {
   const [attempts, setAttempts] = useState(0);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [authSuccess, setAuthSuccess] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -36,10 +37,14 @@ export default function BiometricLockScreen({ onSuccess }: Props) {
       const result = await authenticateWithBiometrics();
 
       if (result) {
-        if (onSuccess) {
-          onSuccess();
-        }
-        router.replace('/(app)');
+        setAuthSuccess(true);
+        // Small delay so user sees the loader before navigating
+        setTimeout(() => {
+          if (onSuccess) {
+            onSuccess();
+          }
+          router.replace('/(app)');
+        }, 800);
       } else {
         const newAttempts = attempts + 1;
         setAttempts(newAttempts);
@@ -56,35 +61,44 @@ export default function BiometricLockScreen({ onSuccess }: Props) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.primary }]}>
-      <View style={styles.iconContainer}>
-        <Ionicons name="finger-print" size={80} color="#FFFFFF" />
+      {/* Logo from login */}
+      <View style={styles.brandBlock}>
+        <Image
+          source={require('../../assets/icon.png')}
+          style={styles.icon}
+          resizeMode="contain"
+        />
       </View>
 
-      <Text style={[styles.title, { color: '#FFFFFF' }]}>
-        {t('biometricLockTitle')}
-      </Text>
+      {/* Fingerprint area */}
+      <View style={styles.fingerprintArea}>
+        {authSuccess ? (
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={64} color="#FFFFFF" />
+          </View>
+        ) : loading ? (
+          <ActivityIndicator size="large" color="#FFFFFF" style={styles.fingerprintLoader} />
+        ) : (
+          <TouchableOpacity
+            style={[styles.fingerprintButton, { borderColor: '#FFFFFF' }]}
+            onPress={attemptAuth}
+          >
+            <Ionicons name="finger-print" size={56} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
 
-      <Text style={[styles.subtitle, { color: '#FFFFFFCC' }]}>
-        {t('biometricLockSubtitle')}
-      </Text>
+        {!authSuccess && !loading && (
+          <Text style={[styles.subtitle, { color: '#FFFFFFCC' }]}>
+            {t('biometricLockSubtitle')}
+          </Text>
+        )}
 
-      {error && (
-        <Text style={[styles.error, { color: '#FFFFFFCC' }]}>
-          {t('biometricFailed')} ({attempts}/{MAX_ATTEMPTS})
-        </Text>
-      )}
-
-      {loading ? (
-        <ActivityIndicator size="large" color="#FFFFFF" style={styles.loader} />
-      ) : (
-        <TouchableOpacity
-          style={[styles.retryButton, { backgroundColor: '#FFFFFF20' }]}
-          onPress={attemptAuth}
-        >
-          <Ionicons name="finger-print" size={24} color="#fff" />
-          <Text style={styles.retryText}>{t('biometricLockRetry')}</Text>
-        </TouchableOpacity>
-      )}
+        {error && !authSuccess && (
+          <Text style={[styles.error, { color: '#FFFFFFCC' }]}>
+            {t('biometricFailed')} ({attempts}/{MAX_ATTEMPTS})
+          </Text>
+        )}
+      </View>
     </View>
   );
 }
@@ -96,40 +110,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
-  iconContainer: {
-    marginBottom: 32,
+  brandBlock: {
+    alignItems: 'center',
+    marginBottom: 48,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 8,
+  icon: {
+    width: 100,
+    height: 100,
+  },
+  fingerprintArea: {
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  fingerprintButton: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  fingerprintLoader: {
+    width: 110,
+    height: 110,
+    marginBottom: 20,
+  },
+  successContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 12,
   },
   error: {
     fontSize: 14,
     textAlign: 'center',
-    marginBottom: 16,
+    marginTop: 8,
   },
   loader: {
-    marginTop: 24,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 24,
-  },
-  retryText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    marginTop: 12,
   },
 });

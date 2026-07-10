@@ -42,6 +42,13 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Moto Tracker to use your location to track your motorcycle."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1B75BC"
+        }
       ]
     ]
   }
