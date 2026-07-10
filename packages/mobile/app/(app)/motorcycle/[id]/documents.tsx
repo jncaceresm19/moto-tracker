@@ -430,21 +430,11 @@ export default function DocumentsScreen() {
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Header: back + edit + delete (only if doc exists) */}
-        <View style={[styles.detailHeader, { paddingHorizontal: 16 }]}>
+        {/* Back button only */}
+        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
           <TouchableOpacity onPress={() => { setSelectedType(null); setViewing(null); }}>
             <Ionicons name="chevron-back" size={26} color={colors.primary} />
           </TouchableOpacity>
-          {doc && (
-            <View style={styles.detailActions}>
-              <TouchableOpacity onPress={() => openEdit(doc)} style={styles.editBtn}>
-                <Ionicons name="pencil" size={20} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(doc)} style={styles.deleteBtn}>
-                <Ionicons name="trash" size={20} color={colors.danger} />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {doc ? (
@@ -490,6 +480,18 @@ export default function DocumentsScreen() {
                 <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
               </View>
             )}
+
+            {/* Edit + Delete buttons centered below photo */}
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 20 }}>
+              <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.actionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Ionicons name="pencil" size={18} color={colors.primary} />
+                <Text style={[styles.actionBtnText, { color: colors.primary }]}>{t('edit')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(doc)} style={[styles.actionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
+                <Ionicons name="trash" size={18} color={colors.danger} />
+                <Text style={[styles.actionBtnText, { color: colors.danger }]}>{t('delete')}</Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         ) : (
           /* Empty state: no document yet */
@@ -500,10 +502,12 @@ export default function DocumentsScreen() {
           </View>
         )}
 
-        {/* FAB: add document (visible when no doc, or always for adding) */}
-        <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
-          <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
-        </TouchableOpacity>
+        {/* FAB: only show when no document exists */}
+        {!doc && (
+          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+            <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Photo Viewer */}
         <Modal visible={showPhotoViewer} animationType="fade" transparent>
@@ -856,6 +860,16 @@ const styles = StyleSheet.create({
   detailStatusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   detailStatusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   detailDate: { fontSize: 15, marginTop: 8 },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  actionBtnText: { fontSize: 15, fontWeight: '600' },
   pdfThumbnail: {
     marginTop: 20,
     padding: 24,
