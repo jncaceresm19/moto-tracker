@@ -204,8 +204,20 @@ export default function HomeScreen() {
 
   const loadRainAlert = useCallback(async () => {
     try {
-      const loc = await getCurrentLocation();
-      const alert = await fetchRainAlert(loc.lat, loc.lon);
+      // Try GPS first, fallback to Santiago center
+      let lat: number;
+      let lon: number;
+      try {
+        const loc = await getCurrentLocation();
+        lat = loc.lat;
+        lon = loc.lon;
+      } catch {
+        // GPS failed — use Santiago center as fallback
+        lat = -33.45;
+        lon = -70.66;
+      }
+
+      const alert = await fetchRainAlert(lat, lon);
 
       if (alert.shouldShow && user) {
         const dismissed = await isRainAlertDismissed(user.id);
