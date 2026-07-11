@@ -9,6 +9,7 @@ import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
+import { VerificationModal } from '../../src/components/VerificationModal';
 
 export default function MotorcycleListScreen() {
   const { user } = useAuth();
@@ -29,6 +30,7 @@ export default function MotorcycleListScreen() {
   const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+  const [verifyingMotorcycle, setVerifyingMotorcycle] = useState<Motorcycle | null>(null);
 
   const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -257,11 +259,19 @@ export default function MotorcycleListScreen() {
               <View style={styles.cardInfo}>
                 <View style={styles.cardTitleRow}>
                   <Text style={dynamicStyles.cardTitle}>{item.brand} {item.model}</Text>
-                  {item.verificada && (
+                  {item.verificada ? (
                     <View style={[styles.verifiedBadge, { backgroundColor: colors.green }]}>
                       <Ionicons name="checkmark-circle" size={12} color="#fff" />
                       <Text style={styles.verifiedText}>{t('verifyMotoApproved')}</Text>
                     </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.verifyButton, { borderColor: colors.primary }]}
+                      onPress={() => setVerifyingMotorcycle(item)}
+                    >
+                      <Ionicons name="shield-checkmark-outline" size={12} color={colors.primary} />
+                      <Text style={[styles.verifyButtonText, { color: colors.primary }]}>{t('verifyMotoStart')}</Text>
+                    </TouchableOpacity>
                   )}
                 </View>
                 <Text style={dynamicStyles.cardSub}>{item.year} · {item.licensePlate}</Text>
@@ -345,6 +355,23 @@ export default function MotorcycleListScreen() {
         iconColor={alertIconColor}
         onClose={() => setAlertVisible(false)}
       />
+
+      {verifyingMotorcycle && (
+        <VerificationModal
+          visible={!!verifyingMotorcycle}
+          motorcycleId={verifyingMotorcycle.id}
+          motorcycleName={`${verifyingMotorcycle.brand} ${verifyingMotorcycle.model}`}
+          licensePlate={verifyingMotorcycle.licensePlate}
+          isClaveUnica={!!user?.verificadoClaveunica}
+          isIdentityVerified={!!user?.identidadVerificada}
+          onClose={() => setVerifyingMotorcycle(null)}
+          onVerified={(result) => {
+            console.log('Verification result:', result);
+            setVerifyingMotorcycle(null);
+            loadMotorcycles();
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -378,6 +405,19 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '700',
+  },
+  verifyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  verifyButtonText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   photoPreview: {
     width: '100%',
