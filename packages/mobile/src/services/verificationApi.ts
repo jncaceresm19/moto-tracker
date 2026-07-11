@@ -23,7 +23,7 @@ export interface VerifyResult {
 }
 
 export async function getVerificationStatus(motorcycleId: string): Promise<{ data: VerificationStatus }> {
-  return api(`/motorcycles/${motorcycleId}/verification-status`);
+  return api(`/api/motorcycles/${motorcycleId}/verification-status`);
 }
 
 export async function verifyMotorcycle(
@@ -33,29 +33,29 @@ export async function verifyMotorcycle(
   carnetBackUrl?: string,
   selfieUrl?: string
 ): Promise<{ data: VerifyResult }> {
-  return api(`/motorcycles/${motorcycleId}/verify`, {
+  return api(`/api/motorcycles/${motorcycleId}/verify`, {
     method: 'POST',
     body: { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl },
   });
 }
 
 export async function unlinkMotorcycle(motorcycleId: string): Promise<void> {
-  await api(`/motorcycles/${motorcycleId}/unlink`, { method: 'POST' });
+  await api(`/api/motorcycles/${motorcycleId}/unlink`, { method: 'POST' });
 }
 
 export async function sendOtp(email: string): Promise<void> {
-  await api('/otp/send', { method: 'POST', body: { email } });
+  await api('/api/otp/send', { method: 'POST', body: { email } });
 }
 
 export async function verifyOtpCode(code: string): Promise<void> {
-  await api('/otp/verify', { method: 'POST', body: { code } });
+  await api('/api/otp/verify', { method: 'POST', body: { code } });
 }
 
 export async function getClaveUnicaAuthUrl(): Promise<string> {
-  const response = await api<{ authUrl: string }>('/auth/claveunica');
+  const response = await api<{ authUrl: string }>('/api/auth/claveunica');
   return response.authUrl;
 }
 
 export async function claveUnicaCallback(code: string): Promise<{ user: any; accessToken: string; refreshToken: string }> {
-  return api('/auth/claveunica/callback', { method: 'POST', body: { code } });
+  return api('/api/auth/claveunica/callback', { method: 'POST', body: { code } });
 }
