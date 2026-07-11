@@ -2,7 +2,6 @@ import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { resolveZone } from '../services/weatherZone';
 import { getWeatherForZone } from '../services/weatherCache';
-import { extractRainAlert } from '../services/openWeatherMap';
 import { createErrorResponse } from '@moto-tracker/shared';
 
 const router = Router();
@@ -33,8 +32,7 @@ router.get('/rain-alert', authenticate, async (req: Request, res: Response) => {
       return;
     }
 
-    const weatherData = await getWeatherForZone(zone);
-    const alert = extractRainAlert(weatherData);
+    const alert = await getWeatherForZone(zone);
 
     res.json({
       success: true,

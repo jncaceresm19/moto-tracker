@@ -2,11 +2,11 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { weatherCache } from '../db/schema';
 import { ComunaZone } from '../data/chileComunas';
-import { fetchOpenWeatherMap, OneCall4Response } from './openWeatherMap';
+import { fetchRainAlert, RainAlertResult } from './openWeatherMap';
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-export async function getWeatherForZone(zone: ComunaZone): Promise<OneCall4Response> {
+export async function getWeatherForZone(zone: ComunaZone): Promise<RainAlertResult> {
   const cached = await db.select().from(weatherCache)
     .where(eq(weatherCache.zoneId, zone.id))
     .get();
@@ -19,7 +19,7 @@ export async function getWeatherForZone(zone: ComunaZone): Promise<OneCall4Respo
   }
 
   // Fetch fresh data from OpenWeatherMap
-  const freshData = await fetchOpenWeatherMap(zone.latitude, zone.longitude);
+  const freshData = await fetchRainAlert(zone.latitude, zone.longitude);
 
   if (cached) {
     // Update existing cache entry
