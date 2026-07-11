@@ -8,6 +8,8 @@ import { users } from '../db/schema';
 import { signTokens, authenticate, JWT_SECRET } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
+import { validateRut, normalizeRut } from '../services/rutValidation';
+import { getClaveUnicaAuthUrl, exchangeCodeForToken, getUserInfo } from '../services/claveUnica';
 
 const router = Router();
 
@@ -18,6 +20,7 @@ const registerSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
   name: z.string().min(1, 'Name is required').max(100),
   phone: z.string().optional(),
+  rut: z.string().min(1, 'RUT is required'),
 });
 
 const loginSchema = z.object({
@@ -34,15 +37,36 @@ const changePasswordSchema = z.object({
   newPassword: z.string().min(6, 'New password must be at least 6 characters'),
 });
 
+const claveUnicaCallbackSchema = z.object({
+  code: z.string().min(1, 'Authorization code is required'),
+});
+
 // --- POST /api/auth/register ---
 router.post('/register', validateBody(registerSchema), async (req: Request, res: Response) => {
   try {
-    const { email, password, name, phone } = req.body;
+    const { email, password, name, phone, rut } = req.body;
 
-    // Check if user already exists
+    // Validate RUT
+    if (!validateRut(rut)) {
+      const error = createErrorResponse('BAD_REQUEST', 'Invalid RUT');
+      res.status(400).json(error);
+      return;
+    }
+
+    const normalizedRut = normalizeRut(rut);
+
+    // Check if email already exists
     const existingUser = await db.select().from(users).where(eq(users.email, email)).get();
     if (existingUser) {
       const error = createErrorResponse('CONFLICT', 'Email already registered');
+      res.status(409).json(error);
+      return;
+    }
+
+    // Check if RUT already exists
+    const existingByRut = await db.select().from(users).where(eq(users.rut, normalizedRut)).get();
+    if (existingByRut) {
+      const error = createErrorResponse('CONFLICT', 'RUT already registered');
       res.status(409).json(error);
       return;
     }
@@ -61,6 +85,7 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
       passwordHash,
       name,
       phone: phone || null,
+      rut: normalizedRut,
       createdAt: now,
       updatedAt: now,
     });
@@ -71,7 +96,7 @@ router.post('/register', validateBody(registerSchema), async (req: Request, res:
     res.status(201).json({
       success: true,
       data: {
-        user: { id: userId, email, name, phone: phone || null, createdAt: now, updatedAt: now },
+        user: { id: userId, email, name, phone: phone || null, rut: normalizedRut, createdAt: now, updatedAt: now },
         ...tokens,
       },
     });
@@ -282,6 +307,105 @@ router.post('/refresh', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Refresh token error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to refresh token');
+    res.status(500).json(error);
+  }
+});
+
+// --- GET /api/auth/claveunica ---
+router.get('/claveunica', (req: Request, res: Response) => {
+  try {
+    const authUrl = getClaveUnicaAuthUrl();
+    res.json({ success: true, data: { authUrl } });
+  } catch (err) {
+    console.error('ClaveÚnica auth URL error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to generate ClaveÚnica URL');
+    res.status(500).json(error);
+  }
+});
+
+// --- POST /api/auth/claveunica/callback ---
+router.post('/claveunica/callback', validateBody(claveUnicaCallbackSchema), async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+
+    // Exchange code for token
+    const tokenResponse = await exchangeCodeForToken(code);
+    const userInfo = await getUserInfo(tokenResponse.access_token);
+
+    if (!userInfo.run || !userInfo.email) {
+      const error = createErrorResponse('UNAUTHORIZED', 'Incomplete data from ClaveÚnica');
+      res.status(401).json(error);
+      return;
+    }
+
+    const normalizedRut = normalizeRut(userInfo.run);
+
+    // Check if user exists by email
+    let user = await db.select().from(users).where(eq(users.email, userInfo.email)).get();
+
+    if (user) {
+      // User exists — update ClaveÚnica verification status
+      if (!user.verificadoClaveunica) {
+        await db.update(users).set({
+          verificadoClaveunica: true,
+          rut: user.rut || normalizedRut,
+          updatedAt: new Date(),
+        }).where(eq(users.id, user.id));
+      }
+    } else {
+      // Check if user exists by RUT
+      user = await db.select().from(users).where(eq(users.rut, normalizedRut)).get();
+
+      if (user) {
+        // Link ClaveÚnica to existing account
+        await db.update(users).set({
+          verificadoClaveunica: true,
+          email: userInfo.email,
+          name: userInfo.name || user.name,
+          updatedAt: new Date(),
+        }).where(eq(users.id, user.id));
+      } else {
+        // Create new user
+        const now = new Date();
+        const userId = crypto.randomUUID();
+
+        await db.insert(users).values({
+          id: userId,
+          email: userInfo.email,
+          passwordHash: '',
+          name: userInfo.name || userInfo.email.split('@')[0],
+          rut: normalizedRut,
+          verificadoClaveunica: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        user = await db.select().from(users).where(eq(users.id, userId)).get();
+      }
+    }
+
+    // Generate tokens
+    const tokens = signTokens({ userId: user!.id, email: user!.email });
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user!.id,
+          email: user!.email,
+          name: user!.name,
+          avatarUrl: user!.avatarUrl,
+          rut: user!.rut,
+          verificadoClaveunica: user!.verificadoClaveunica,
+          createdAt: new Date(user!.createdAt),
+          updatedAt: new Date(user!.updatedAt),
+        },
+        ...tokens,
+      },
+    });
+  } catch (err) {
+    console.error('ClaveÚnica callback error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to authenticate with ClaveÚnica');
     res.status(500).json(error);
   }
 });

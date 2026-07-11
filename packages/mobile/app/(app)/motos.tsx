@@ -255,7 +255,15 @@ export default function MotorcycleListScreen() {
                 </View>
               )}
               <View style={styles.cardInfo}>
-                <Text style={dynamicStyles.cardTitle}>{item.brand} {item.model}</Text>
+                <View style={styles.cardTitleRow}>
+                  <Text style={dynamicStyles.cardTitle}>{item.brand} {item.model}</Text>
+                  {item.verificada && (
+                    <View style={[styles.verifiedBadge, { backgroundColor: colors.green }]}>
+                      <Ionicons name="checkmark-circle" size={12} color="#fff" />
+                      <Text style={styles.verifiedText}>{t('verifyMotoApproved')}</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={dynamicStyles.cardSub}>{item.year} · {item.licensePlate}</Text>
                 <Text style={dynamicStyles.cardKm}>{item.currentKilometers.toLocaleString()} km</Text>
               </View>
@@ -352,6 +360,24 @@ const styles = StyleSheet.create({
   },
   cardInfo: {
     padding: 16,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  verifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  verifiedText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   photoPreview: {
     width: '100%',

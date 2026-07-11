@@ -114,10 +114,10 @@ export async function login(email: string, password: string) {
   return data;
 }
 
-export async function register(email: string, password: string, name: string, phone?: string) {
+export async function register(email: string, password: string, name: string, phone?: string, rut?: string) {
   const data = await api<{ user: { id: string; email: string }; accessToken: string; refreshToken: string }>(
     '/api/auth/register',
-    { method: 'POST', body: { email, password, name, phone } }
+    { method: 'POST', body: { email, password, name, phone, rut } }
   );
   await AsyncStorage.setItem('accessToken', data.accessToken);
   await AsyncStorage.setItem('refreshToken', data.refreshToken);
@@ -146,6 +146,13 @@ export interface Motorcycle {
   currentKilometers: number;
   imageUrl?: string;
   gpsTracker?: string;
+  verificada?: boolean;
+  verificadaEn?: string;
+  verificadaPor?: string;
+  fotoConPatente?: string;
+  rtVigente?: boolean;
+  encargoRobo?: boolean;
+  desvinculada?: boolean;
 }
 
 export async function listMotorcycles(): Promise<Motorcycle[]> {

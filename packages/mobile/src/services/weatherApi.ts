@@ -10,6 +10,5 @@ export interface RainAlertData {
 }
 
 export async function fetchRainAlert(lat: number, lon: number): Promise<RainAlertData> {
-  const response = await api.get(`/weather/rain-alert?lat=${lat}&lon=${lon}`);
-  return response.data.data;
+  return api(`/weather/rain-alert?lat=${lat}&lon=${lon}`);
 }

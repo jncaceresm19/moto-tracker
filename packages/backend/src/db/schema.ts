@@ -8,6 +8,11 @@ export const users = sqliteTable('users', {
   name: text('name').notNull(),
   phone: text('phone'),
   googleId: text('google_id').unique(),
+  rut: text('rut').unique(),
+  verificadoClaveunica: integer('verificado_claveunica', { mode: 'boolean' }).default(false),
+  identidadVerificada: integer('identidad_verificada', { mode: 'boolean' }).default(false),
+  otpAttempts: integer('otp_attempts').default(0),
+  otpLockedUntil: integer('otp_locked_until', { mode: 'timestamp' }),
   avatarUrl: text('avatar_url'),
   pushToken: text('push_token'),
   lastLatitude: real('last_latitude'),
@@ -29,6 +34,15 @@ export const motorcycles = sqliteTable('motorcycles', {
   currentKilometers: real('current_kilometers').notNull().default(0),
   imageUrl: text('image_url'),
   gpsTracker: text('gps_tracker'),
+  // Verification fields
+  verificada: integer('verificada', { mode: 'boolean' }).default(false),
+  verificadaEn: integer('verificada_en', { mode: 'timestamp' }),
+  verificadaPor: text('verificada_por'), // 'clave_unica' | 'carnet' | 'padron'
+  fotoConPatente: text('foto_con_patente'),
+  rtVigente: integer('rt_vigente', { mode: 'boolean' }),
+  encargoRobo: integer('encargo_robo', { mode: 'boolean' }).default(false),
+  desvinculada: integer('desvinculada', { mode: 'boolean' }).default(false),
+  desvinculadaEn: integer('desvinculada_en', { mode: 'timestamp' }),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
@@ -202,3 +216,36 @@ export const weatherCache = sqliteTable('weather_cache', {
 });
 
 export const idxWeatherCacheLastFetched = index('idx_weather_cache_last_fetched').on(weatherCache.lastFetchedAt);
+
+// OTP table
+export const otps = sqliteTable('otps', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  code: text('code').notNull(),
+  tipo: text('tipo').notNull().default('email'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  used: integer('used', { mode: 'boolean' }).default(false),
+});
+
+export const idxOtpsUserId = index('idx_otps_user_id').on(otps.userId);
+
+// Pending verifications table (for manual review)
+export const verificacionesPendientes = sqliteTable('verificaciones_pendientes', {
+  id: text('id').primaryKey(),
+  motorcycleId: text('motorcycle_id').notNull().references(() => motorcycles.id),
+  userId: text('user_id').notNull().references(() => users.id),
+  tipo: text('tipo').notNull(),
+  archivoUrl: text('archivo_url').notNull(),
+  estado: text('estado').notNull().default('pendiente'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
+  reviewerNotes: text('reviewer_notes'),
+});
+
+export const idxVerificacionesMotorcycleId = index('idx_verificaciones_motorcycle_id').on(verificacionesPendientes.motorcycleId);
+export const idxVerificacionesUserId = index('idx_verificaciones_user_id').on(verificacionesPendientes.userId);
+
+// Indexes for verification
+export const idxMotorcyclesVerificada = index('idx_motorcycles_verificada').on(motorcycles.verificada);
+export const idxUsersRut = uniqueIndex('idx_users_rut').on(users.rut);

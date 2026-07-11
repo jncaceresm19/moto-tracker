@@ -8,13 +8,17 @@ interface User {
   name?: string;
   phone?: string;
   avatarUrl?: string;
+  rut?: string;
+  verificadoClaveunica?: boolean;
+  identidadVerificada?: boolean;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, phone?: string) => Promise<void>;
+  signInWithToken: (accessToken: string, refreshToken: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, phone?: string, rut?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -91,9 +95,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, phone?: string) => {
-    const data = await apiRegister(email, password, name, phone);
+  const signUp = async (email: string, password: string, name: string, phone?: string, rut?: string) => {
+    const data = await apiRegister(email, password, name, phone, rut);
     setUser(data.user);
+  };
+
+  const signInWithToken = async (accessToken: string, refreshToken: string) => {
+    await AsyncStorage.setItem('accessToken', accessToken);
+    await AsyncStorage.setItem('refreshToken', refreshToken);
+    const profile = await getProfile();
+    setUser({ id: profile.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl });
   };
 
   const signOut = async () => {
@@ -102,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signUp, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signInWithToken, signUp, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

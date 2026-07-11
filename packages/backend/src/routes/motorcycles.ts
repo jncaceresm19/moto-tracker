@@ -1,11 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import { db } from '../db';
-import { motorcycles } from '../db/schema';
+import { motorcycles, users, verificacionesPendientes } from '../db/schema';
 import { authenticate } from '../middleware/auth';
 import { validateBody, validateParams } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
+import { validatePlate } from '../services/plateValidation';
+import { checkTechnicalReview, checkTheftHistory } from '../services/vehicleCheck';
 
 const router = Router();
 
@@ -257,6 +259,208 @@ router.delete('/:id', validateParams(motorcycleIdParam), async (req: Request, re
     console.error('Delete motorcycle error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to delete motorcycle');
     res.status(500).json(error);
+  }
+});
+
+// --- Verification Schemas ---
+
+const verifyMotorcycleSchema = z.object({
+  padronUrl: z.string().url('Padrón photo URL is required'),
+  carnetFrontUrl: z.string().url().optional(),
+  carnetBackUrl: z.string().url().optional(),
+  selfieUrl: z.string().url().optional(),
+});
+
+// --- GET /api/motorcycles/:id/verification-status ---
+router.get('/:id/verification-status', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const motorcycleId = getMotorcycleId(req);
+
+    const moto = await db
+      .select()
+      .from(motorcycles)
+      .where(and(eq(motorcycles.id, motorcycleId), eq(motorcycles.userId, userId)))
+      .get();
+
+    if (!moto) {
+      res.status(404).json(createErrorResponse('NOT_FOUND', 'Motorcycle not found'));
+      return;
+    }
+
+    const pending = await db
+      .select()
+      .from(verificacionesPendientes)
+      .where(eq(verificacionesPendientes.motorcycleId, motorcycleId))
+      .orderBy(desc(verificacionesPendientes.createdAt))
+      .all();
+
+    res.json({
+      success: true,
+      data: {
+        verificada: moto.verificada,
+        verificadaEn: moto.verificadaEn,
+        verificadaPor: moto.verificadaPor,
+        rtVigente: moto.rtVigente,
+        encargoRobo: moto.encargoRobo,
+        pendingFiles: pending.filter(p => p.estado === 'pendiente').map(p => ({
+          id: p.id,
+          tipo: p.tipo,
+          estado: p.estado,
+          createdAt: p.createdAt,
+        })),
+      },
+    });
+  } catch (err) {
+    console.error('Get verification status error:', err);
+    res.status(500).json(createErrorResponse('INTERNAL_ERROR', 'Failed to get verification status'));
+  }
+});
+
+// --- POST /api/motorcycles/:id/verify ---
+router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const motorcycleId = getMotorcycleId(req);
+    const { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl } = req.body;
+
+    // Get motorcycle
+    const moto = await db
+      .select()
+      .from(motorcycles)
+      .where(and(eq(motorcycles.id, motorcycleId), eq(motorcycles.userId, userId)))
+      .get();
+
+    if (!moto) {
+      res.status(404).json(createErrorResponse('NOT_FOUND', 'Motorcycle not found'));
+      return;
+    }
+
+    if (moto.verificada) {
+      res.status(400).json(createErrorResponse('BAD_REQUEST', 'Motorcycle already verified'));
+      return;
+    }
+
+    // Get user
+    const user = await db.select().from(users).where(eq(users.id, userId)).get();
+    if (!user) {
+      res.status(404).json(createErrorResponse('NOT_FOUND', 'User not found'));
+      return;
+    }
+
+    // Validate plate format
+    const plateResult = validatePlate(moto.licensePlate);
+    if (!plateResult.valid) {
+      res.status(400).json(createErrorResponse('INVALID_PLATE', 'Invalid license plate format'));
+      return;
+    }
+
+    // Run external checks (non-blocking)
+    const [rtCheck, theftCheck] = await Promise.all([
+      checkTechnicalReview(plateResult.normalized),
+      checkTheftHistory(plateResult.normalized),
+    ]);
+
+    // Determine verification method
+    const isClaveUnica = user.verificadoClaveunica;
+    const isIdentityVerified = user.identidadVerificada;
+
+    if (isClaveUnica || isIdentityVerified) {
+      // ClaveÚnica user or already verified identity — padrón only
+      await db.update(motorcycles).set({
+        verificada: true,
+        verificadaEn: new Date(),
+        verificadaPor: isClaveUnica ? 'clave_unica' : 'padron',
+        fotoConPatente: padronUrl,
+        rtVigente: rtCheck.vigente,
+        encargoRobo: theftCheck.encargo,
+        updatedAt: new Date(),
+      }).where(eq(motorcycles.id, motorcycleId));
+
+      res.json({
+        success: true,
+        data: {
+          verificada: true,
+          verificadaPor: isClaveUnica ? 'clave_unica' : 'padron',
+          rtVigente: rtCheck.vigente,
+          encargoRobo: theftCheck.encargo,
+          warnings: [
+            ...(!rtCheck.vigente ? ['Revisión técnica no vigente'] : []),
+            ...(theftCheck.encargo ? ['Este vehículo tiene encargo por robo'] : []),
+          ],
+        },
+      });
+    } else {
+      // Email user, first verification — need carnet + selfie
+      if (!carnetFrontUrl || !carnetBackUrl || !selfieUrl) {
+        res.status(400).json(createErrorResponse('MISSING_FILES', 'Carnet (front/back) and selfie required for first verification'));
+        return;
+      }
+
+      // Mark identity as verified
+      await db.update(users).set({
+        identidadVerificada: true,
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
+
+      // Verify motorcycle
+      await db.update(motorcycles).set({
+        verificada: true,
+        verificadaEn: new Date(),
+        verificadaPor: 'carnet',
+        fotoConPatente: padronUrl,
+        rtVigente: rtCheck.vigente,
+        encargoRobo: theftCheck.encargo,
+        updatedAt: new Date(),
+      }).where(eq(motorcycles.id, motorcycleId));
+
+      res.json({
+        success: true,
+        data: {
+          verificada: true,
+          verificadaPor: 'carnet',
+          rtVigente: rtCheck.vigente,
+          encargoRobo: theftCheck.encargo,
+          warnings: [
+            ...(!rtCheck.vigente ? ['Revisión técnica no vigente'] : []),
+            ...(theftCheck.encargo ? ['Este vehículo tiene encargo por robo'] : []),
+          ],
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Verify motorcycle error:', err);
+    res.status(500).json(createErrorResponse('INTERNAL_ERROR', 'Failed to verify motorcycle'));
+  }
+});
+
+// --- POST /api/motorcycles/:id/unlink ---
+router.post('/:id/unlink', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const motorcycleId = getMotorcycleId(req);
+
+    const moto = await db
+      .select()
+      .from(motorcycles)
+      .where(and(eq(motorcycles.id, motorcycleId), eq(motorcycles.userId, userId)))
+      .get();
+
+    if (!moto) {
+      res.status(404).json(createErrorResponse('NOT_FOUND', 'Motorcycle not found'));
+      return;
+    }
+
+    await db.update(motorcycles).set({
+      desvinculada: true,
+      desvinculadaEn: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(motorcycles.id, motorcycleId));
+
+    res.json({ success: true, message: 'Motorcycle unlinked' });
+  } catch (err) {
+    console.error('Unlink motorcycle error:', err);
+    res.status(500).json(createErrorResponse('INTERNAL_ERROR', 'Failed to unlink motorcycle'));
   }
 });
 

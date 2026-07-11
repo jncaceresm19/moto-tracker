@@ -14,6 +14,7 @@ export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [rut, setRut] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -33,8 +34,15 @@ export default function RegisterScreen() {
   };
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !rut) {
       showAlert(t('error'), t('fillAllFields'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
+      return;
+    }
+
+    // Validate RUT format (basic check)
+    const rutClean = rut.replace(/[\.\-\s]/g, '').toUpperCase();
+    if (!/^\d+[0-9K]$/.test(rutClean)) {
+      showAlert(t('error'), 'RUT inválido', [{ text: 'OK' }], 'close-circle', '#FF3B30');
       return;
     }
 
@@ -46,7 +54,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await signUp(email, password, name, phone || undefined);
+      await signUp(email, password, name, phone || undefined, rut);
       router.replace('/(app)');
     } catch (err) {
       showAlert(t('error'), err instanceof Error ? err.message : t('registrationFailed'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
@@ -138,6 +146,15 @@ export default function RegisterScreen() {
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
+      />
+
+      <TextInput
+        style={dynamicStyles.input}
+        placeholder="RUT"
+        placeholderTextColor={colors.textMuted}
+        value={rut}
+        onChangeText={setRut}
+        autoCapitalize="characters"
       />
 
       <TextInput

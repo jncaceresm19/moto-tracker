@@ -13,9 +13,11 @@ import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
+import { getClaveUnicaAuthUrl, claveUnicaCallback } from '../../src/services/verificationApi';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function LoginScreen() {
-  const { signIn } = useAuth();
+  const { signIn, signInWithToken } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
 
@@ -36,6 +38,34 @@ export default function LoginScreen() {
     setAlertIcon(icon);
     setAlertIconColor(iconColor);
     setAlertVisible(true);
+  };
+
+  const handleClaveUnica = async () => {
+    try {
+      setLoading(true);
+      const authUrl = await getClaveUnicaAuthUrl();
+      const result = await WebBrowser.openAuthSessionAsync(authUrl);
+
+      if (result.type === 'success' && result.url) {
+        const url = new URL(result.url);
+        const code = url.searchParams.get('code');
+        if (code) {
+          const data = await claveUnicaCallback(code);
+          await signInWithToken(data.accessToken, data.refreshToken);
+          router.replace('/(app)');
+        }
+      }
+    } catch (err) {
+      showAlert(
+        t('error'),
+        err instanceof Error ? err.message : 'ClaveÚnica login failed',
+        [{ text: 'OK' }],
+        'close-circle',
+        '#FF3B30'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -190,24 +220,16 @@ export default function LoginScreen() {
 
       <TouchableOpacity
         style={dynamicStyles.googleButton}
-        onPress={() =>
-          showAlert(
-            'Coming Soon',
-            'Google Sign-In will be available in a future update.',
-            [{ text: 'OK' }],
-            'information-circle',
-            '#007AFF'
-          )
-        }
-        disabled
+        onPress={handleClaveUnica}
+        disabled={loading}
       >
         <Text style={dynamicStyles.googleButtonTextDisabled}>
-          {t('continueWithGoogle')}
+          {t('loginWithClaveUnica')}
         </Text>
       </TouchableOpacity>
 
       <Text style={dynamicStyles.googleNote}>
-        {t('googleComingSoon')}
+        {t('claveUnicaNote')}
       </Text>
 
       <Link href="/(auth)/register" asChild>
