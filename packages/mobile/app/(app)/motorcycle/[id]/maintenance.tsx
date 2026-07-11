@@ -1,50 +1,29 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
 import { useTheme } from '../../../../src/theme-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
 
-const TYPES = [
-  'motor_oil',
-  'air_filter',
-  'drive_chain',
-  'brakes',
-  'spark_plugs',
-  'battery',
-  'tires',
-  'coolant',
-  'valve_adjustment',
-] as const;
+const CATEGORY_ICON = '🔧';
 
-type MaintenanceType = typeof TYPES[number];
+const DEFAULT_TYPES = [
+  { key: 'motor_oil', labelKey: 'motorOil' },
+  { key: 'air_filter', labelKey: 'airFilter' },
+  { key: 'drive_chain', labelKey: 'driveChain' },
+  { key: 'brakes', labelKey: 'brakes' },
+  { key: 'spark_plugs', labelKey: 'sparkPlugs' },
+  { key: 'battery', labelKey: 'battery' },
+  { key: 'tires', labelKey: 'tires' },
+  { key: 'coolant', labelKey: 'coolant' },
+  { key: 'valve_adjustment', labelKey: 'valveAdjustment' },
+];
 
-const TYPE_KEYS: Record<string, string> = {
-  motor_oil: 'motorOil',
-  air_filter: 'airFilter',
-  drive_chain: 'driveChain',
-  brakes: 'brakes',
-  spark_plugs: 'sparkPlugs',
-  battery: 'battery',
-  tires: 'tires',
-  coolant: 'coolant',
-  valve_adjustment: 'valveAdjustment',
-};
-
-const CATEGORY_ICONS: Record<string, string> = {
-  motor_oil: '🛢️',
-  air_filter: '🌬️',
-  drive_chain: '⛓️',
-  brakes: '🛑',
-  spark_plugs: '⚡',
-  battery: '🔋',
-  tires: '🛞',
-  coolant: '🧊',
-  valve_adjustment: '🔧',
-};
+const CUSTOM_TYPES_KEY = 'custom_maintenance_types';
 
 export default function MaintenanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -64,6 +43,11 @@ export default function MaintenanceScreen() {
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // Custom types (user-created)
+  const [customTypes, setCustomTypes] = useState<{ key: string; label: string }[]>([]);
+  const [showAddType, setShowAddType] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -81,10 +65,25 @@ export default function MaintenanceScreen() {
     setAlertVisible(true);
   };
 
+  // Load custom types from AsyncStorage
+  const loadCustomTypes = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(`${CUSTOM_TYPES_KEY}_${id}`);
+      if (stored) setCustomTypes(JSON.parse(stored));
+    } catch {}
+  };
+
+  // Save custom types to AsyncStorage
+  const saveCustomTypes = async (types: { key: string; label: string }[]) => {
+    setCustomTypes(types);
+    await AsyncStorage.setItem(`${CUSTOM_TYPES_KEY}_${id}`, JSON.stringify(types));
+  };
+
   // Navigation header
   useEffect(() => {
+    const label = getLabel(selectedType);
     navigation.setOptions({
-      title: selectedType ? t(TYPE_KEYS[selectedType] as any) : t('maintenance'),
+      title: label || t('maintenance'),
       headerLeft: () => (
         <TouchableOpacity
           onPress={() => {
@@ -100,7 +99,7 @@ export default function MaintenanceScreen() {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, id, router, selectedType, t, colors]);
+  }, [navigation, id, router, selectedType, t, colors, customTypes]);
 
   const load = async () => {
     if (!id) return;
@@ -109,12 +108,27 @@ export default function MaintenanceScreen() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); loadCustomTypes(); }, [id]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  };
+
+  // Build all categories: defaults + custom
+  const allTypes = [
+    ...DEFAULT_TYPES,
+    ...customTypes.map((ct) => ({ key: ct.key, labelKey: ct.label })),
+  ];
+
+  const getLabel = (key: string | null): string => {
+    if (!key) return '';
+    const def = DEFAULT_TYPES.find((d) => d.key === key);
+    if (def) return t(def.labelKey as any);
+    const custom = customTypes.find((c) => c.key === key);
+    if (custom) return custom.label;
+    return key;
   };
 
   const resetForm = (type: string = 'motor_oil') => setForm({ type, description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
@@ -132,6 +146,16 @@ export default function MaintenanceScreen() {
       notes: record.notes || '',
     });
     setEditing(record);
+  };
+
+  const handleAddCustomType = async () => {
+    const name = newTypeName.trim();
+    if (!name) return;
+    const key = `custom_${Date.now()}`;
+    const updated = [...customTypes, { key, label: name }];
+    await saveCustomTypes(updated);
+    setNewTypeName('');
+    setShowAddType(false);
   };
 
   const handleCreate = async () => {
@@ -222,19 +246,19 @@ export default function MaintenanceScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <FlatList
-          data={TYPES}
-          keyExtractor={(item) => item}
+          data={allTypes}
+          keyExtractor={(item) => item.key}
           contentContainerStyle={styles.categoryList}
           renderItem={({ item }) => {
-            const count = records.filter((r) => r.type === item).length;
+            const count = records.filter((r) => r.type === item.key).length;
             return (
               <TouchableOpacity
                 style={[styles.categoryBtn, { backgroundColor: colors.card }]}
-                onPress={() => setSelectedType(item)}
+                onPress={() => setSelectedType(item.key)}
               >
-                <Text style={styles.categoryIcon}>{CATEGORY_ICONS[item]}</Text>
+                <Text style={styles.categoryIcon}>{CATEGORY_ICON}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.categoryText, { color: colors.text }]}>{t(TYPE_KEYS[item] as any)}</Text>
+                  <Text style={[styles.categoryText, { color: colors.text }]}>{item.labelKey ? t(item.labelKey as any) : item.labelKey}</Text>
                   <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
                     {count} {count === 1 ? 'registro' : 'registros'}
                   </Text>
@@ -245,9 +269,50 @@ export default function MaintenanceScreen() {
           }}
         />
 
-        <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+        {/* FAB: + */}
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+          onPress={() => setShowAddType(true)}
+        >
           <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
         </TouchableOpacity>
+
+        {/* Add Custom Type Modal */}
+        <Modal visible={showAddType} transparent animationType="fade">
+          <TouchableOpacity
+            style={styles.overlay}
+            activeOpacity={1}
+            onPress={() => setShowAddType(false)}
+          >
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.addTypeModal, { backgroundColor: colors.surface }]}>
+                  <Text style={[styles.addTypeTitle, { color: colors.text }]}>Nueva categoría</Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+                    placeholder="Nombre del mantenimiento"
+                    placeholderTextColor={colors.textMuted}
+                    value={newTypeName}
+                    onChangeText={setNewTypeName}
+                    autoFocus
+                  />
+                  <View style={styles.addTypeActions}>
+                    <TouchableOpacity onPress={() => setShowAddType(false)} style={[styles.addTypeBtn, { backgroundColor: colors.surfaceSecondary }]}>
+                      <Text style={{ color: colors.text }}>{t('cancel')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={handleAddCustomType}
+                      style={[styles.addTypeBtn, { backgroundColor: colors.primary }]}
+                      disabled={!newTypeName.trim()}
+                    >
+                      <Text style={{ color: colors.primaryText, fontWeight: '600' }}>Agregar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
 
         <CustomAlert
           visible={alertVisible}
@@ -275,7 +340,7 @@ export default function MaintenanceScreen() {
         ListHeaderComponent={filteredRecords.length > 0 ? <View style={{ height: 8 }} /> : null}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>{CATEGORY_ICONS[selectedType]}</Text>
+            <Text style={styles.emptyIcon}>{CATEGORY_ICON}</Text>
             <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noRecords')}</Text>
             <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noRecordsSub')}</Text>
           </View>
@@ -313,8 +378,8 @@ export default function MaintenanceScreen() {
 
             {/* Type indicator (read-only, set by category) */}
             <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-              <Text style={{ fontSize: 18 }}>{CATEGORY_ICONS[form.type]}</Text>
-              <Text style={{ fontSize: 15, color: colors.text }}>{t(TYPE_KEYS[form.type] as any)}</Text>
+              <Text style={{ fontSize: 18 }}>{CATEGORY_ICON}</Text>
+              <Text style={{ fontSize: 15, color: colors.text }}>{getLabel(form.type)}</Text>
             </View>
 
             <TextInput
@@ -446,4 +511,10 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { fontSize: 28, fontWeight: '300', marginTop: -2 },
+  // Add Type Modal
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
+  addTypeModal: { borderRadius: 14, padding: 20 },
+  addTypeTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
+  addTypeActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  addTypeBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
 });

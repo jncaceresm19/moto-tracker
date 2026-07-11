@@ -78,7 +78,14 @@ export default function DocumentsScreen() {
       title: selectedType ? t(TYPE_KEYS[selectedType]) : t('documents'),
       headerLeft: () => (
         <TouchableOpacity
-          onPress={() => (selectedType ? setSelectedType(null) : router.push(`/(app)/motorcycle/${id}`))}
+          onPress={() => {
+            if (selectedType) {
+              setSelectedType(null);
+              setViewing(null);
+            } else {
+              router.push(`/(app)/motorcycle/${id}`);
+            }
+          }}
           style={{ marginLeft: 12 }}
         >
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
@@ -430,18 +437,10 @@ export default function DocumentsScreen() {
 
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Back button only */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-          <TouchableOpacity onPress={() => { setSelectedType(null); setViewing(null); }}>
-            <Ionicons name="chevron-back" size={26} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-
         {doc ? (
           <ScrollView contentContainerStyle={styles.detailContent}>
             {/* Title + Status badge */}
-            <View style={styles.detailTitleRow}>
-              <Text style={[styles.detailTitle, { color: colors.text, flex: 1 }]}>{doc.title}</Text>
+            <View style={[styles.detailTitleRow, { justifyContent: 'flex-end' }]}>
               <View style={[styles.detailStatusBadge, {
                 backgroundColor: doc.status === 'expired' ? colors.danger + '15' : doc.status === 'expiring' ? colors.accent + '15' : colors.success + '15',
                 borderColor: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,

@@ -21,11 +21,19 @@ const maintenanceTypes = [
   'spark_plugs',
   'technical_review',
   'circulation_permit',
+  'motor_oil',
+  'air_filter',
+  'drive_chain',
+  'brakes',
+  'battery',
+  'tires',
+  'coolant',
+  'valve_adjustment',
   'other',
 ] as const;
 
 const createMaintenanceSchema = z.object({
-  type: z.enum(maintenanceTypes),
+  type: z.string().min(1, 'Type is required').max(100),
   description: z.string().min(1, 'Description is required').max(500),
   kilometersAtService: z.number().min(0, 'Kilometers must be non-negative'),
   serviceDate: z.string().datetime('Invalid service date'),
@@ -37,7 +45,7 @@ const createMaintenanceSchema = z.object({
 });
 
 const updateMaintenanceSchema = z.object({
-  type: z.enum(maintenanceTypes).optional(),
+  type: z.string().min(1).max(100).optional(),
   description: z.string().min(1).max(500).optional(),
   kilometersAtService: z.number().min(0).optional(),
   serviceDate: z.string().datetime().optional(),
