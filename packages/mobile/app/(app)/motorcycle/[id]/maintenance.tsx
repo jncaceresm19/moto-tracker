@@ -237,6 +237,38 @@ export default function MaintenanceScreen() {
 
   const filteredRecords = selectedType ? records.filter((r) => r.type === selectedType) : [];
 
+  const isCustomType = (key: string) => customTypes.some((c) => c.key === key);
+
+  const handleDeleteCustomType = (key: string, label: string) => {
+    const hasRecords = records.some((r) => r.type === key);
+    if (hasRecords) {
+      showAlert(
+        'No se puede eliminar',
+        `Esta categoría tiene registros asociados. Eliminá los registros primero.`,
+        [{ text: 'OK' }],
+        'close-circle',
+        colors.accent
+      );
+      return;
+    }
+    showAlert(
+      'Eliminar categoría',
+      `¿Eliminar "${label}"?`,
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('delete'), style: 'destructive',
+          onPress: async () => {
+            const updated = customTypes.filter((c) => c.key !== key);
+            await saveCustomTypes(updated);
+          },
+        },
+      ],
+      'warning',
+      colors.accent
+    );
+  };
+
   if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
   // ============================================================
@@ -251,10 +283,12 @@ export default function MaintenanceScreen() {
           contentContainerStyle={styles.categoryList}
           renderItem={({ item }) => {
             const count = records.filter((r) => r.type === item.key).length;
+            const isCustom = isCustomType(item.key);
             return (
               <TouchableOpacity
                 style={[styles.categoryBtn, { backgroundColor: colors.card }]}
                 onPress={() => setSelectedType(item.key)}
+                onLongPress={isCustom ? () => handleDeleteCustomType(item.key, getLabel(item.key)) : undefined}
               >
                 <Text style={styles.categoryIcon}>{CATEGORY_ICON}</Text>
                 <View style={{ flex: 1 }}>
@@ -263,6 +297,15 @@ export default function MaintenanceScreen() {
                     {count} {count === 1 ? 'registro' : 'registros'}
                   </Text>
                 </View>
+                {isCustom && (
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCustomType(item.key, getLabel(item.key))}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={{ padding: 4 }}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  </TouchableOpacity>
+                )}
                 <Text style={[styles.arrow, { color: colors.textMuted }]}>›</Text>
               </TouchableOpacity>
             );
