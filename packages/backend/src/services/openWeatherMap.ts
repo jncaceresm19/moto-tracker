@@ -1,21 +1,17 @@
 const API_KEY = process.env.OPENWEATHER_API_KEY;
-const BASE_URL = 'https://api.openweathermap.org/data/3.0/onecall';
+const BASE_URL = 'https://api.openweathermap.org/data/4.0/onecall';
 
-interface MinutelyEntry {
+interface TimelineEntry {
   dt: number;
   precipitation: number;
-  probability: number;
 }
 
-interface HourlyEntry {
-  dt: number;
-  pop: number;
-  rain?: { '1h': number };
-}
-
-interface OpenWeatherResponse {
-  minutely?: MinutelyEntry[];
-  hourly?: HourlyEntry[];
+interface OneCall4Response {
+  lat: number;
+  lon: number;
+  timezone: string;
+  timezone_offset: number;
+  data: TimelineEntry[];
 }
 
 export interface RainAlertResult {
@@ -24,12 +20,13 @@ export interface RainAlertResult {
   probability: number;
 }
 
-export async function fetchOpenWeatherMap(lat: number, lon: number): Promise<OpenWeatherResponse> {
+export async function fetchOpenWeatherMap(lat: number, lon: number): Promise<OneCall4Response> {
   if (!API_KEY) {
     throw new Error('OPENWEATHER_API_KEY not configured');
   }
 
-  const url = `${BASE_URL}?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&exclude=current,daily,alerts`;
+  // Use 1-minute timeline endpoint (returns up to 60 records)
+  const url = `${BASE_URL}/timeline/1min?lat=${lat}&lon=${lon}&appid=${API_KEY}`;
 
   const response = await fetch(url);
   if (!response.ok) {
@@ -39,33 +36,19 @@ export async function fetchOpenWeatherMap(lat: number, lon: number): Promise<Ope
   return response.json();
 }
 
-export function extractRainAlert(data: OpenWeatherResponse): RainAlertResult {
+export function extractRainAlert(data: OneCall4Response): RainAlertResult {
   const now = Date.now();
-  const THRESHOLD = 60; // 60% probability threshold
+  const THRESHOLD_MM = 0.1; // 0.1 mm/h threshold for rain
 
-  // Check minutely data (next 60 min, most precise)
-  if (data.minutely) {
-    for (const minute of data.minutely) {
-      const minutesAhead = (minute.dt * 1000 - now) / 60000;
-      if (minutesAhead > 0 && minutesAhead <= 60 && minute.probability > THRESHOLD) {
+  // Check 1-minute timeline data (next 60 min)
+  if (data.data) {
+    for (const entry of data.data) {
+      const minutesAhead = (entry.dt * 1000 - now) / 60000;
+      if (minutesAhead > 0 && minutesAhead <= 60 && entry.precipitation > THRESHOLD_MM) {
         return {
           shouldShow: true,
           minutesUntilRain: Math.round(minutesAhead),
-          probability: minute.probability,
-        };
-      }
-    }
-  }
-
-  // Check hourly data (next 2 hours)
-  if (data.hourly) {
-    for (const hour of data.hourly) {
-      const hoursAhead = (hour.dt * 1000 - now) / 3600000;
-      if (hoursAhead > 0 && hoursAhead <= 2 && hour.pop * 100 > THRESHOLD) {
-        return {
-          shouldShow: true,
-          minutesUntilRain: Math.round(hoursAhead * 60),
-          probability: Math.round(hour.pop * 100),
+          probability: Math.min(100, Math.round((entry.precipitation / 5) * 100)), // rough probability estimate
         };
       }
     }
