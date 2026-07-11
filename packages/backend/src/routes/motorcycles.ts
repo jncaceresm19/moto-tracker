@@ -324,6 +324,8 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
     const motorcycleId = getMotorcycleId(req);
     const { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl } = req.body;
 
+    console.log('[VERIFY] Request for motorcycle:', motorcycleId);
+
     // Get motorcycle
     const moto = await db
       .select()
@@ -332,11 +334,13 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
       .get();
 
     if (!moto) {
+      console.log('[VERIFY] Motorcycle not found');
       res.status(404).json(createErrorResponse('NOT_FOUND', 'Motorcycle not found'));
       return;
     }
 
     if (moto.verificada) {
+      console.log('[VERIFY] Already verified');
       res.status(400).json(createErrorResponse('BAD_REQUEST', 'Motorcycle already verified'));
       return;
     }
@@ -344,22 +348,26 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
     // Get user
     const user = await db.select().from(users).where(eq(users.id, userId)).get();
     if (!user) {
+      console.log('[VERIFY] User not found');
       res.status(404).json(createErrorResponse('NOT_FOUND', 'User not found'));
       return;
     }
 
     // Validate plate format
     const plateResult = validatePlate(moto.licensePlate);
+    console.log('[VERIFY] Plate:', moto.licensePlate, '→ valid:', plateResult.valid, 'format:', plateResult.format);
     if (!plateResult.valid) {
       res.status(400).json(createErrorResponse('INVALID_PLATE', 'Invalid license plate format'));
       return;
     }
 
     // Run external checks (non-blocking)
+    console.log('[VERIFY] Running vehicle checks for plate:', plateResult.normalized);
     const [rtCheck, theftCheck] = await Promise.all([
       checkTechnicalReview(plateResult.normalized),
       checkTheftHistory(plateResult.normalized),
     ]);
+    console.log('[VERIFY] RT check:', rtCheck, 'Theft check:', theftCheck);
 
     // For now, accept padrón-only verification for all users
     // ClaveÚnica identity verification will be enabled later
