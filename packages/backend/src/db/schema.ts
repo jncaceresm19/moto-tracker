@@ -188,3 +188,17 @@ export const activeMotos = sqliteTable('active_motos', {
 
 export const idxActiveMotosUserId = index('idx_active_motos_user_id').on(activeMotos.userId);
 export const idxActiveMotosUserUnique = uniqueIndex('idx_active_motos_user_unique').on(activeMotos.userId);
+
+// Weather Cache table (for rain alerts)
+export const weatherCache = sqliteTable('weather_cache', {
+  zoneId: text('zone_id').primaryKey(),
+  zoneName: text('zone_name').notNull(),
+  latitude: real('latitude').notNull(),
+  longitude: real('longitude').notNull(),
+  data: text('data').notNull(),
+  lastFetchedAt: integer('last_fetched_at', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const idxWeatherCacheLastFetched = index('idx_weather_cache_last_fetched').on(weatherCache.lastFetchedAt);

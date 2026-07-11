@@ -12,6 +12,7 @@ import theftAlertRoutes from './routes/theft-alerts';
 import activeMotoRoutes from './routes/activeMotos';
 import notificationRoutes from './routes/notifications';
 import googleRoutes from './routes/google';
+import weatherRoutes from './routes/weather';
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use('/api/theft-alerts', theftAlertRoutes);
 app.use('/api/active-motos', activeMotoRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/google', googleRoutes);
+app.use('/api/weather', weatherRoutes);
 
 // Only listen when not in test environment
 if (process.env.NODE_ENV !== 'test') {

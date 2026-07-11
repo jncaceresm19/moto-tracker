@@ -23,6 +23,9 @@ import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 import { reverseGeocode } from '../../src/services/geocoding';
 import { getUnreadCount } from '../../src/services/notificationService';
 import { CustomAlert } from '../../src/components/CustomAlert';
+import { RainAlertCard } from '../../src/components/RainAlertCard';
+import { RainAlertData, fetchRainAlert } from '../../src/services/weatherApi';
+import { isRainAlertDismissed, dismissRainAlert } from '../../src/services/rainAlertDismiss';
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -44,6 +47,7 @@ export default function HomeScreen() {
   const [instagramAlertVisible, setInstagramAlertVisible] = useState(false);
   const [biometricPromptVisible, setBiometricPromptVisible] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [rainAlert, setRainAlert] = useState<RainAlertData | null>(null);
 
   // Check for biometric prompt on first load
   useEffect(() => {
@@ -198,6 +202,29 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const loadRainAlert = useCallback(async () => {
+    try {
+      const loc = await getCurrentLocation();
+      const alert = await fetchRainAlert(loc.lat, loc.lon);
+
+      if (alert.shouldShow && user) {
+        const dismissed = await isRainAlertDismissed(user.id);
+        if (!dismissed) {
+          setRainAlert(alert);
+        }
+      }
+    } catch (e: any) {
+      console.log('[RAIN] Error:', e?.message || 'Unknown');
+    }
+  }, [user]);
+
+  const handleDismissRainAlert = async () => {
+    if (user) {
+      await dismissRainAlert(user.id);
+    }
+    setRainAlert(null);
+  };
+
   useEffect(() => {
     console.log('[NEARBY] useEffect fired');
     // Load cached gas stations immediately on mount (no await - runs in background)
@@ -207,11 +234,12 @@ export default function HomeScreen() {
     loadNearbyPlaces();
     loadActiveMoto();
     loadUnreadCount();
+    loadRainAlert();
 
     // Poll for new notifications every 30 seconds
     const notificationInterval = setInterval(loadUnreadCount, 30 * 1000);
     return () => clearInterval(notificationInterval);
-  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces, loadActiveMoto, loadUnreadCount]);
+  }, [loadMotorcycles, loadGasStations, loadTheftAlerts, loadNearbyPlaces, loadActiveMoto, loadUnreadCount, loadRainAlert]);
 
   // Refresh theft alerts when returning from other screens (e.g. manual publication)
   useFocusEffect(
@@ -223,7 +251,7 @@ export default function HomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts(), loadNearbyPlaces(), loadActiveMoto()]);
+    await Promise.all([loadMotorcycles(), loadGasStations(), loadTheftAlerts(), loadNearbyPlaces(), loadActiveMoto(), loadRainAlert()]);
     setRefreshing(false);
   };
 
@@ -428,6 +456,22 @@ export default function HomeScreen() {
             <Text style={[styles.emptyMotoText, { color: colors.inkSoft }]}>
               {t('registerFirstMoto')}
             </Text>
+          </View>
+        )}
+
+        {/* Rain Alert */}
+        {rainAlert && rainAlert.shouldShow && (
+          <View style={styles.section}>
+            <RainAlertCard
+              minutesUntilRain={rainAlert.minutesUntilRain!}
+              probability={rainAlert.probability}
+              zoneName={rainAlert.zoneName || undefined}
+              onDismiss={handleDismissRainAlert}
+              onPress={() => {
+                // MVP: show detail in CustomAlert
+                // Future: navigate to weather detail screen
+              }}
+            />
           </View>
         )}
 

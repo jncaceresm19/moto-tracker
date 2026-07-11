@@ -296,6 +296,10 @@ const translations = {
     registrationFailed: 'Registration failed',
     invalidPhone: 'Enter a valid phone: +569XXXXXXXX',
     password: 'Password',
+    // Weather
+    weatherRainAlertTitle: 'Rain expected soon',
+    weatherRainAlertSubtitle: 'Consider waiting or bringing waterproof gear',
+    weatherRainAlertDismiss: 'Dismiss',
   },
   es: {
     // Tabs
@@ -588,6 +592,10 @@ const translations = {
     registrationFailed: 'Error al registrarse',
     invalidPhone: 'Ingresa un teléfono válido: +569XXXXXXXX',
     password: 'Contraseña',
+    // Weather
+    weatherRainAlertTitle: 'Lluvia esperada pronto',
+    weatherRainAlertSubtitle: 'Considera esperar o llevar equipo impermeable',
+    weatherRainAlertDismiss: 'Cerrar',
   },
 };
 
