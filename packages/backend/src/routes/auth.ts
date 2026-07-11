@@ -323,7 +323,97 @@ router.get('/claveunica', (req: Request, res: Response) => {
   }
 });
 
-// --- POST /api/auth/claveunica/callback ---
+// --- GET /api/auth/claveunica/callback ---
+// ClaveÚnica redirects here with ?code=xxx via GET
+router.get('/claveunica/callback', async (req: Request, res: Response) => {
+  try {
+    const code = req.query.code as string;
+    if (!code) {
+      res.status(400).send('<html><body><h1>Error: No code provided</h1></body></html>');
+      return;
+    }
+
+    // Exchange code for token
+    const tokenResponse = await exchangeCodeForToken(code);
+    const userInfo = await getUserInfo(tokenResponse.access_token);
+
+    if (!userInfo.run || !userInfo.email) {
+      res.status(401).send('<html><body><h1>Error: Incomplete data from ClaveÚnica</h1></body></html>');
+      return;
+    }
+
+    const normalizedRut = normalizeRut(userInfo.run);
+
+    // Check if user exists by email
+    let user = await db.select().from(users).where(eq(users.email, userInfo.email)).get();
+
+    if (user) {
+      // User exists — update ClaveÚnica verification status
+      if (!user.verificadoClaveunica) {
+        await db.update(users).set({
+          verificadoClaveunica: true,
+          rut: user.rut || normalizedRut,
+          updatedAt: new Date(),
+        }).where(eq(users.id, user.id));
+      }
+    } else {
+      // Check if user exists by RUT
+      user = await db.select().from(users).where(eq(users.rut, normalizedRut)).get();
+
+      if (user) {
+        // Link ClaveÚnica to existing account
+        await db.update(users).set({
+          verificadoClaveunica: true,
+          email: userInfo.email,
+          name: userInfo.name || user.name,
+          updatedAt: new Date(),
+        }).where(eq(users.id, user.id));
+      } else {
+        // Create new user
+        const now = new Date();
+        const userId = crypto.randomUUID();
+
+        await db.insert(users).values({
+          id: userId,
+          email: userInfo.email,
+          passwordHash: '',
+          name: userInfo.name || userInfo.email.split('@')[0],
+          rut: normalizedRut,
+          verificadoClaveunica: true,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        user = await db.select().from(users).where(eq(users.id, userId)).get();
+      }
+    }
+
+    // Generate tokens
+    const tokens = signTokens({ userId: user!.id, email: user!.email });
+
+    // Redirect back to the app via deep link with tokens
+    const deepLinkUrl = `moto-tracker://claveunica-callback?accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}`;
+
+    res.send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>ClaveÚnica</title></head>
+      <body>
+        <p>Redirigiendo a la app...</p>
+        <script>window.location.href = '${deepLinkUrl}';</script>
+        <noscript>
+          <meta http-equiv="refresh" content="0;url=${deepLinkUrl}">
+        </noscript>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    console.error('ClaveÚnica callback error:', err);
+    res.status(500).send('<html><body><h1>Error al autenticar con ClaveÚnica</h1></body></html>');
+  }
+});
+
+// --- POST /api/auth/claveunica/callback (for frontend-initiated flows) ---
 router.post('/claveunica/callback', validateBody(claveUnicaCallbackSchema), async (req: Request, res: Response) => {
   try {
     const { code } = req.body;

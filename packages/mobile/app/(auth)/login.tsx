@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
-import { getClaveUnicaAuthUrl, claveUnicaCallback } from '../../src/services/verificationApi';
+import { getClaveUnicaAuthUrl } from '../../src/services/verificationApi';
 import * as WebBrowser from 'expo-web-browser';
 
 export default function LoginScreen() {
@@ -31,6 +32,34 @@ export default function LoginScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
+  // Listen for deep link callback from ClaveÚnica
+  useEffect(() => {
+    const handleDeepLink = async (event: { url: string }) => {
+      const url = new URL(event.url);
+      if (url.pathname.includes('claveunica-callback')) {
+        const accessToken = url.searchParams.get('accessToken');
+        const refreshToken = url.searchParams.get('refreshToken');
+        if (accessToken && refreshToken) {
+          try {
+            await signInWithToken(accessToken, refreshToken);
+            router.replace('/(app)');
+          } catch (err) {
+            showAlert(
+              t('error'),
+              err instanceof Error ? err.message : 'Login failed',
+              [{ text: 'OK' }],
+              'close-circle',
+              '#FF3B30'
+            );
+          }
+        }
+      }
+    };
+
+    const subscription = Linking.addEventListener('url', handleDeepLink);
+    return () => subscription.remove();
+  }, []);
+
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
@@ -44,17 +73,8 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       const authUrl = await getClaveUnicaAuthUrl();
-      const result = await WebBrowser.openAuthSessionAsync(authUrl);
-
-      if (result.type === 'success' && result.url) {
-        const url = new URL(result.url);
-        const code = url.searchParams.get('code');
-        if (code) {
-          const data = await claveUnicaCallback(code);
-          await signInWithToken(data.accessToken, data.refreshToken);
-          router.replace('/(app)');
-        }
-      }
+      await WebBrowser.openBrowserAsync(authUrl);
+      // The deep link listener will handle the callback when the user returns
     } catch (err) {
       showAlert(
         t('error'),
@@ -143,7 +163,10 @@ export default function LoginScreen() {
       borderColor: colors.border,
       borderRadius: 10,
       paddingVertical: 16,
+      flexDirection: 'row',
+      justifyContent: 'center',
       alignItems: 'center',
+      gap: 10,
     },
     googleButtonTextDisabled: {
       color: colors.textMuted,
@@ -223,9 +246,11 @@ export default function LoginScreen() {
         onPress={handleClaveUnica}
         disabled={loading}
       >
-        <Text style={dynamicStyles.googleButtonTextDisabled}>
-          {t('loginWithClaveUnica')}
-        </Text>
+        <Image
+          source={require('../../assets/Clave-Unica-Logo-Vector.svg-.png')}
+          style={styles.claveUnicaIcon}
+          resizeMode="contain"
+        />
       </TouchableOpacity>
 
       <Text style={dynamicStyles.googleNote}>
@@ -275,5 +300,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 22,
+  },
+  claveUnicaIcon: {
+    width: 140,
+    height: 24,
   },
 });
