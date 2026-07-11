@@ -1,22 +1,49 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, MaintenanceRecord } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
+import { useTheme } from '../../../../src/theme-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
 
-const TYPES = ['oil_change', 'tire_change', 'brake_check', 'spark_plugs', 'technical_review', 'circulation_permit', 'other'];
+const TYPES = [
+  'motor_oil',
+  'air_filter',
+  'drive_chain',
+  'brakes',
+  'spark_plugs',
+  'battery',
+  'tires',
+  'coolant',
+  'valve_adjustment',
+] as const;
+
+type MaintenanceType = typeof TYPES[number];
 
 const TYPE_KEYS: Record<string, string> = {
-  oil_change: 'oilChange',
-  tire_change: 'tireChange',
-  brake_check: 'brakeCheck',
+  motor_oil: 'motorOil',
+  air_filter: 'airFilter',
+  drive_chain: 'driveChain',
+  brakes: 'brakes',
   spark_plugs: 'sparkPlugs',
-  technical_review: 'technicalReview',
-  circulation_permit: 'circulationPermit',
-  other: 'other',
+  battery: 'battery',
+  tires: 'tires',
+  coolant: 'coolant',
+  valve_adjustment: 'valveAdjustment',
+};
+
+const CATEGORY_ICONS: Record<string, string> = {
+  motor_oil: '🛢️',
+  air_filter: '🌬️',
+  drive_chain: '⛓️',
+  brakes: '🛑',
+  spark_plugs: '⚡',
+  battery: '🔋',
+  tires: '🛞',
+  coolant: '🧊',
+  valve_adjustment: '🔧',
 };
 
 export default function MaintenanceScreen() {
@@ -24,15 +51,28 @@ export default function MaintenanceScreen() {
   const navigation = useNavigation();
   const router = useRouter();
   const { t } = useLanguage();
+  const { colors } = useTheme();
+
   const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [form, setForm] = useState({ type: 'motor_oil', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
-  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+  const [alertIconColor, setAlertIconColor] = useState(colors.primary);
 
-  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = colors.primary) => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -41,29 +81,31 @@ export default function MaintenanceScreen() {
     setAlertVisible(true);
   };
 
+  // Navigation header
   useEffect(() => {
     navigation.setOptions({
+      title: selectedType ? t(TYPE_KEYS[selectedType] as any) : t('maintenance'),
       headerLeft: () => (
-        <TouchableOpacity onPress={() => router.push(`/(app)/motorcycle/${id}`)} style={{ marginLeft: 12 }}>
-          <Ionicons name="chevron-back" size={26} color="white" />
+        <TouchableOpacity
+          onPress={() => {
+            if (selectedType) {
+              setSelectedType(null);
+            } else {
+              router.push(`/(app)/motorcycle/${id}`);
+            }
+          }}
+          style={{ marginLeft: 12 }}
+        >
+          <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
         </TouchableOpacity>
       ),
     });
-  }, [navigation, id, router]);
-  const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [form, setForm] = useState({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  }, [navigation, id, router, selectedType, t, colors]);
 
   const load = async () => {
     if (!id) return;
-    try {
-      setRecords(await listMaintenance(id));
-    } catch { showAlert(t('error'), t('failedToLoad'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
+    try { setRecords(await listMaintenance(id)); }
+    catch { showAlert(t('error'), t('failedToLoad'), [{ text: 'OK' }], 'close-circle', colors.danger); }
     finally { setLoading(false); }
   };
 
@@ -75,9 +117,9 @@ export default function MaintenanceScreen() {
     setRefreshing(false);
   };
 
-  const resetForm = () => setForm({ type: 'oil_change', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
+  const resetForm = (type: string = 'motor_oil') => setForm({ type, description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
 
-  const openCreate = () => { resetForm(); setErrors({}); setShowCreate(true); };
+  const openCreate = () => { resetForm(selectedType || 'motor_oil'); setErrors({}); setShowCreate(true); };
 
   const openEdit = (record: MaintenanceRecord) => {
     setErrors({});
@@ -112,9 +154,9 @@ export default function MaintenanceScreen() {
       setRecords((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      showAlert(t('success'), t('recordSaved'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('recordSaved'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
     } catch {
-      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToCreate'), [{ text: 'OK' }], 'close-circle', colors.danger);
     } finally {
       setSaving(false);
     }
@@ -140,9 +182,9 @@ export default function MaintenanceScreen() {
       });
       setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       setEditing(null);
-      showAlert(t('success'), t('recordUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('recordUpdated'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
     } catch {
-      showAlert(t('error'), t('failedToUpdate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToUpdate'), [{ text: 'OK' }], 'close-circle', colors.danger);
     } finally {
       setSaving(false);
     }
@@ -158,10 +200,10 @@ export default function MaintenanceScreen() {
           try {
             await deleteMaintenance(id, record.id);
             setRecords((prev) => prev.filter((r) => r.id !== record.id));
-          } catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
+          } catch { showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', colors.danger); }
         },
       },
-    ], 'warning', '#FF9500');
+    ], 'warning', colors.accent);
   };
 
   const modalTitle = editing ? t('editRecord') : t('newRecord');
@@ -169,81 +211,174 @@ export default function MaintenanceScreen() {
   const showModal = showCreate || editing !== null;
   const closeModal = () => { setShowCreate(false); setEditing(null); };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
+  const filteredRecords = selectedType ? records.filter((r) => r.type === selectedType) : [];
 
+  if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
+
+  // ============================================================
+  // VISTA 1: LISTA DE CATEGORÍAS
+  // ============================================================
+  if (!selectedType) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <FlatList
+          data={TYPES}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.categoryList}
+          renderItem={({ item }) => {
+            const count = records.filter((r) => r.type === item).length;
+            return (
+              <TouchableOpacity
+                style={[styles.categoryBtn, { backgroundColor: colors.card }]}
+                onPress={() => setSelectedType(item)}
+              >
+                <Text style={styles.categoryIcon}>{CATEGORY_ICONS[item]}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.categoryText, { color: colors.text }]}>{t(TYPE_KEYS[item] as any)}</Text>
+                  <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
+                    {count} {count === 1 ? 'registro' : 'registros'}
+                  </Text>
+                </View>
+                <Text style={[styles.arrow, { color: colors.textMuted }]}>›</Text>
+              </TouchableOpacity>
+            );
+          }}
+        />
+
+        <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+          <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
+        </TouchableOpacity>
+
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          buttons={alertButtons}
+          icon={alertIcon}
+          iconColor={alertIconColor}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
+
+  // ============================================================
+  // VISTA 2: REGISTROS DE LA CATEGORÍA SELECCIONADA
+  // ============================================================
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={records}
+        data={filteredRecords}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={records.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={filteredRecords.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        ListHeaderComponent={filteredRecords.length > 0 ? <View style={{ height: 8 }} /> : null}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔧</Text>
-            <Text style={styles.empty}>{t('noRecords')}</Text>
-            <Text style={styles.emptySub}>{t('noRecordsSub')}</Text>
+            <Text style={styles.emptyIcon}>{CATEGORY_ICONS[selectedType]}</Text>
+            <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noRecords')}</Text>
+            <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noRecordsSub')}</Text>
           </View>
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.card}
+            style={[styles.card, { backgroundColor: colors.card }]}
             onPress={() => openEdit(item)}
             onLongPress={() => handleDelete(item)}
           >
             <View style={styles.cardRow}>
-              <Text style={styles.cardType}>{t(TYPE_KEYS[item.type] as any || 'other')}</Text>
-              <Text style={styles.cardDate}>{new Date(item.serviceDate).toLocaleDateString()}</Text>
+              <Text style={[styles.cardDesc, { color: colors.text }]}>{item.description}</Text>
             </View>
-            <Text style={styles.cardDesc}>{item.description}</Text>
-            <Text style={styles.cardKm}>{item.kilometersAtService.toLocaleString()} km</Text>
-            {item.cost != null && <Text style={styles.cardCost}>${item.cost.toLocaleString()}</Text>}
+            <View style={styles.cardMeta}>
+              <Text style={[styles.cardDate, { color: colors.textSecondary }]}>{new Date(item.serviceDate).toLocaleDateString()}</Text>
+              <Text style={[styles.cardKm, { color: colors.primary }]}>{item.kilometersAtService.toLocaleString()} km</Text>
+            </View>
+            {item.cost != null && <Text style={[styles.cardCost, { color: colors.success }]}>${item.cost.toLocaleString()}</Text>}
           </TouchableOpacity>
         )}
       />
 
-      <TouchableOpacity style={styles.fab} onPress={openCreate}>
-        <Text style={styles.fabText}>+</Text>
+      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+        <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
       </TouchableOpacity>
 
+      {/* Create/Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>{modalTitle}</Text>
-            <TouchableOpacity onPress={closeModal}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
-          </View>
-          <TextInput style={styles.input} placeholder="Description *" value={form.description} onChangeText={(t) => { setForm((p) => ({ ...p, description: t })); setErrors((p) => ({ ...p, description: '' })); }} />
-          {errors.description ? <Text style={styles.errorText}>{errors.description}</Text> : null}
-          <TextInput style={styles.input} placeholder="Kilometers *" keyboardType="numeric" value={form.kilometersAtService} onChangeText={(t) => { setForm((p) => ({ ...p, kilometersAtService: t })); setErrors((p) => ({ ...p, kilometersAtService: '' })); }} />
-          {errors.kilometersAtService ? <Text style={styles.errorText}>{errors.kilometersAtService}</Text> : null}
-          <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
-            <Text style={form.serviceDate ? styles.dateText : styles.datePlaceholder}>
-              {form.serviceDate || t('selectDate')}
-            </Text>
-          </TouchableOpacity>
-          {errors.serviceDate ? <Text style={styles.errorText}>{errors.serviceDate}</Text> : null}
-          {showDatePicker && (
-            <DateTimePicker
-              value={form.serviceDate ? new Date(form.serviceDate) : new Date()}
-              mode="date"
-              display="default"
-              onValueChange={(date) => {
-                setShowDatePicker(false);
-                if (date) {
-                  const iso = date.toISOString().split('T')[0];
-                  setForm((p) => ({ ...p, serviceDate: iso }));
-                  setErrors((p) => ({ ...p, serviceDate: '' }));
-                }
-              }}
-              onDismiss={() => setShowDatePicker(false)}
+          <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
+              <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+            </View>
+
+            {/* Type indicator (read-only, set by category) */}
+            <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
+              <Text style={{ fontSize: 18 }}>{CATEGORY_ICONS[form.type]}</Text>
+              <Text style={{ fontSize: 15, color: colors.text }}>{t(TYPE_KEYS[form.type] as any)}</Text>
+            </View>
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+              placeholder={`${t('description')} *`}
+              placeholderTextColor={colors.textMuted}
+              value={form.description}
+              onChangeText={(text) => { setForm((p) => ({ ...p, description: text })); setErrors((p) => ({ ...p, description: '' })); }}
             />
-          )}
-          <TextInput style={styles.input} placeholder="Cost (optional)" keyboardType="numeric" value={form.cost} onChangeText={(t) => setForm((p) => ({ ...p, cost: t }))} />
-          <TextInput style={styles.input} placeholder="Notes (optional)" value={form.notes} onChangeText={(t) => setForm((p) => ({ ...p, notes: t }))} />
-          <TouchableOpacity style={styles.saveBtn} onPress={modalSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
-          </TouchableOpacity>
+            {errors.description ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.description}</Text> : null}
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+              placeholder={`${t('kilometers')} *`}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numeric"
+              value={form.kilometersAtService}
+              onChangeText={(text) => { setForm((p) => ({ ...p, kilometersAtService: text })); setErrors((p) => ({ ...p, kilometersAtService: '' })); }}
+            />
+            {errors.kilometersAtService ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.kilometersAtService}</Text> : null}
+
+            <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowDatePicker(true)}>
+              <Text style={{ fontSize: 15, color: form.serviceDate ? colors.text : colors.textMuted }}>
+                {form.serviceDate || t('selectDate')}
+              </Text>
+            </TouchableOpacity>
+            {errors.serviceDate ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.serviceDate}</Text> : null}
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={form.serviceDate ? new Date(form.serviceDate) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event: DateTimePickerEvent, date?: Date) => {
+                  setShowDatePicker(false);
+                  if (event.type === 'set' && date) {
+                    const iso = date.toISOString().split('T')[0];
+                    setForm((p) => ({ ...p, serviceDate: iso }));
+                    setErrors((p) => ({ ...p, serviceDate: '' }));
+                  }
+                }}
+              />
+            )}
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+              placeholder={`${t('cost')} (${t('optional')})`}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="numeric"
+              value={form.cost}
+              onChangeText={(text) => setForm((p) => ({ ...p, cost: text }))}
+            />
+
+            <TextInput
+              style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+              placeholder={`${t('notes')} (${t('optional')})`}
+              placeholderTextColor={colors.textMuted}
+              value={form.notes}
+              onChangeText={(text) => setForm((p) => ({ ...p, notes: text }))}
+            />
+
+            <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>}
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -262,33 +397,39 @@ export default function MaintenanceScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  title: { fontSize: 20, fontWeight: 'bold' },
-  addBtn: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
-  addBtnText: { color: '#fff', fontWeight: '600' },
-  empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  categoryList: { padding: 16 },
+  categoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  categoryIcon: { fontSize: 20, marginRight: 12 },
+  categoryText: { fontSize: 16, fontWeight: '500' },
+  categoryCount: { fontSize: 13, marginTop: 2 },
+  arrow: { fontSize: 20 },
+  empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
   emptyContainer: { alignItems: 'center' },
   emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptySub: { fontSize: 13, color: '#ccc', marginTop: 4 },
-  card: { padding: 14, marginHorizontal: 16, marginTop: 8, backgroundColor: '#f8f8f8', borderRadius: 8 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  cardType: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize' },
-  cardDate: { fontSize: 13, color: '#666' },
-  cardDesc: { fontSize: 15, marginTop: 4 },
-  cardKm: { fontSize: 13, color: '#007AFF', marginTop: 2 },
-  cardCost: { fontSize: 13, color: '#34C759', marginTop: 2 },
+  emptySub: { fontSize: 13, marginTop: 4 },
+  card: { padding: 14, marginHorizontal: 16, marginTop: 8, borderRadius: 8 },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardDesc: { fontSize: 15, fontWeight: '600', flex: 1 },
+  cardMeta: { flexDirection: 'row', gap: 12, marginTop: 4 },
+  cardDate: { fontSize: 13 },
+  cardKm: { fontSize: 13, fontWeight: '500' },
+  cardCost: { fontSize: 13, fontWeight: '500', marginTop: 2 },
+  // Modal
   modal: { flex: 1, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  cancel: { color: '#007AFF', fontSize: 16 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
-  errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
-  dateText: { fontSize: 15, color: '#333' },
-  datePlaceholder: { fontSize: 15, color: '#999' },
-  saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10 },
+  errorText: { fontSize: 12, marginBottom: 8, marginTop: -6 },
+  saveBtn: { borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtnText: { fontSize: 16, fontWeight: '600' },
   fab: {
     position: 'absolute',
     bottom: 24,
@@ -296,7 +437,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,
@@ -305,5 +445,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
   },
-  fabText: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginTop: -2 },
+  fabText: { fontSize: 28, fontWeight: '300', marginTop: -2 },
 });
