@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,16 +9,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
-import * as Linking from 'expo-linking';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
-import { getClaveUnicaAuthUrl } from '../../src/services/verificationApi';
-import * as WebBrowser from 'expo-web-browser';
 
 export default function LoginScreen() {
-  const { signIn, signInWithToken } = useAuth();
+  const { signIn } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
 
@@ -32,34 +29,6 @@ export default function LoginScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
-  // Listen for deep link callback from ClaveÚnica
-  useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      const url = new URL(event.url);
-      if (url.pathname.includes('claveunica-callback')) {
-        const accessToken = url.searchParams.get('accessToken');
-        const refreshToken = url.searchParams.get('refreshToken');
-        if (accessToken && refreshToken) {
-          try {
-            await signInWithToken(accessToken, refreshToken);
-            router.replace('/(app)');
-          } catch (err) {
-            showAlert(
-              t('error'),
-              err instanceof Error ? err.message : 'Login failed',
-              [{ text: 'OK' }],
-              'close-circle',
-              '#FF3B30'
-            );
-          }
-        }
-      }
-    };
-
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-    return () => subscription.remove();
-  }, []);
-
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
@@ -67,25 +36,6 @@ export default function LoginScreen() {
     setAlertIcon(icon);
     setAlertIconColor(iconColor);
     setAlertVisible(true);
-  };
-
-  const handleClaveUnica = async () => {
-    try {
-      setLoading(true);
-      const authUrl = await getClaveUnicaAuthUrl();
-      await WebBrowser.openBrowserAsync(authUrl);
-      // The deep link listener will handle the callback when the user returns
-    } catch (err) {
-      showAlert(
-        t('error'),
-        err instanceof Error ? err.message : 'ClaveÚnica login failed',
-        [{ text: 'OK' }],
-        'close-circle',
-        '#FF3B30'
-      );
-    } finally {
-      setLoading(false);
-    }
   };
 
   const handleLogin = async () => {
@@ -147,38 +97,6 @@ export default function LoginScreen() {
       fontSize: 16,
       fontWeight: '600',
     },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: colors.border,
-    },
-    dividerText: {
-      marginHorizontal: 12,
-      color: colors.textMuted,
-      fontSize: 14,
-    },
-    googleButton: {
-      backgroundColor: colors.surfaceSecondary,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 10,
-      paddingVertical: 16,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 10,
-    },
-    googleButtonTextDisabled: {
-      color: colors.textMuted,
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    googleNote: {
-      color: colors.textMuted,
-      fontSize: 12,
-      textAlign: 'center',
-      marginTop: 6,
-    },
     link: {
       color: colors.accent,
       textAlign: 'center',
@@ -235,28 +153,6 @@ export default function LoginScreen() {
         </Text>
       </TouchableOpacity>
 
-      <View style={styles.divider}>
-        <View style={dynamicStyles.dividerLine} />
-        <Text style={dynamicStyles.dividerText}>{t('or')}</Text>
-        <View style={dynamicStyles.dividerLine} />
-      </View>
-
-      <TouchableOpacity
-        style={dynamicStyles.googleButton}
-        onPress={handleClaveUnica}
-        disabled={loading}
-      >
-        <Image
-          source={require('../../assets/Clave-Unica-Logo-Vector.svg-.png')}
-          style={styles.claveUnicaIcon}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
-
-      <Text style={dynamicStyles.googleNote}>
-        {t('claveUnicaNote')}
-      </Text>
-
       <Link href="/(auth)/register" asChild>
         <TouchableOpacity>
           <Text style={dynamicStyles.link}>
@@ -294,15 +190,5 @@ const styles = StyleSheet.create({
     width: 500,
     height: 180,
     marginBottom: -60,
-  },
-
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 22,
-  },
-  claveUnicaIcon: {
-    width: 140,
-    height: 24,
   },
 });
