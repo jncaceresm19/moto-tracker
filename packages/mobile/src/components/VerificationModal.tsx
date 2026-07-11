@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme-context';
 import { useLanguage } from '../language-context';
@@ -60,19 +60,52 @@ export function VerificationModal({
   };
 
   const pickImage = async (onResult: (uri: string) => void) => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const manipulated = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { width: 1200 } }],
-        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-      );
-      onResult(manipulated.uri);
-    }
+    // Show options: camera or gallery
+    Alert.alert(
+      'Agregar foto',
+      'Elegí una opción',
+      [
+        {
+          text: 'Tomar foto',
+          onPress: async () => {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert('Permiso requerido', 'Necesitamos acceso a la cámara');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const manipulated = await ImageManipulator.manipulateAsync(
+                result.assets[0].uri,
+                [{ resize: { width: 1200 } }],
+                { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+              );
+              onResult(manipulated.uri);
+            }
+          },
+        },
+        {
+          text: 'Elegir de galería',
+          onPress: async () => {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              const manipulated = await ImageManipulator.manipulateAsync(
+                result.assets[0].uri,
+                [{ resize: { width: 1200 } }],
+                { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+              );
+              onResult(manipulated.uri);
+            }
+          },
+        },
+        { text: 'Cancelar', style: 'cancel' },
+      ]
+    );
   };
 
   const handleVerify = async () => {
