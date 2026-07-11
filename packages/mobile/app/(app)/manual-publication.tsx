@@ -119,6 +119,21 @@ export default function ManualPublicationScreen() {
       return;
     }
 
+    // Check if motorcycle is verified
+    if (!selectedMoto.verificada) {
+      setAlertTitle(t('verifyMotoTitle'));
+      setAlertMessage('Para publicar una alerta de robo, primero debés verificar tu moto desde la pantalla de Motos.');
+      setAlertButtons([
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: 'Verificar ahora',
+          onPress: () => router.replace('/(app)/motos'),
+        },
+      ]);
+      setAlertVisible(true);
+      return;
+    }
+
     // Confirm before publishing
     setAlertTitle(t('publishAlert'));
     setAlertMessage(t('publishConfirm'));
