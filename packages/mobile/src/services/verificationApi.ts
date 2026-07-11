@@ -43,8 +43,8 @@ export async function unlinkMotorcycle(motorcycleId: string): Promise<void> {
   await api(`/api/motorcycles/${motorcycleId}/unlink`, { method: 'POST' });
 }
 
-export async function sendOtp(email: string): Promise<void> {
-  await api('/api/otp/send', { method: 'POST', body: { email } });
+export async function sendOtp(email: string, tipo: 'email' | 'phone' = 'email', phone?: string): Promise<void> {
+  await api('/api/otp/send', { method: 'POST', body: { email, tipo, phone } });
 }
 
 export async function verifyOtpCode(code: string): Promise<void> {

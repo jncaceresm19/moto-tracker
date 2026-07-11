@@ -13,8 +13,9 @@ export function generateOtp(): string {
 
 export async function sendOtp(
   userId: string,
-  email: string,
-  sendEmailFn: (to: string, subject: string, body: string) => Promise<void>
+  destination: string,
+  sendFn: (to: string, subject: string, body: string) => Promise<void>,
+  tipo: 'email' | 'phone' = 'email'
 ): Promise<{ success: boolean; error?: string }> {
   const user = await db.select().from(users).where(eq(users.id, userId)).get();
   if (!user) return { success: false, error: 'USER_NOT_FOUND' };
@@ -39,12 +40,13 @@ export async function sendOtp(
     id: crypto.randomUUID(),
     userId,
     code,
-    tipo: 'email',
+    tipo,
     createdAt: now,
     expiresAt: new Date(now.getTime() + OTP_EXPIRY_MS),
   });
 
-  await sendEmailFn(email, 'Tu código de verificación - Moto Tracker', `Tu código de verificación es: ${code}. Expira en 5 minutos.`);
+  const label = tipo === 'phone' ? 'SMS' : 'email';
+  await sendFn(destination, 'Tu código de verificación - Moto Tracker', `Tu código de verificación es: ${code}. Expira en 5 minutos. (${label})`);
 
   return { success: true };
 }
