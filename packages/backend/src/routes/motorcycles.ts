@@ -265,10 +265,10 @@ router.delete('/:id', validateParams(motorcycleIdParam), async (req: Request, re
 // --- Verification Schemas ---
 
 const verifyMotorcycleSchema = z.object({
-  padronUrl: z.string().url('Padrón photo URL is required'),
-  carnetFrontUrl: z.string().url().optional(),
-  carnetBackUrl: z.string().url().optional(),
-  selfieUrl: z.string().url().optional(),
+  padronUrl: z.string().min(1, 'Padrón photo is required'),
+  carnetFrontUrl: z.string().optional(),
+  carnetBackUrl: z.string().optional(),
+  selfieUrl: z.string().optional(),
 });
 
 // --- GET /api/motorcycles/:id/verification-status ---
@@ -361,73 +361,31 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
       checkTheftHistory(plateResult.normalized),
     ]);
 
-    // Determine verification method
-    const isClaveUnica = user.verificadoClaveunica;
-    const isIdentityVerified = user.identidadVerificada;
+    // For now, accept padrón-only verification for all users
+    // ClaveÚnica identity verification will be enabled later
+    await db.update(motorcycles).set({
+      verificada: true,
+      verificadaEn: new Date(),
+      verificadaPor: 'padron',
+      fotoConPatente: padronUrl,
+      rtVigente: rtCheck.vigente,
+      encargoRobo: theftCheck.encargo,
+      updatedAt: new Date(),
+    }).where(eq(motorcycles.id, motorcycleId));
 
-    if (isClaveUnica || isIdentityVerified) {
-      // ClaveÚnica user or already verified identity — padrón only
-      await db.update(motorcycles).set({
+    res.json({
+      success: true,
+      data: {
         verificada: true,
-        verificadaEn: new Date(),
-        verificadaPor: isClaveUnica ? 'clave_unica' : 'padron',
-        fotoConPatente: padronUrl,
+        verificadaPor: 'padron',
         rtVigente: rtCheck.vigente,
         encargoRobo: theftCheck.encargo,
-        updatedAt: new Date(),
-      }).where(eq(motorcycles.id, motorcycleId));
-
-      res.json({
-        success: true,
-        data: {
-          verificada: true,
-          verificadaPor: isClaveUnica ? 'clave_unica' : 'padron',
-          rtVigente: rtCheck.vigente,
-          encargoRobo: theftCheck.encargo,
-          warnings: [
-            ...(!rtCheck.vigente ? ['Revisión técnica no vigente'] : []),
-            ...(theftCheck.encargo ? ['Este vehículo tiene encargo por robo'] : []),
-          ],
-        },
-      });
-    } else {
-      // Email user, first verification — need carnet + selfie
-      if (!carnetFrontUrl || !carnetBackUrl || !selfieUrl) {
-        res.status(400).json(createErrorResponse('MISSING_FILES', 'Carnet (front/back) and selfie required for first verification'));
-        return;
-      }
-
-      // Mark identity as verified
-      await db.update(users).set({
-        identidadVerificada: true,
-        updatedAt: new Date(),
-      }).where(eq(users.id, userId));
-
-      // Verify motorcycle
-      await db.update(motorcycles).set({
-        verificada: true,
-        verificadaEn: new Date(),
-        verificadaPor: 'carnet',
-        fotoConPatente: padronUrl,
-        rtVigente: rtCheck.vigente,
-        encargoRobo: theftCheck.encargo,
-        updatedAt: new Date(),
-      }).where(eq(motorcycles.id, motorcycleId));
-
-      res.json({
-        success: true,
-        data: {
-          verificada: true,
-          verificadaPor: 'carnet',
-          rtVigente: rtCheck.vigente,
-          encargoRobo: theftCheck.encargo,
-          warnings: [
-            ...(!rtCheck.vigente ? ['Revisión técnica no vigente'] : []),
-            ...(theftCheck.encargo ? ['Este vehículo tiene encargo por robo'] : []),
-          ],
-        },
-      });
-    }
+        warnings: [
+          ...(!rtCheck.vigente ? ['Revisión técnica no vigente'] : []),
+          ...(theftCheck.encargo ? ['Este vehículo tiene encargo por robo'] : []),
+        ],
+      },
+    });
   } catch (err) {
     console.error('Verify motorcycle error:', err);
     res.status(500).json(createErrorResponse('INTERNAL_ERROR', 'Failed to verify motorcycle'));

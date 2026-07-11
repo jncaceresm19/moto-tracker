@@ -105,35 +105,15 @@ export function VerificationModal({
   const renderStep = () => {
     switch (step) {
       case 'method':
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={[styles.stepTitle, { color: colors.ink }]}>{t('verifyMotoTitle')}</Text>
-            <Text style={[styles.stepSubtitle, { color: colors.inkSoft }]}>{t('verifyMotoSubtitle')}</Text>
-
-            <TouchableOpacity
-              style={[styles.methodButton, { backgroundColor: colors.primary }]}
-              onPress={() => setStep('padron')}
-            >
-              <Ionicons name="checkmark-circle" size={24} color="#fff" />
-              <Text style={styles.methodButtonText}>ClaveÚnica</Text>
-              <Text style={styles.methodButtonSubtext}>Solo padrón</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.methodButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={() => setStep('carnet')}
-            >
-              <Ionicons name="card" size={24} color={colors.primary} />
-              <Text style={[styles.methodButtonText, { color: colors.ink }]}>Email y contraseña</Text>
-              <Text style={[styles.methodButtonSubtext, { color: colors.inkSoft }]}>Carnet + selfie + padrón</Text>
-            </TouchableOpacity>
-          </View>
-        );
+        // Skip method selection, go directly to padrón
+        setStep('padron');
+        return null;
 
       case 'padron':
         return (
           <View style={styles.stepContainer}>
             <Text style={[styles.stepTitle, { color: colors.ink }]}>{t('verifyMotoPadron')}</Text>
+            <Text style={[styles.stepSubtitle, { color: colors.inkSoft }]}>Subí una foto del padrón de tu moto</Text>
             <TouchableOpacity
               style={[styles.photoButton, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
               onPress={() => pickImage(setPadronUri)}
