@@ -1,24 +1,21 @@
-const API_KEY = process.env.OPENWEATHER_API_KEY;
+// Open-Meteo API — free, no key required
+// https://open-meteo.com/en/docs
 
-// Free tier endpoints (no subscription needed)
-const CURRENT_URL = 'https://api.openweathermap.org/data/2.5/weather';
-const FORECAST_URL = 'https://api.openweathermap.org/data/2.5/forecast';
+const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 
-interface CurrentWeatherResponse {
-  weather: { id: number; main: string; description: string }[];
-  main: { temp: number; humidity: number };
-  rain?: { '1h': number };
-  snow?: { '1h': number };
-}
-
-interface ForecastResponse {
-  list: Array<{
-    dt: number;
-    pop: number; // probability of precipitation (0-1)
-    rain?: { '3h': number };
-    snow?: { '3h': number };
-    weather: { id: number; main: string }[];
-  }>;
+interface OpenMeteoResponse {
+  current: {
+    time: string;
+    precipitation: number;
+    rain: number;
+    showers: number;
+    weather_code: number;
+  };
+  minutely_15: {
+    time: string[];
+    precipitation_probability: number[];
+    precipitation: number[];
+  };
 }
 
 export interface RainAlertResult {
@@ -27,58 +24,45 @@ export interface RainAlertResult {
   probability: number;
 }
 
-export async function fetchCurrentWeather(lat: number, lon: number): Promise<CurrentWeatherResponse> {
-  if (!API_KEY) {
-    throw new Error('OPENWEATHER_API_KEY not configured');
-  }
-
-  const url = `${CURRENT_URL}?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`OpenWeatherMap API error: ${response.status}`);
-  }
-  return response.json();
-}
-
-export async function fetchForecast(lat: number, lon: number): Promise<ForecastResponse> {
-  if (!API_KEY) {
-    throw new Error('OPENWEATHER_API_KEY not configured');
-  }
-
-  const url = `${FORECAST_URL}?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric`;
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`OpenWeatherMap API error: ${response.status}`);
-  }
-  return response.json();
-}
-
 export async function fetchRainAlert(lat: number, lon: number): Promise<RainAlertResult> {
-  const [current, forecast] = await Promise.all([
-    fetchCurrentWeather(lat, lon),
-    fetchForecast(lat, lon),
-  ]);
+  const url = `${BASE_URL}?latitude=${lat}&longitude=${lon}` +
+    `&current=precipitation,rain,showers,weather_code` +
+    `&minutely_15=precipitation_probability,precipitation` +
+    `&forecast_days=1` +
+    `&timezone=America%2FSantiago`;
 
-  const now = Date.now();
-
-  // Check current weather for rain
-  if (current.rain && current.rain['1h'] > 0.1) {
-    return { shouldShow: true, minutesUntilRain: 0, probability: 100 };
-  }
-  if (current.snow && current.snow['1h'] > 0.1) {
-    return { shouldShow: true, minutesUntilRain: 0, probability: 100 };
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Open-Meteo API error: ${response.status}`);
   }
 
-  // Check forecast (3-hour intervals for next 24 hours)
-  for (const entry of forecast.list) {
-    const hoursAhead = (entry.dt * 1000 - now) / 3600000;
-    if (hoursAhead > 0 && hoursAhead <= 24) {
-      const prob = entry.pop * 100;
-      if (prob > 60 || (entry.rain && entry.rain['3h'] > 0.5)) {
+  const data: OpenMeteoResponse = await response.json();
+
+  // Check current conditions
+  const current = data.current;
+  if (current.precipitation > 0.1 || current.rain > 0.1 || current.showers > 0.1) {
+    return { shouldShow: true, minutesUntilRain: 0, probability: 100 };
+  }
+
+  // Check 15-minute forecast for next 2 hours
+  const now = new Date();
+  const times = data.minutely_15.time;
+  const probs = data.minutely_15.precipitation_probability;
+  const precip = data.minutely_15.precipitation;
+
+  for (let i = 0; i < times.length; i++) {
+    const forecastTime = new Date(times[i]);
+    const minutesAhead = (forecastTime.getTime() - now.getTime()) / 60000;
+
+    if (minutesAhead > 0 && minutesAhead <= 120) {
+      const prob = probs[i];
+      const mm = precip[i];
+
+      if (prob > 60 || mm > 0.5) {
         return {
           shouldShow: true,
-          minutesUntilRain: Math.round(hoursAhead * 60),
-          probability: Math.round(prob),
+          minutesUntilRain: Math.round(minutesAhead),
+          probability: prob,
         };
       }
     }
