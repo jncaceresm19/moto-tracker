@@ -57,6 +57,7 @@ export const maintenanceRecords = sqliteTable('maintenance_records', {
   serviceDate: integer('service_date', { mode: 'timestamp' }).notNull(),
   cost: real('cost'),
   notes: text('notes'),
+  photoUrl: text('photo_url'), // Photo of the product/service
   nextServiceKilometers: real('next_service_kilometers'),
   nextServiceDate: integer('next_service_date', { mode: 'timestamp' }),
   oilTypeId: text('oil_type_id').references(() => oilCatalogProducts.id),

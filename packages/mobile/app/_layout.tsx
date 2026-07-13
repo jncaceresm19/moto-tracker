@@ -11,6 +11,8 @@ import * as Location from 'expo-location';
 import { isBiometricEnabled, hasBiometricPreference, hasBiometricHardware, isBiometricEnrolled, enableBiometric, disableBiometric, authenticateWithBiometrics } from '../src/services/biometric';
 import BiometricLockScreen from './(auth)/biometric';
 import { api } from '../src/api';
+import { getDueRemindersByDate, getReminderMessage } from '../src/services/reminderService';
+import { CustomAlert } from '../src/components/CustomAlert';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,6 +53,7 @@ function RootLayoutInner() {
   const [biometricNeeded, setBiometricNeeded] = useState(false);
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [initialCheckDone, setInitialCheckDone] = useState(false);
+  const [reminderAlert, setReminderAlert] = useState<{ visible: boolean; title: string; message: string }>({ visible: false, title: '', message: '' });
   const appState = useRef(AppState.currentState);
   const backgroundTime = useRef<number | null>(null);
   const biometricChecked = useRef(false);
@@ -104,6 +107,9 @@ function RootLayoutInner() {
     // Save user location for proximity-based notifications
     saveUserLocation();
 
+    // Check for due oil change reminders
+    checkDueReminders();
+
     // Check biometric only once per session
     if (!biometricChecked.current) {
       console.log('[AUTH] Checking biometric...');
@@ -128,6 +134,21 @@ function RootLayoutInner() {
       }
     } catch (err) {
       console.log('[LOCATION] Could not save location:', err);
+    }
+  };
+
+  const checkDueReminders = async () => {
+    try {
+      // Check date-based reminders only — this is reliable
+      const dueByDate = await getDueRemindersByDate();
+      
+      if (dueByDate.length > 0) {
+        const first = dueByDate[0];
+        const msg = getReminderMessage(first, 'date');
+        setReminderAlert({ visible: true, title: msg.title, message: msg.body });
+      }
+    } catch (err) {
+      console.log('[REMINDER] Check error:', err);
     }
   };
 
@@ -240,6 +261,17 @@ function RootLayoutInner() {
           </View>
         </View>
       </Modal>
+
+      {/* Oil Change Reminder Alert */}
+      <CustomAlert
+        visible={reminderAlert.visible}
+        title={reminderAlert.title}
+        message={reminderAlert.message}
+        buttons={[{ text: 'OK', onPress: () => setReminderAlert({ visible: false, title: '', message: '' }) }]}
+        icon="alarm-outline"
+        iconColor={colors.accent}
+        onClose={() => setReminderAlert({ visible: false, title: '', message: '' })}
+      />
     </View>
   );
 }

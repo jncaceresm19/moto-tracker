@@ -35,13 +35,14 @@ const CATEGORY_ICONS: Record<string, string> = {
 // Types where the title is auto-set and non-editable
 const FIXED_TITLE_TYPES: Record<string, string> = {
   circulation_permit: 'circulationPermit',
+  technical_review: 'technicalReview',
   insurance: 'insurance',
   padron: 'padron',
   drivers_license: 'driversLicense',
 };
 
 // Types that allow multiple documents
-const MULTI_DOC_TYPES = ['technical_review', 'fines'];
+const MULTI_DOC_TYPES = ['fines'];
 
 export default function DocumentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,6 +73,7 @@ export default function DocumentsScreen() {
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoSide, setPhotoSide] = useState<'front' | 'back'>('front');
+  const [showDocPortarModal, setShowDocPortarModal] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -385,6 +387,15 @@ export default function DocumentsScreen() {
               <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('documentsDisclaimer')}</Text>
             </View>
           }
+          ListFooterComponent={
+            <TouchableOpacity
+              style={[styles.docPortarBtn, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}
+              onPress={() => setShowDocPortarModal(true)}
+            >
+              <Ionicons name="help-circle-outline" size={18} color={colors.brandBlue} />
+              <Text style={[styles.docPortarBtnText, { color: colors.brandBlue }]}>¿Qué documentos debo portar?</Text>
+            </TouchableOpacity>
+          }
           renderItem={({ item }) => {
             const docsForType = docs.filter((d) => d.type === item);
             const count = docsForType.length;
@@ -439,58 +450,267 @@ export default function DocumentsScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {doc ? (
           <ScrollView contentContainerStyle={styles.detailContent}>
-            {/* Title + Status badge */}
-            <View style={[styles.detailTitleRow, { justifyContent: 'flex-end' }]}>
-              <View style={[styles.detailStatusBadge, {
-                backgroundColor: doc.status === 'expired' ? colors.danger + '15' : doc.status === 'expiring' ? colors.accent + '15' : colors.success + '15',
-                borderColor: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,
+            {/* Photo with status badge overlay */}
+            <View>
+              {((doc.type === 'drivers_license' || doc.type === 'technical_review') && doc.fileUrlBack) ? (
+                <View style={{ gap: 10 }}>
+                  <View>
+                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{doc.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
+                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
+                      <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
+                    </TouchableOpacity>
+                  </View>
+                  <View>
+                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{doc.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text>
+                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('back'); setShowPhotoViewer(true); }}>
+                      <Image source={{ uri: doc.fileUrlBack }} style={styles.pdfPreviewImage} resizeMode="contain" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : doc.fileUrl ? (
+                <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
+                  <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
+                  <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
+                </View>
+              )}
+              {/* Status badge overlay */}
+              <View style={[styles.statusBadgeOverlay, {
+                backgroundColor: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,
               }]}>
-                <Text style={[styles.detailStatusText, {
-                  color: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,
-                }]}>
+                <Text style={styles.statusBadgeOverlayText}>
                   {doc.status === 'expired' ? t('expired') : doc.status === 'expiring' ? t('expiring') : t('valid')}
                 </Text>
               </View>
             </View>
-            {doc.issueDate && <Text style={[styles.detailDate, { color: colors.textSecondary }]}>{t('issued')}: {new Date(doc.issueDate).toLocaleDateString()}</Text>}
-            {doc.expiryDate && <Text style={[styles.detailDate, { color: colors.textSecondary }]}>{t('expires')}: {new Date(doc.expiryDate).toLocaleDateString()}</Text>}
 
-            {doc.type === 'drivers_license' && doc.fileUrlBack ? (
-              <View style={{ gap: 10, marginTop: 20 }}>
-                <View>
-                  <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{t('frontPhoto')}</Text>
-                  <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
-                    <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                  </TouchableOpacity>
-                </View>
-                <View>
-                  <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{t('backPhoto')}</Text>
-                  <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('back'); setShowPhotoViewer(true); }}>
-                    <Image source={{ uri: doc.fileUrlBack }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                  </TouchableOpacity>
-                </View>
+            {/* Edit + Delete buttons */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+              <View>
+                {doc.issueDate && <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>{t('issued')}: {new Date(doc.issueDate).toLocaleDateString()}</Text>}
+                {doc.expiryDate && <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 4 }]}>{t('expires')}: {new Date(doc.expiryDate).toLocaleDateString()}</Text>}
               </View>
-            ) : doc.fileUrl ? (
-              <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
-                <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
-                <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                  <Ionicons name="pencil" size={18} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
+                  <Ionicons name="trash" size={18} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Requisitos Permiso de Circulación */}
+            {doc.type === 'circulation_permit' && (
+              <View style={{
+                backgroundColor: colors.brandBlueBg,
+                borderColor: colors.brandBlue,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 14,
+                marginTop: 16,
+              }}>
+                <View style={styles.cardRow}>
+                  <Ionicons name="document-text-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Permiso de Circulación</Text>
+                </View>
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Revisión técnica al día</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>SOAP vigente (hasta 31 de marzo del año siguiente)</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Sin multas de tránsito impagas</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No estar en el Registro de Pasajeros Infractores</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Permiso de circulación del año anterior + padrón del vehículo</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.brandBlue + '99'} />
+                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Plazo: 1 feb – 31 mar</Text>
+                </View>
               </View>
             )}
 
-            {/* Edit + Delete buttons centered below photo */}
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 20 }}>
-              <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.actionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-                <Ionicons name="pencil" size={18} color={colors.primary} />
-                <Text style={[styles.actionBtnText, { color: colors.primary }]}>{t('edit')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(doc)} style={[styles.actionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
-                <Ionicons name="trash" size={18} color={colors.danger} />
-                <Text style={[styles.actionBtnText, { color: colors.danger }]}>{t('delete')}</Text>
-              </TouchableOpacity>
-            </View>
+            {/* Requisitos SOAP */}
+            {doc.type === 'insurance' && (
+              <View style={{
+                backgroundColor: colors.brandBlueBg,
+                borderColor: colors.brandBlue,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 14,
+                marginTop: 16,
+              }}>
+                <View style={styles.cardRow}>
+                  <Ionicons name="shield-checkmark-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos SOAP</Text>
+                </View>
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Patente del vehículo</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>RUT del propietario/contratante</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva: se contrata junto a la inscripción</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto usada: vigencia desde el 1 de abril</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.brandBlue + '99'} />
+                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Plazo: hasta 31 de marzo</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Información relevante del Padrón */}
+            {doc.type === 'padron' && (
+              <View style={{
+                backgroundColor: colors.brandBlueBg,
+                borderColor: colors.brandBlue,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 14,
+                marginTop: 16,
+              }}>
+                <View style={styles.cardRow}>
+                  <Ionicons name="document-text-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Información relevante</Text>
+                </View>
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Obligatorio portarlo para circular</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No caduca mientras no cambie de dueño</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Si se pierde, se saca duplicado online con ClaveÚnica</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="alert-circle-outline" size={16} color={colors.brandBlue + '99'} />
+                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Multa por no portarlo: hasta 0,5 UTM</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Requisitos Licencia de Conducir */}
+            {doc.type === 'drivers_license' && (
+              <View style={{
+                backgroundColor: colors.brandBlueBg,
+                borderColor: colors.brandBlue,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 14,
+                marginTop: 16,
+              }}>
+                <View style={styles.cardRow}>
+                  <Ionicons name="card-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Licencia (Clase C)</Text>
+                </View>
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Cédula de identidad vigente</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Licencia anterior (para renovación)</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Exámenes de reflejos, vista y teórico</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No estar en el RPI ni con deudas de pensión de alimentos</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Vigencia: 6 años</Text>
+                </View>
+              </View>
+            )}
+            {/* Requisitos Revisión Técnica */}
+            {viewing?.type === 'technical_review' && (
+              <View style={{
+                backgroundColor: colors.brandBlueBg,
+                borderColor: colors.brandBlue,
+                borderWidth: 1,
+                borderRadius: 10,
+                padding: 14,
+                marginTop: 16,
+              }}>
+                <View style={styles.cardRow}>
+                  <Ionicons name="construct-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Revisión Técnica</Text>
+                </View>
+                <View style={{ marginTop: 10 }}>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Certificado de revisión técnica anterior</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Certificado de emisión de gases anterior</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Permiso de circulación al día</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva sin revisión previa: certificado de homologación + padrón</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                <View style={{ marginTop: 4 }}>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva: exenta los primeros 36-48 meses desde inscripción</Text>
+                  </View>
+                  <View style={styles.infoCardItem}>
+                    <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>5-9 años: cada 2 años · 10+ años: cada año</Text>
+                  </View>
+                </View>
+                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="alert-circle-outline" size={16} color={colors.brandBlue + '99'} />
+                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Multa por no tenerla al día: 1 a 1,5 UTM</Text>
+                </View>
+              </View>
+            )}
           </ScrollView>
         ) : (
           /* Empty state: no document yet */
@@ -541,7 +761,7 @@ export default function DocumentsScreen() {
                 <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
                 <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
               </View>
-              {form.type === 'drivers_license' ? (
+              {(form.type === 'drivers_license' || form.type === 'technical_review') ? (
                 <View style={{ gap: 10, marginBottom: 12 }}>
                   <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
                     {form.fileUrl ? (
@@ -549,7 +769,7 @@ export default function DocumentsScreen() {
                     ) : (
                       <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
                         <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                        <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('frontPhoto')}</Text>
+                        <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -559,7 +779,7 @@ export default function DocumentsScreen() {
                     ) : (
                       <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
                         <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                        <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('backPhoto')}</Text>
+                        <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -614,6 +834,54 @@ export default function DocumentsScreen() {
         </Modal>
 
         <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+
+        {/* Modal: ¿Qué documentos debo portar? */}
+        <Modal visible={showDocPortarModal} transparent animationType="fade">
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowDocPortarModal(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="shield-outline" size={22} color={colors.primary} />
+                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>En un control policial te piden</Text>
+                    <TouchableOpacity onPress={() => setShowDocPortarModal(false)}>
+                      <Ionicons name="close" size={22} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                    <View style={{ marginTop: 12 }}>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Cédula de identidad</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Licencia de conducir Clase C</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Permiso de circulación vigente</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>SOAP vigente</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Revisión técnica (u homologación si es nueva)</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.infoCardDivider, { backgroundColor: colors.border, marginTop: 12 }]} />
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                      <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+                      <Text style={[styles.infoCardText, { color: colors.textMuted, flex: 1 }]}>El padrón no es obligatorio portarlo físicamente, pero se recomienda</Text>
+                    </View>
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
       </View>
     );
   }
@@ -753,13 +1021,13 @@ export default function DocumentsScreen() {
               <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
               <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
             </View>
-            {form.type === 'drivers_license' ? (
+            {(form.type === 'drivers_license' || form.type === 'technical_review') ? (
               <View style={{ gap: 10, marginBottom: 12 }}>
                 <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
-                  {form.fileUrl ? (<Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('frontPhoto')}</Text></View>)}
+                  {form.fileUrl ? (<Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text></View>)}
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('back')}>
-                  {form.fileUrlBack ? (<Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('backPhoto')}</Text></View>)}
+                  {form.fileUrlBack ? (<Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text></View>)}
                 </TouchableOpacity>
               </View>
             ) : (
@@ -827,6 +1095,14 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     flex: 1,
   },
+  iconActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   categoryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -844,9 +1120,9 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 13, marginTop: 4 },
   card: { padding: 14, marginHorizontal: 16, marginTop: 8, borderRadius: 8 },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 15, flex: 1 },
+  cardTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   cardStatus: { fontSize: 12, fontWeight: '500' },
-  cardDate: { fontSize: 13, marginTop: 2 },
+  cardDate: { fontSize: 11, marginTop: 2 },
   // Detail Modal
   detailContainer: { flex: 1 },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
@@ -858,6 +1134,8 @@ const styles = StyleSheet.create({
   detailTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailStatusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   detailStatusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
+  statusBadgeOverlay: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
+  statusBadgeOverlayText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   detailDate: { fontSize: 15, marginTop: 8 },
   actionBtn: {
     flexDirection: 'row',
@@ -886,6 +1164,21 @@ const styles = StyleSheet.create({
   pdfName: { fontSize: 14, fontWeight: '600' },
   pdfHint: { fontSize: 12, marginTop: 4 },
   noPhoto: { height: 150, borderRadius: 10, marginTop: 16, justifyContent: 'center', alignItems: 'center' },
+  // Info card (requisitos)
+  infoCard: { borderRadius: 12, borderWidth: 1, padding: 16, marginTop: 20 },
+  infoCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
+  infoCardItem: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+  infoCardCheck: { fontSize: 11 },
+  infoCardText: { fontSize: 11.5, flex: 1, lineHeight: 15 },
+  infoCardDivider: { height: 1, marginVertical: 6 },
+  infoCardDeadline: { fontSize: 13, fontWeight: '600' },
+  // Doc portar button + modal
+  docPortarBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, borderRadius: 10, marginTop: 12, borderWidth: 1 },
+  docPortarBtnText: { fontSize: 14, fontWeight: '600' },
+  docPortarModal: { borderRadius: 14, padding: 20, marginHorizontal: 24 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
+  docPortarModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12, borderBottomWidth: 1 },
+  docPortarModalTitle: { fontSize: 17, fontWeight: '700', flex: 1 },
   // Photo Viewer
   photoViewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   photoViewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },

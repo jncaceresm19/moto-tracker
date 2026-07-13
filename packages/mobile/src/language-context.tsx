@@ -631,8 +631,8 @@ const translations = {
     weatherRainAlertSubtitle: 'Considera esperar o llevar equipo impermeable',
     weatherRainAlertDismiss: 'Cerrar',
     // Verification
-    verifyMotoTitle: 'Verificá tu moto',
-    verifyMotoSubtitle: 'Verificá para poder reportar robos',
+    verifyMotoTitle: 'Verifica tu moto',
+    verifyMotoSubtitle: 'Verifica para poder reportar robos',
     verifyMotoPadron: 'Padrón de la moto',
     verifyMotoCarnetFront: 'Carnet (anverso)',
     verifyMotoCarnetBack: 'Carnet (reverso)',

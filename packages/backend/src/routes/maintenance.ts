@@ -39,6 +39,7 @@ const createMaintenanceSchema = z.object({
   serviceDate: z.string().datetime('Invalid service date'),
   cost: z.number().min(0).optional(),
   notes: z.string().max(1000).optional(),
+  photoUrl: z.string().max(1000000).optional(), // Base64 image
   nextServiceKilometers: z.number().min(0).optional(),
   nextServiceDate: z.string().datetime().optional(),
   oilTypeId: z.string().uuid().optional(),
@@ -51,6 +52,7 @@ const updateMaintenanceSchema = z.object({
   serviceDate: z.string().datetime().optional(),
   cost: z.number().min(0).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
+  photoUrl: z.string().max(1000000).nullable().optional(), // Base64 image
   nextServiceKilometers: z.number().min(0).nullable().optional(),
   nextServiceDate: z.string().datetime().nullable().optional(),
   oilTypeId: z.string().uuid().nullable().optional(),
@@ -97,7 +99,7 @@ router.post('/', validateBody(createMaintenanceSchema), async (req: Request, res
       return;
     }
 
-    const { type, description, kilometersAtService, serviceDate, cost, notes, nextServiceKilometers, nextServiceDate, oilTypeId } = req.body;
+    const { type, description, kilometersAtService, serviceDate, cost, notes, photoUrl, nextServiceKilometers, nextServiceDate, oilTypeId } = req.body;
     const now = new Date();
     const recordId = crypto.randomUUID();
 
@@ -110,6 +112,7 @@ router.post('/', validateBody(createMaintenanceSchema), async (req: Request, res
       serviceDate: new Date(serviceDate),
       cost: cost ?? null,
       notes: notes ?? null,
+      photoUrl: photoUrl ?? null,
       nextServiceKilometers: nextServiceKilometers ?? null,
       nextServiceDate: nextServiceDate ? new Date(nextServiceDate) : null,
       oilTypeId: oilTypeId ?? null,
@@ -272,6 +275,7 @@ router.put('/:recordId', validateParams(recordIdParam), validateBody(updateMaint
     if (req.body.serviceDate !== undefined) updates.serviceDate = new Date(req.body.serviceDate);
     if (req.body.cost !== undefined) updates.cost = req.body.cost;
     if (req.body.notes !== undefined) updates.notes = req.body.notes;
+    if (req.body.photoUrl !== undefined) updates.photoUrl = req.body.photoUrl;
     if (req.body.nextServiceKilometers !== undefined) updates.nextServiceKilometers = req.body.nextServiceKilometers;
     if (req.body.nextServiceDate !== undefined) updates.nextServiceDate = req.body.nextServiceDate ? new Date(req.body.nextServiceDate) : null;
     if (req.body.oilTypeId !== undefined) updates.oilTypeId = req.body.oilTypeId;

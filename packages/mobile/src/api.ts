@@ -169,6 +169,7 @@ export async function createMotorcycle(data: {
   year: number;
   licensePlate: string;
   currentKilometers?: number;
+  imageUrl?: string;
   gpsTracker?: string;
 }): Promise<Motorcycle> {
   return api<Motorcycle>('/api/motorcycles', { method: 'POST', body: data });
@@ -195,6 +196,7 @@ export interface MaintenanceRecord {
   serviceDate: string;
   cost?: number;
   notes?: string;
+  photoUrl?: string;
 }
 
 export async function listMaintenance(motorcycleId: string): Promise<MaintenanceRecord[]> {
@@ -203,7 +205,7 @@ export async function listMaintenance(motorcycleId: string): Promise<Maintenance
 
 export async function createMaintenance(
   motorcycleId: string,
-  data: { type: string; description: string; kilometersAtService: number; serviceDate: string; cost?: number; notes?: string }
+  data: { type: string; description: string; kilometersAtService: number; serviceDate: string; cost?: number; notes?: string; photoUrl?: string }
 ): Promise<MaintenanceRecord> {
   return api<MaintenanceRecord>(`/api/motorcycles/${motorcycleId}/maintenance`, { method: 'POST', body: data });
 }
@@ -211,7 +213,7 @@ export async function createMaintenance(
 export async function updateMaintenance(
   motorcycleId: string,
   recordId: string,
-  data: { type?: string; description?: string; kilometersAtService?: number; serviceDate?: string; cost?: number | null; notes?: string | null }
+  data: { type?: string; description?: string; kilometersAtService?: number; serviceDate?: string; cost?: number | null; notes?: string | null; photoUrl?: string | null }
 ): Promise<MaintenanceRecord> {
   return api<MaintenanceRecord>(`/api/motorcycles/${motorcycleId}/maintenance/${recordId}`, { method: 'PUT', body: data });
 }

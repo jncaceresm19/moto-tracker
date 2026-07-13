@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle } from '../../../src/api';
 import { useLanguage } from '../../../src/language-context';
 import { CustomAlert } from '../../../src/components/CustomAlert';
+import { getDueRemindersByKm, getReminderMessage, dismissReminder } from '../../../src/services/reminderService';
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -41,6 +42,18 @@ export default function MotorcycleDetailScreen() {
         console.log('[MOTO] Loaded:', moto.brand, moto.model);
         setMotorcycle(moto);
         setGpsEnabled(!!moto.gpsTracker);
+        
+        // Check for due oil change reminders based on current km (estimated)
+        if (moto.currentKilometers) {
+          const dueReminders = await getDueRemindersByKm(moto.currentKilometers);
+          if (dueReminders.length > 0) {
+            const first = dueReminders[0];
+            const msg = getReminderMessage(first, 'km');
+            showAlert(msg.title, msg.body, [
+              { text: 'OK', onPress: () => dismissReminder(first.id) },
+            ], 'alarm-outline', '#FF9500');
+          }
+        }
       }
       catch (e: any) {
         console.log('[MOTO] Error:', e?.message, e?.status);
