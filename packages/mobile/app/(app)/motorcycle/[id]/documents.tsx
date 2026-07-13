@@ -392,8 +392,7 @@ export default function DocumentsScreen() {
               style={[styles.docPortarBtn, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}
               onPress={() => setShowDocPortarModal(true)}
             >
-              <Ionicons name="help-circle-outline" size={18} color={colors.brandBlue} />
-              <Text style={[styles.docPortarBtnText, { color: colors.brandBlue }]}>¿Qué documentos debo portar?</Text>
+              <Text style={[styles.docPortarBtnText, { color: colors.brandBlue, textAlign: 'center' }]}>¿Qué documentos debo portar?</Text>
             </TouchableOpacity>
           }
           renderItem={({ item }) => {
@@ -404,10 +403,6 @@ export default function DocumentsScreen() {
                 style={[styles.categoryBtn, { backgroundColor: colors.card }]}
                 onPress={() => {
                   setSelectedType(item);
-                  // Single-doc types: if doc exists, show detail directly
-                  if (!MULTI_DOC_TYPES.includes(item) && docsForType.length === 1) {
-                    setViewing(docsForType[0]);
-                  }
                 }}
               >
                 <Text style={styles.categoryIcon}>{CATEGORY_ICONS[item]}</Text>
@@ -1173,8 +1168,8 @@ const styles = StyleSheet.create({
   infoCardDivider: { height: 1, marginVertical: 6 },
   infoCardDeadline: { fontSize: 13, fontWeight: '600' },
   // Doc portar button + modal
-  docPortarBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14, borderRadius: 10, marginTop: 12, borderWidth: 1 },
-  docPortarBtnText: { fontSize: 14, fontWeight: '600' },
+  docPortarBtn: { alignItems: 'center', padding: 14, borderRadius: 10, marginTop: 12, borderWidth: 1 },
+  docPortarBtnText: { fontSize: 15, fontWeight: '600' },
   docPortarModal: { borderRadius: 14, padding: 20, marginHorizontal: 24 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
   docPortarModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12, borderBottomWidth: 1 },
