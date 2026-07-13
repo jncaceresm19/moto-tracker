@@ -387,7 +387,17 @@ export default function DocumentsScreen() {
               <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('documentsDisclaimer')}</Text>
             </View>
           }
-          ListFooterComponent={undefined}
+          ListFooterComponent={
+            <>
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 16 }]}
+                onPress={() => setShowDocPortarModal(true)}
+              >
+                <Ionicons name="help-circle-outline" size={20} color="#fff" />
+                <Text style={[styles.submitBtnText, { color: '#fff' }]}>¿Qué documentos debo portar?</Text>
+              </TouchableOpacity>
+            </>
+          }
           renderItem={({ item }) => {
             const docsForType = docs.filter((d) => d.type === item);
             const count = docsForType.length;
@@ -411,13 +421,6 @@ export default function DocumentsScreen() {
           }}
         />
 
-        <TouchableOpacity
-          style={[styles.docPortarBtn, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}
-          onPress={() => setShowDocPortarModal(true)}
-        >
-          <Text style={[styles.docPortarBtnText, { color: colors.brandBlue, textAlign: 'center' }]}>¿Qué documentos debo portar?</Text>
-        </TouchableOpacity>
-
         <CustomAlert
           visible={alertVisible}
           title={alertTitle}
@@ -427,6 +430,54 @@ export default function DocumentsScreen() {
           iconColor={alertIconColor}
           onClose={() => setAlertVisible(false)}
         />
+
+        {/* Modal: ¿Qué documentos debo portar? */}
+        <Modal visible={showDocPortarModal} transparent animationType="fade">
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowDocPortarModal(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="shield-outline" size={22} color={colors.primary} />
+                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>En un control policial te piden</Text>
+                    <TouchableOpacity onPress={() => setShowDocPortarModal(false)}>
+                      <Ionicons name="close" size={22} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                    <View style={{ marginTop: 12 }}>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Cédula de identidad</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Licencia de conducir Clase C</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Permiso de circulación vigente</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>SOAP vigente</Text>
+                      </View>
+                      <View style={styles.infoCardItem}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                        <Text style={[styles.infoCardText, { color: colors.text }]}>Revisión técnica (u homologación si es nueva)</Text>
+                      </View>
+                    </View>
+                    <View style={[styles.infoCardDivider, { backgroundColor: colors.border, marginTop: 12 }]} />
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                      <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+                      <Text style={[styles.infoCardText, { color: colors.textMuted, flex: 1 }]}>El padrón no es obligatorio portarlo físicamente, pero se recomienda</Text>
+                    </View>
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
       </View>
     );
   }
@@ -657,7 +708,7 @@ export default function DocumentsScreen() {
               </View>
             )}
             {/* Requisitos Revisión Técnica */}
-            {viewing?.type === 'technical_review' && (
+            {doc.type === 'technical_review' && (
               <View style={{
                 backgroundColor: colors.brandBlueBg,
                 borderColor: colors.brandBlue,
@@ -829,54 +880,6 @@ export default function DocumentsScreen() {
         </Modal>
 
         <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
-
-        {/* Modal: ¿Qué documentos debo portar? */}
-        <Modal visible={showDocPortarModal} transparent animationType="fade">
-          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowDocPortarModal(false)}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
-                <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
-                  <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
-                    <Ionicons name="shield-outline" size={22} color={colors.primary} />
-                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>En un control policial te piden</Text>
-                    <TouchableOpacity onPress={() => setShowDocPortarModal(false)}>
-                      <Ionicons name="close" size={22} color={colors.textMuted} />
-                    </TouchableOpacity>
-                  </View>
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
-                    <View style={{ marginTop: 12 }}>
-                      <View style={styles.infoCardItem}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                        <Text style={[styles.infoCardText, { color: colors.text }]}>Cédula de identidad</Text>
-                      </View>
-                      <View style={styles.infoCardItem}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                        <Text style={[styles.infoCardText, { color: colors.text }]}>Licencia de conducir Clase C</Text>
-                      </View>
-                      <View style={styles.infoCardItem}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                        <Text style={[styles.infoCardText, { color: colors.text }]}>Permiso de circulación vigente</Text>
-                      </View>
-                      <View style={styles.infoCardItem}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                        <Text style={[styles.infoCardText, { color: colors.text }]}>SOAP vigente</Text>
-                      </View>
-                      <View style={styles.infoCardItem}>
-                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-                        <Text style={[styles.infoCardText, { color: colors.text }]}>Revisión técnica (u homologación si es nueva)</Text>
-                      </View>
-                    </View>
-                    <View style={[styles.infoCardDivider, { backgroundColor: colors.border, marginTop: 12 }]} />
-                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
-                      <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-                      <Text style={[styles.infoCardText, { color: colors.textMuted, flex: 1 }]}>El padrón no es obligatorio portarlo físicamente, pero se recomienda</Text>
-                    </View>
-                  </ScrollView>
-                </View>
-              </TouchableOpacity>
-            </KeyboardAvoidingView>
-          </TouchableOpacity>
-        </Modal>
       </View>
     );
   }
@@ -1168,8 +1171,6 @@ const styles = StyleSheet.create({
   infoCardDivider: { height: 1, marginVertical: 6 },
   infoCardDeadline: { fontSize: 13, fontWeight: '600' },
   // Doc portar button + modal
-  docPortarBtn: { alignItems: 'center', padding: 14, borderRadius: 10, marginTop: 3, borderWidth: 1 },
-  docPortarBtnText: { fontSize: 15, fontWeight: '600' },
   docPortarModal: { borderRadius: 14, padding: 20, marginHorizontal: 24 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
   docPortarModalHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingBottom: 12, borderBottomWidth: 1 },
@@ -1288,5 +1289,17 @@ const styles = StyleSheet.create({
   photoOverlayBtnText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  submitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
+  },
+  submitBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
