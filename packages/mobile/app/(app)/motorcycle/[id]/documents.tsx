@@ -387,14 +387,7 @@ export default function DocumentsScreen() {
               <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('documentsDisclaimer')}</Text>
             </View>
           }
-          ListFooterComponent={
-            <TouchableOpacity
-              style={[styles.docPortarBtn, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}
-              onPress={() => setShowDocPortarModal(true)}
-            >
-              <Text style={[styles.docPortarBtnText, { color: colors.brandBlue, textAlign: 'center' }]}>¿Qué documentos debo portar?</Text>
-            </TouchableOpacity>
-          }
+          ListFooterComponent={undefined}
           renderItem={({ item }) => {
             const docsForType = docs.filter((d) => d.type === item);
             const count = docsForType.length;
@@ -417,6 +410,13 @@ export default function DocumentsScreen() {
             );
           }}
         />
+
+        <TouchableOpacity
+          style={[styles.docPortarBtn, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}
+          onPress={() => setShowDocPortarModal(true)}
+        >
+          <Text style={[styles.docPortarBtnText, { color: colors.brandBlue, textAlign: 'center' }]}>¿Qué documentos debo portar?</Text>
+        </TouchableOpacity>
 
         <CustomAlert
           visible={alertVisible}
@@ -1168,7 +1168,7 @@ const styles = StyleSheet.create({
   infoCardDivider: { height: 1, marginVertical: 6 },
   infoCardDeadline: { fontSize: 13, fontWeight: '600' },
   // Doc portar button + modal
-  docPortarBtn: { alignItems: 'center', padding: 14, borderRadius: 10, marginTop: 12, borderWidth: 1 },
+  docPortarBtn: { alignItems: 'center', padding: 14, borderRadius: 10, marginTop: 3, borderWidth: 1 },
   docPortarBtnText: { fontSize: 15, fontWeight: '600' },
   docPortarModal: { borderRadius: 14, padding: 20, marginHorizontal: 24 },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center' },
