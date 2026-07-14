@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView, Dimensions } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, updateMotorcycle, getMotorcycle, MaintenanceRecord } from '../../../../src/api';
@@ -11,7 +12,19 @@ import { useTheme } from '../../../../src/theme-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
 import { createReminder, OilType, getOilInterval } from '../../../../src/services/reminderService';
 
-const CATEGORY_ICON = '🔧';
+const CATEGORY_CHIPS: Record<string, { icon: keyof typeof Ionicons.glyphMap; bg: string; color: string }> = {
+  motor_oil: { icon: 'water-outline', bg: '#FAEEDA', color: '#854F0B' },
+  air_filter: { icon: 'filter-outline', bg: '#E6F1FB', color: '#185FA5' },
+  drive_chain: { icon: 'link-outline', bg: '#E1F5EE', color: '#0F6E56' },
+  brakes: { icon: 'stop-circle-outline', bg: '#FDEAEA', color: '#B42318' },
+  spark_plugs: { icon: 'flash-outline', bg: '#FFF6D9', color: '#8A6D00' },
+  battery: { icon: 'battery-charging-outline', bg: '#EAF3E6', color: '#3D7A2E' },
+  tires: { icon: 'ellipse-outline', bg: '#EFEAF6', color: '#5B3E9E' },
+  coolant: { icon: 'thermometer-outline', bg: '#E1F0FB', color: '#1C6FA5' },
+  valve_adjustment: { icon: 'settings-outline', bg: '#F3E8FF', color: '#6B21A8' },
+};
+
+const DEFAULT_CHIP = { icon: 'build-outline' as const, bg: '#F1EFE8', color: '#666' };
 
 const DEFAULT_TYPES = [
   { key: 'motor_oil', labelKey: 'motorOil' },
@@ -33,6 +46,87 @@ const MOTOR_OIL_OPTIONS = [
   { key: 'synthetic', label: 'Sintético', detail: 'Cada 5.000–6.000 km (premium hasta 8.000–10.000 km) o 12 meses' },
 ];
 
+const BRAKE_OPTIONS = [
+  { key: 'pastillas_delanteras', label: 'Pastillas delanteras', detail: 'Cada 10.000–20.000 km' },
+  { key: 'pastillas_traseras', label: 'Pastillas traseras', detail: 'Cada 8.000–15.000 km' },
+  { key: 'liquido_frenos', label: 'Líquido de frenos', detail: 'Cada 2 años' },
+  { key: 'balatas', label: 'Balatas', detail: 'Según uso' },
+];
+
+const TIRE_OPTIONS = [
+  { key: 'delantero', label: 'Delantero', detail: 'Revisar desgaste visual de la banda de rodado' },
+  { key: 'trasero', label: 'Trasero', detail: 'Revisar desgaste visual de la banda de rodado' },
+];
+
+const BALATAS_USAGE_OPTIONS = [
+  {
+    key: 'normal',
+    label: 'Uso normal (ciudad)',
+    checkInterval: 'Cada 5.000 km',
+    changeInterval: 'Entre 15.000 y 30.000 km',
+  },
+  {
+    key: 'intensivo',
+    label: 'Uso intensivo (delivery, carga, cerros)',
+    checkInterval: 'Cada 3.000–5.000 km',
+    changeInterval: 'Entre 10.000 y 20.000 km',
+  },
+];
+
+const MAX_BRAKE_RECORDS = 4;
+const MAX_TIRE_RECORDS = 2;
+
+type MaintenanceInterval = { km?: number; months?: number; notes?: string };
+
+
+const MAINTENANCE_INTERVALS: Record<string, MaintenanceInterval> = {
+  air_filter: {
+    km: 10000,
+    months: 12,
+    notes: 'Revisión cada 3.000–4.000 km · Limpieza filtro de espuma (off-road) cada 1.000–2.000 km',
+  },
+  drive_chain: {
+    km: 20000,
+    months: 24,
+    notes: 'Tensado cada 500–1.000 km · Lubricado cada 300–500 km o después de lavar la moto / lluvia',
+  },
+  brakes: {
+    km: 15000,
+    months: 18,
+    notes: 'Pastillas traseras cada 8.000–15.000 km (se desgastan más rápido) · Líquido de frenos cada 2 años',
+  },
+  spark_plugs: {
+    km: 10000,
+    notes: 'Rango habitual: 8.000–12.000 km',
+  },
+  battery: {
+    months: 6,
+    notes: 'Reemplazo estimado cada 2–3 años',
+  },
+  coolant: {
+    months: 24,
+  },
+  valve_adjustment: {
+    km: 18000,
+    notes: 'Rango habitual: 12.000–24.000 km',
+  },
+};
+
+const MONTH_MS = 1000 * 60 * 60 * 24 * 30.44;
+
+function calcProgress(startKm: number, startDate: string, currentKm: number, interval: MaintenanceInterval) {
+  const kmDone = interval.km ? Math.max(0, currentKm - startKm) : 0;
+  const kmProgress = interval.km ? Math.min(1, kmDone / interval.km) : 0;
+
+  const monthsElapsed = Math.max(0, (Date.now() - new Date(startDate).getTime()) / MONTH_MS);
+  const timeProgress = interval.months ? Math.min(1, monthsElapsed / interval.months) : 0;
+
+  return {
+    progress: Math.max(kmProgress, timeProgress),
+    kmDone: Math.round(kmDone),
+    monthsElapsed: Math.round(monthsElapsed),
+  };
+}
 export default function MaintenanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
@@ -46,6 +140,7 @@ export default function MaintenanceScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [pageIdx, setPageIdx] = useState(0);
   const [form, setForm] = useState({ type: 'motor_oil', description: '', kilometersAtService: '', serviceDate: '', cost: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -73,6 +168,10 @@ export default function MaintenanceScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState(colors.primary);
 
+  // Balatas usage modal
+  const [showBalatasModal, setShowBalatasModal] = useState(false);
+  const [selectedBalatasUsage, setSelectedBalatasUsage] = useState<string | null>(null);
+
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = colors.primary) => {
     setAlertTitle(title);
     setAlertMessage(message || '');
@@ -89,29 +188,23 @@ export default function MaintenanceScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showAlert(t('permissionNeeded'), fromCamera ? t('permissionCamera') : t('permissionGallery'), [{text: 'OK'}], 'lock-closed', '#FF9500');
+      showAlert(t('permissionNeeded'), fromCamera ? t('permissionCamera') : t('permissionGallery'), [{ text: 'OK' }], 'lock-closed', '#FF9500');
       return;
     }
 
     const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 0.5, base64: true })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.5, base64: true });
+      ? await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.8, allowsEditing: true });
 
     if (!result.canceled && result.assets[0]) {
-      let uri: string;
-      if (result.assets[0].base64) {
-        uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      } else {
-        const response = await fetch(result.assets[0].uri);
-        const blob = await response.blob();
-        const base64 = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(blob);
-        });
-        uri = base64;
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      if (manipulated.base64) {
+        setImageUri(`data:image/jpeg;base64,${manipulated.base64}`);
       }
-      setImageUri(uri);
     }
   };
 
@@ -124,7 +217,7 @@ export default function MaintenanceScreen() {
     try {
       const stored = await AsyncStorage.getItem(`${CUSTOM_TYPES_KEY}_${id}`);
       if (stored) setCustomTypes(JSON.parse(stored));
-    } catch {}
+    } catch { }
   };
 
   // Save custom types to AsyncStorage
@@ -241,14 +334,22 @@ export default function MaintenanceScreen() {
         cost: form.cost ? Number(form.cost) : undefined,
         photoUrl: imageUri || undefined,
       };
-      console.log('CREATE PAYLOAD:', JSON.stringify({ ...payload, photoUrl: payload.photoUrl ? `[${payload.photoUrl.length} chars]` : undefined }));
       const created = await createMaintenance(id, payload);
       setRecords((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
-      // Update motorcycle km when saving motor_oil
-      if (form.type === 'motor_oil' && id) {
-        try { await updateMotorcycle(id as string, { currentKilometers: Number(form.kilometersAtService) }); } catch {}
+
+      // Actualiza el km de la moto SIEMPRE, sin importar el tipo de mantenimiento.
+      // El km ingresado en cualquier registro pasa a ser el km actual de la moto.
+      if (id) {
+        try {
+          await updateMotorcycle(id as string, { currentKilometers: Number(form.kilometersAtService) });
+          setMotorcycleKm(Number(form.kilometersAtService));
+        } catch { }
+      }
+
+      // El flujo del recordatorio de aceite queda igual, pero ya no controla el update de km
+      if (form.type === 'motor_oil') {
         const oilTypeMap: Record<string, OilType> = {
           'Mineral': 'mineral',
           'Semi-sintético': 'semi_synthetic',
@@ -262,12 +363,13 @@ export default function MaintenanceScreen() {
             serviceDate: form.serviceDate,
           });
           setShowReminderModal(true);
+        } else {
+          showAlert(t('success'), t('recordSaved'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
         }
       } else {
         showAlert(t('success'), t('recordSaved'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
       }
     } catch (e) {
-      console.error('CREATE MAINTENANCE ERROR:', e);
       showAlert(t('error'), t('failedToCreate'), [{ text: 'OK' }], 'close-circle', colors.danger);
     } finally {
       setSaving(false);
@@ -294,10 +396,15 @@ export default function MaintenanceScreen() {
       });
       setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       setEditing(null);
-      // Update motorcycle km when editing motor_oil
-      if (form.type === 'motor_oil' && id) {
-        try { await updateMotorcycle(id as string, { currentKilometers: Number(form.kilometersAtService) }); } catch {}
+
+      // Actualiza el km de la moto siempre, igual que en handleCreate
+      if (id) {
+        try {
+          await updateMotorcycle(id as string, { currentKilometers: Number(form.kilometersAtService) });
+          setMotorcycleKm(Number(form.kilometersAtService));
+        } catch { }
       }
+
       showAlert(t('success'), t('recordUpdated'), [{ text: 'OK' }], 'checkmark-circle', colors.success);
     } catch {
       showAlert(t('error'), t('failedToUpdate'), [{ text: 'OK' }], 'close-circle', colors.danger);
@@ -327,8 +434,13 @@ export default function MaintenanceScreen() {
   const showModal = showCreate || editing !== null;
   const closeModal = () => { setShowCreate(false); setEditing(null); };
 
-  const filteredRecords = selectedType ? records.filter((r) => r.type === selectedType) : [];
-  const hasOilRecord = records.some((r) => r.type === 'motor_oil');
+  // Ordenado por fecha de servicio descendente: el [0] es siempre el más reciente,
+  // y de él depende el detalle principal, la barra de progreso y el historial.
+  const filteredRecords = selectedType
+    ? records
+      .filter((r) => r.type === selectedType)
+      .sort((a, b) => new Date(b.serviceDate).getTime() - new Date(a.serviceDate).getTime())
+    : [];
 
   const isCustomType = (key: string) => customTypes.some((c) => c.key === key);
 
@@ -380,10 +492,18 @@ export default function MaintenanceScreen() {
             return (
               <TouchableOpacity
                 style={[styles.categoryBtn, { backgroundColor: colors.card }]}
-                onPress={() => setSelectedType(item.key)}
+                onPress={() => { setSelectedType(item.key); setPageIdx(0); }}
+                activeOpacity={0.8}
                 onLongPress={isCustom ? () => handleDeleteCustomType(item.key, getLabel(item.key)) : undefined}
               >
-                <Text style={styles.categoryIcon}>{CATEGORY_ICON}</Text>
+                {(() => {
+                  const chip = CATEGORY_CHIPS[item.key] || DEFAULT_CHIP;
+                  return (
+                    <View style={[styles.categoryChip, { backgroundColor: chip.bg }]}>
+                      <Ionicons name={chip.icon} size={18} color={chip.color} />
+                    </View>
+                  );
+                })()}
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.categoryText, { color: colors.text }]}>{item.labelKey ? t(item.labelKey as any) : item.labelKey}</Text>
                   <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
@@ -408,6 +528,7 @@ export default function MaintenanceScreen() {
         {/* FAB: + */}
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: colors.primary }]}
+          activeOpacity={0.7}
           onPress={() => setShowAddType(true)}
         >
           <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
@@ -464,109 +585,255 @@ export default function MaintenanceScreen() {
   }
 
   // ============================================================
-  // VISTA 2: DETALLE DEL REGISTRO (como documentos)
+  // VISTA 2: DETALLE DEL REGISTRO (estilo documentos)
   // ============================================================
-  const record = filteredRecords[0]; // Un solo registro por categoría
-  const oilLabel = record ? MOTOR_OIL_OPTIONS.find((o) => o.label === record.description) : null;
+  const currentRecord = filteredRecords.length > 0 ? filteredRecords[Math.min(pageIdx, filteredRecords.length - 1)] : null;
+  const oilLabel = currentRecord ? MOTOR_OIL_OPTIONS.find((o) => o.label === currentRecord.description) : null;
+  const screenWidth = Dimensions.get('window').width;
+
+  const renderRecordPage = ({ item: rec }: { item: MaintenanceRecord }) => {
+    const recOilLabel = rec.type === 'motor_oil' ? MOTOR_OIL_OPTIONS.find((o) => o.label === rec.description) : null;
+
+    return (
+      <ScrollView
+        key={rec.id}
+        style={{ width: screenWidth }}
+        contentContainerStyle={styles.detailContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+      >
+        {/* Foto del producto */}
+        {rec.photoUrl ? (
+          <TouchableOpacity
+            style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}
+            activeOpacity={0.9}
+            onPress={() => { setViewingPhoto(rec.photoUrl ?? null); setShowPhotoViewer(true); }}
+          >
+            <Image source={{ uri: rec.photoUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
+            <Text style={{ fontSize: 48 }}>📷</Text>
+          </View>
+        )}
+
+        {/* Título */}
+        <Text style={[styles.detailTitle, { color: colors.text }]}>{rec.description}</Text>
+
+        {/* Fila: datos clave + botones de acción */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 12 }}>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
+              <Text style={[styles.detailDate, { color: colors.textSecondary }]}>
+                Fecha: {new Date(rec.serviceDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <Ionicons name="speedometer-outline" size={16} color={colors.primary} />
+              <Text style={[styles.detailDate, { color: colors.textSecondary }]}>
+                Kilometraje: {rec.kilometersAtService.toLocaleString('es-CL')} km
+              </Text>
+            </View>
+            {rec.cost != null && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <Ionicons name="cash-outline" size={16} color={colors.success} />
+                <Text style={[styles.detailDate, { color: colors.success }]}>
+                  Costo: ${rec.cost.toLocaleString('es-CL')}
+                </Text>
+              </View>
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity onPress={() => openEdit(rec)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+              <Ionicons name="pencil" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDelete(rec)} style={[styles.iconActionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
+              <Ionicons name="trash" size={18} color={colors.danger} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Próximo cambio + barra de progreso */}
+        {rec.type === 'tires' ? (
+          <View style={{
+            backgroundColor: colors.brandBlueBg,
+            borderColor: colors.brandBlue,
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: 14,
+            marginTop: 16,
+          }}>
+            {/* Recordatorio de presión */}
+            <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginBottom: 12 }]} />
+            <View style={styles.cardRow}>
+              <Ionicons name="alert-circle-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+              <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Recordatorio: Presión mensual</Text>
+            </View>
+            <Text style={[styles.notesText, { color: colors.brandBlue + '99', marginTop: 8 }]}>
+              Revisá la presión de ambos neumáticos una vez al mes para un desempeño óptimo y seguridad.
+            </Text>
+            <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginVertical: 12 }]} />
+            {/* Info del neumático */}
+            <View style={styles.cardRow}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+              <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Según desgaste visual</Text>
+            </View>
+            <Text style={[styles.notesText, { color: colors.brandBlue + '99', marginTop: 8 }]}>
+              No hay intervalo fijo en km. Revisá visualmente el desgaste de la banda de rodado y cambialo cuando las marcas de desgaste lleguen al nivel mínimo.
+            </Text>
+          </View>
+        ) : rec.type === 'brakes' ? (
+          <View style={{
+            backgroundColor: colors.brandBlueBg,
+            borderColor: colors.brandBlue,
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: 14,
+            marginTop: 16,
+          }}>
+            <View style={styles.cardRow}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+              <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Intervalo de revisión</Text>
+            </View>
+            <Text style={[styles.notesText, { color: colors.brandBlue + '99', marginTop: 8 }]}>
+              {rec.description.includes('Pastillas delanteras') && 'Revisa las pastillas delanteras cada 10.000–20.000 km según tu estilo de conducción.'}
+              {rec.description.includes('Pastillas traseras') && 'Revisa las pastillas traseras cada 8.000–15.000 km. Se desgastan más rápido en ciudad.'}
+              {rec.description.includes('Líquido de frenos') && 'Cambialo cada 2 años para mantener la eficiencia del frenado. El líquido viejo pierde efectividad.'}
+              {rec.description.includes('Balatas') && 'Según el uso seleccionado: revisión y cambio en los intervalos indicados.'}
+            </Text>
+          </View>
+        ) : (() => {
+          const interval: MaintenanceInterval | undefined = rec.type === 'motor_oil' && recOilLabel
+            ? { ...getOilInterval(recOilLabel.key as OilType), notes: undefined }
+            : MAINTENANCE_INTERVALS[rec.type];
+
+          if (!interval) return null;
+
+          const nextKm = interval.km ? rec.kilometersAtService + interval.km : null;
+          const nextDate = interval.months
+            ? (() => { const d = new Date(rec.serviceDate); d.setMonth(d.getMonth() + interval.months!); return d; })()
+            : null;
+
+          const { progress, kmDone, monthsElapsed } = calcProgress(rec.kilometersAtService, rec.serviceDate, motorcycleKm, interval);
+          const isOverdue = progress >= 1;
+          const kmRemaining = nextKm ? Math.max(0, nextKm - motorcycleKm) : null;
+
+          return (
+            <View style={{
+              backgroundColor: colors.brandBlueBg,
+              borderColor: colors.brandBlue,
+              borderWidth: 1,
+              borderRadius: 10,
+              padding: 14,
+              marginTop: 16,
+            }}>
+              <View style={styles.cardRow}>
+                <Text style={{ fontSize: 18, marginRight: 8 }}>{isOverdue ? '⚠️' : '🔔'}</Text>
+                <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>
+                  {isOverdue ? 'Cambio vencido' : 'Próximo cambio'}
+                </Text>
+              </View>
+
+              <View style={[styles.progressTrack, { backgroundColor: colors.brandBlue + '25', marginTop: 12 }]}>
+                <View style={[styles.progressFill, {
+                  width: `${progress * 100}%`,
+                  backgroundColor: isOverdue ? colors.danger : colors.brandBlue,
+                }]} />
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                <Text style={[styles.progressLabel, { color: colors.brandBlue + '99' }]}>
+                  {nextKm ? `${kmDone.toLocaleString('es-CL')} km recorridos` : `${monthsElapsed} meses transcurridos`}
+                </Text>
+                <Text style={[styles.progressLabel, { color: isOverdue ? colors.danger : colors.brandBlue + '99' }]}>
+                  {isOverdue
+                    ? 'Vencido'
+                    : kmRemaining != null
+                      ? `Faltan ${kmRemaining.toLocaleString('es-CL')} km`
+                      : 'Próximo por fecha'}
+                </Text>
+              </View>
+
+              <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 12 }]} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>
+                  {nextKm ? `${nextKm.toLocaleString('es-CL')} km` : ''}
+                  {nextKm && nextDate ? ' o el ' : ''}
+                  {nextDate ? nextDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                </Text>
+              </View>
+
+              {interval.notes && (
+                <Text style={[styles.notesText, { color: colors.brandBlue + '80', marginTop: 8 }]}>
+                  {interval.notes}
+                </Text>
+              )}
+            </View>
+          );
+        })()}
+      </ScrollView>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={record ? { paddingBottom: 40 } : { flexGrow: 1, justifyContent: 'center' }} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}>
-        {record ? (
-          <>
-            {/* Foto del producto */}
-            {record.photoUrl ? (
-              <TouchableOpacity onPress={() => { setViewingPhoto(record.photoUrl ?? null); setShowPhotoViewer(true); }}>
-                <Image source={{ uri: record.photoUrl }} style={styles.detailImage} resizeMode="cover" />
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.detailImage, styles.detailImagePlaceholder, { backgroundColor: colors.surfaceSecondary }]}>
-                <Text style={{ fontSize: 48 }}>📷</Text>
-              </View>
-            )}
-
-            <View style={styles.detailContent}>
-              {/* Título */}
-              <Text style={[styles.detailTitle, { color: colors.text }]}>{record.description}</Text>
-
-              {/* Info row */}
-              <View style={[styles.detailInfoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.detailInfoRow}>
-                  <Ionicons name="calendar-outline" size={18} color={colors.primary} />
-                  <Text style={[styles.detailInfoLabel, { color: colors.textMuted }]}>Fecha:</Text>
-                  <Text style={[styles.detailInfoValue, { color: colors.text }]}>{new Date(record.serviceDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
-                </View>
-                <View style={[styles.detailInfoDivider, { backgroundColor: colors.border }]} />
-                <View style={styles.detailInfoRow}>
-                  <Ionicons name="speedometer-outline" size={18} color={colors.primary} />
-                  <Text style={[styles.detailInfoLabel, { color: colors.textMuted }]}>Kilometraje:</Text>
-                  <Text style={[styles.detailInfoValue, { color: colors.text }]}>{record.kilometersAtService.toLocaleString('es-CL')} km</Text>
-                </View>
-                {record.cost != null && (
-                  <>
-                    <View style={[styles.detailInfoDivider, { backgroundColor: colors.border }]} />
-                    <View style={styles.detailInfoRow}>
-                      <Ionicons name="cash-outline" size={18} color={colors.success} />
-                      <Text style={[styles.detailInfoLabel, { color: colors.textMuted }]}>Costo:</Text>
-                      <Text style={[styles.detailInfoValue, { color: colors.success }]}>${record.cost.toLocaleString('es-CL')}</Text>
-                    </View>
-                  </>
-                )}
-              </View>
-
-              {/* Próximo cambio (solo aceite) */}
-              {record.type === 'motor_oil' && oilLabel && (() => {
-                const interval = getOilInterval(oilLabel.key as OilType);
-                const nextKm = record.kilometersAtService + interval.km;
-                const nextDate = new Date(record.serviceDate);
-                nextDate.setMonth(nextDate.getMonth() + interval.months);
-                return (
-                  <View style={[styles.detailInfoCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-                    <View style={styles.detailInfoRow}>
-                      <Text style={{ fontSize: 18 }}>🔔</Text>
-                      <Text style={[styles.detailInfoLabel, { color: colors.textMuted }]}>Próximo cambio:</Text>
-                    </View>
-                    <Text style={[styles.detailInfoValue, { color: colors.primary, marginTop: 6, marginLeft: 26 }]}>
-                      {nextKm.toLocaleString('es-CL')} km o el {nextDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </Text>
-                  </View>
-                );
-              })()}
-
-              {/* Botones editar / eliminar */}
-              <View style={styles.detailActions}>
-                <TouchableOpacity
-                  style={[styles.detailActionBtn, { backgroundColor: colors.primary }]}
-                  onPress={() => openEdit(record)}
-                >
-                  <Ionicons name="pencil" size={18} color={colors.primaryText} />
-                  <Text style={[styles.detailActionText, { color: colors.primaryText }]}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.detailActionBtn, { backgroundColor: colors.danger }]}
-                  onPress={() => handleDelete(record)}
-                >
-                  <Ionicons name="trash" size={18} color="#fff" />
-                  <Text style={[styles.detailActionText, { color: '#fff' }]}>Eliminar</Text>
-                </TouchableOpacity>
-              </View>
+      {filteredRecords.length > 0 ? (
+        <>
+          <FlatList
+            data={filteredRecords}
+            keyExtractor={(item) => item.id}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            initialScrollIndex={Math.min(pageIdx, filteredRecords.length - 1)}
+            getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
+            onMomentumScrollEnd={(e) => {
+              const idx = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+              setPageIdx(idx);
+            }}
+            renderItem={renderRecordPage}
+          />
+          {/* Page dots */}
+          {filteredRecords.length > 1 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'center', paddingVertical: 8, gap: 6 }}>
+              {filteredRecords.map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: i === pageIdx ? 20 : 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: i === pageIdx ? colors.primary : colors.textMuted + '40',
+                  }}
+                />
+              ))}
             </View>
-          </>
-        ) : (
-          /* Sin registro */
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>{CATEGORY_ICON}</Text>
-            <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noRecords')}</Text>
-            <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noRecordsSub')}</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {!record && (
-        <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
-          <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
-        </TouchableOpacity>
+          )}
+        </>
+      ) : (
+        /* Sin registro */
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name="build-outline" size={48} color={colors.textMuted} style={{ marginBottom: 8 }} />
+          <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noRecords')}</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noRecordsSub')}</Text>
+        </View>
       )}
+
+      {/* FAB: + (visible when no records OR when limit not reached for brakes/tires) */}
+      {(() => {
+        const hasNoRecords = filteredRecords.length === 0;
+        const currentCount = filteredRecords.length;
+        const isBrakes = selectedType === 'brakes';
+        const isTires = selectedType === 'tires';
+        const isAtLimit = (isBrakes && currentCount >= MAX_BRAKE_RECORDS) || (isTires && currentCount >= MAX_TIRE_RECORDS);
+        const canAdd = hasNoRecords || (!isBrakes && !isTires) || !isAtLimit;
+        return canAdd ? (
+          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+            <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
+          </TouchableOpacity>
+        ) : null;
+      })()}
 
       {/* Create/Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
@@ -580,7 +847,6 @@ export default function MaintenanceScreen() {
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
               {/* Type indicator (read-only, set by category) */}
               <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-                <Text style={{ fontSize: 18 }}>{CATEGORY_ICON}</Text>
                 <Text style={{ fontSize: 15, color: colors.text }}>{getLabel(form.type)}</Text>
               </View>
 
@@ -588,6 +854,54 @@ export default function MaintenanceScreen() {
                 <View>
                   <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('description')} *</Text>
                   {MOTOR_OIL_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.oilOption,
+                        { borderColor: form.description === opt.label ? colors.primary : colors.inputBorder, backgroundColor: form.description === opt.label ? colors.surfaceSecondary : colors.surface },
+                      ]}
+                      onPress={() => { setForm((p) => ({ ...p, description: opt.label })); setErrors((p) => ({ ...p, description: '' })); }}
+                    >
+                      <View style={styles.oilOptionRow}>
+                        <Text style={[styles.oilOptionTitle, { color: form.description === opt.label ? colors.primary : colors.text }]}>{opt.label}</Text>
+                        {form.description === opt.label && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                      </View>
+                      <Text style={[styles.oilOptionDetail, { color: colors.textSecondary }]}>{opt.detail}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : form.type === 'brakes' ? (
+                <View>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('description')} *</Text>
+                  {BRAKE_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.oilOption,
+                        { borderColor: form.description === opt.label ? colors.primary : colors.inputBorder, backgroundColor: form.description === opt.label ? colors.surfaceSecondary : colors.surface },
+                      ]}
+                      onPress={() => {
+                        if (opt.key === 'balatas') {
+                          // Open balatas usage modal first
+                          setShowBalatasModal(true);
+                        } else {
+                          setForm((p) => ({ ...p, description: opt.label }));
+                          setErrors((p) => ({ ...p, description: '' }));
+                        }
+                      }}
+                    >
+                      <View style={styles.oilOptionRow}>
+                        <Text style={[styles.oilOptionTitle, { color: form.description === opt.label ? colors.primary : colors.text }]}>{opt.label}</Text>
+                        {form.description === opt.label && <Ionicons name="checkmark-circle" size={20} color={colors.primary} />}
+                      </View>
+                      <Text style={[styles.oilOptionDetail, { color: colors.textSecondary }]}>{opt.detail}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : form.type === 'tires' ? (
+                <View>
+                  <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('description')} *</Text>
+                  {TIRE_OPTIONS.map((opt) => (
                     <TouchableOpacity
                       key={opt.key}
                       style={[
@@ -637,15 +951,14 @@ export default function MaintenanceScreen() {
                   value={form.serviceDate ? new Date(form.serviceDate) : new Date()}
                   mode="date"
                   display="default"
-                  onValueChange={(_event: any, date?: Date) => {
+                  onChange={(event: DateTimePickerEvent, date?: Date) => {
                     setShowDatePicker(false);
-                    if (date) {
+                    if (event.type === 'set' && date) {
                       const iso = date.toISOString().split('T')[0];
                       setForm((p) => ({ ...p, serviceDate: iso }));
                       setErrors((p) => ({ ...p, serviceDate: '' }));
                     }
                   }}
-                  onDismiss={() => setShowDatePicker(false)}
                 />
               )}
 
@@ -697,12 +1010,12 @@ export default function MaintenanceScreen() {
             </TouchableOpacity>
             <Text style={[styles.photoModalTitle, { color: colors.text }]}>Foto del producto</Text>
             <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(true); }}>
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.photoModalBtnText}>Tomar foto</Text>
+              <Ionicons name="camera" size={20} color={colors.primaryText} />
+              <Text style={[styles.photoModalBtnText, { color: colors.primaryText }]}>Tomar foto</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(false); }}>
-              <Ionicons name="images" size={20} color="#fff" />
-              <Text style={styles.photoModalBtnText}>Elegir de galería</Text>
+              <Ionicons name="images" size={20} color={colors.primaryText} />
+              <Text style={[styles.photoModalBtnText, { color: colors.primaryText }]}>Elegir de galería</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -717,6 +1030,46 @@ export default function MaintenanceScreen() {
           {viewingPhoto && (
             <Image source={{ uri: viewingPhoto }} style={styles.photoViewerImage} resizeMode="contain" />
           )}
+        </View>
+      </Modal>
+
+      {/* Balatas Usage Modal */}
+      <Modal visible={showBalatasModal} transparent animationType="fade">
+        <View style={styles.overlay}>
+          <View style={[styles.oilOptionModal, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.oilOptionModalTitle, { color: colors.text }]}>Uso de balatas</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginBottom: 16, textAlign: 'center' }}>
+              Seleccioná el tipo de uso para determinar los intervalos de revisión y cambio
+            </Text>
+            {BALATAS_USAGE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.oilOption,
+                  { borderColor: colors.inputBorder, backgroundColor: colors.surfaceSecondary, marginBottom: 12 },
+                ]}
+                onPress={() => {
+                  setSelectedBalatasUsage(opt.key);
+                  setShowBalatasModal(false);
+                  setForm((p) => ({ ...p, description: `Balatas - ${opt.label}` }));
+                  setErrors((p) => ({ ...p, description: '' }));
+                }}
+              >
+                <View style={styles.oilOptionRow}>
+                  <Text style={[styles.oilOptionTitle, { color: colors.text }]}>{opt.label}</Text>
+                </View>
+                <Text style={[styles.oilOptionDetail, { color: colors.textSecondary }]}>
+                  Revisión: {opt.checkInterval}{'\n'}Cambio: {opt.changeInterval}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[styles.cancelBtn, { borderColor: colors.border }]}
+              onPress={() => setShowBalatasModal(false)}
+            >
+              <Text style={[styles.cancelBtnText, { color: colors.primary }]}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -813,36 +1166,42 @@ const styles = StyleSheet.create({
   categoryText: { fontSize: 16, fontWeight: '500' },
   categoryCount: { fontSize: 13, marginTop: 2 },
   arrow: { fontSize: 20 },
-  empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
-  emptyContainer: { alignItems: 'center' },
-  emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptySub: { fontSize: 13, marginTop: 4 },
-  card: { padding: 14, marginHorizontal: 16, marginTop: 8, borderRadius: 8 },
-  cardInfo: { flex: 1 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardDesc: { fontSize: 15, fontWeight: '600', flex: 1 },
-  cardMeta: { flexDirection: 'row', gap: 12, marginTop: 4 },
-  cardDate: { fontSize: 13 },
-  cardKm: { fontSize: 13, fontWeight: '500' },
-  cardCost: { fontSize: 13, fontWeight: '500', marginTop: 2 },
-  // Detail view (like documents)
-  detailImage: { width: '100%', height: 220 },
-  detailImagePlaceholder: { justifyContent: 'center', alignItems: 'center' },
-  detailContent: { padding: 20 },
-  detailTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
-  detailInfoCard: { borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 16 },
-  detailInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  detailInfoLabel: { fontSize: 14 },
-  detailInfoValue: { fontSize: 15, fontWeight: '500', flex: 1 },
-  detailInfoDivider: { height: 1, marginVertical: 12 },
-  detailActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  detailActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 10 },
-  detailActionText: { fontSize: 16, fontWeight: '600' },
+  empty: { textAlign: 'center', marginTop: 8, fontSize: 16 },
+  emptySub: { fontSize: 13, marginTop: 4, textAlign: 'center' },
+
+  // Detail view (estilo documentos)
+  detailContent: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 6 },
+  detailTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 12 },
+  detailDate: { fontSize: 12 },
+  pdfThumbnail: {
+    marginTop: 4,
+    padding: 24,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+  },
+  pdfPreviewImage: { width: '100%', height: 200, borderRadius: 8 },
+  noPhoto: { height: 150, borderRadius: 10, marginTop: 4, justifyContent: 'center', alignItems: 'center' },
+  iconActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardRow: { flexDirection: 'row', alignItems: 'center' },
+  cardTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
+  cardDate: { fontSize: 11, marginTop: 2 },
+  infoCardDivider: { height: 1, marginVertical: 6 },
+
   // Photo Viewer
   photoViewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
   photoViewerClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 },
   photoViewerCloseText: { color: '#fff', fontSize: 24 },
   photoViewerImage: { width: '90%', height: '70%' },
+
   // Modal
   modal: { flex: 1, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1 },
@@ -853,6 +1212,11 @@ const styles = StyleSheet.create({
   oilOptionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   oilOptionTitle: { fontSize: 15, fontWeight: '600' },
   oilOptionDetail: { fontSize: 13, marginTop: 4 },
+  oilOptionModal: { borderRadius: 14, padding: 20, width: '90%' },
+  oilOptionModalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  cancelBtn: { borderRadius: 10, paddingVertical: 12, alignItems: 'center', borderWidth: 1, marginTop: 12 },
+  cancelBtnText: { fontSize: 15, fontWeight: '600' },
+
   // Reminder Modal
   reminderModal: { borderRadius: 14, padding: 24, marginHorizontal: 24, alignItems: 'center' },
   reminderIcon: { fontSize: 48, marginBottom: 12 },
@@ -864,17 +1228,20 @@ const styles = StyleSheet.create({
   reminderInfoNote: { fontSize: 11, marginTop: 6, fontStyle: 'italic' },
   reminderActions: { flexDirection: 'row', gap: 10, width: '100%' },
   reminderBtn: { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center' },
+
   // Photo picker
   photoBtn: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 10, alignItems: 'center', overflow: 'hidden' },
   photoPreview: { width: '100%', height: 40, borderRadius: 6 },
   photoPlaceholder: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   photoPlaceholderText: { fontSize: 13 },
+
   // Photo modal
   photoModalContent: { borderRadius: 14, padding: 20, marginHorizontal: 24 },
   photoModalClose: { alignSelf: 'flex-end', padding: 4 },
   photoModalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
   photoModalBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 8, marginBottom: 10 },
-  photoModalBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  photoModalBtnText: { fontSize: 16, fontWeight: '600' },
+
   errorText: { fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { fontSize: 16, fontWeight: '600' },
@@ -894,10 +1261,69 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   fabText: { fontSize: 28, fontWeight: '300', marginTop: -2 },
+
   // Add Type Modal
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 },
   addTypeModal: { borderRadius: 14, padding: 20 },
   addTypeTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   addTypeActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
   addTypeBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  categoryChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+
+  // Barra de progreso
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Historial
+  historyTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  historyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginTop: 5,
+  },
+  historyDesc: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  historyMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  notesText: {
+    fontSize: 11,
+    lineHeight: 15,
+    fontStyle: 'italic',
+  },
 });

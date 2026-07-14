@@ -14,6 +14,16 @@ function BackButton() {
   );
 }
 
+function MotoDetailBackButton() {
+  const router = useRouter();
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity onPress={() => router.push('/(app)/motos')} style={{ marginLeft: 12 }}>
+      <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
+    </TouchableOpacity>
+  );
+}
+
 function TrackingBackButton() {
   const router = useRouter();
   const { colors } = useTheme();
@@ -101,7 +111,7 @@ export default function AppLayout() {
         options={{
           href: null,
           title: t('motorcycleDetail'),
-          headerLeft: () => <BackButton />,
+          headerLeft: () => <MotoDetailBackButton />,
         }}
       />
       <Tabs.Screen

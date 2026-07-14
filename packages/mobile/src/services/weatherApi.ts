@@ -7,6 +7,8 @@ export interface RainAlertData {
   message: string | null;
   suggestion: string | null;
   zoneName: string | null;
+  currentTemp: number | null;
+  weatherCondition: string;
 }
 
 export async function fetchRainAlert(lat: number, lon: number): Promise<RainAlertData> {

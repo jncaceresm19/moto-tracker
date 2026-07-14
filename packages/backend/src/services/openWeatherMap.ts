@@ -6,6 +6,7 @@ const BASE_URL = 'https://api.open-meteo.com/v1/forecast';
 interface OpenMeteoResponse {
   current: {
     time: string;
+    temperature_2m: number;
     precipitation: number;
     rain: number;
     showers: number;
@@ -22,11 +23,25 @@ export interface RainAlertResult {
   shouldShow: boolean;
   minutesUntilRain: number | null;
   probability: number;
+  currentTemp: number | null;
+  weatherCode: number;
+}
+
+export function weatherCodeToCondition(code: number): string {
+  if (code === 0) return 'Despejado';
+  if (code <= 3) return 'Nublado';
+  if (code <= 48) return 'Neblina';
+  if (code <= 55) return 'Llovizna';
+  if (code <= 65) return 'Lluvia';
+  if (code <= 75) return 'Nieve';
+  if (code <= 82) return 'Chubascos';
+  if (code <= 99) return 'Tormenta';
+  return 'Desconocido';
 }
 
 export async function fetchRainAlert(lat: number, lon: number): Promise<RainAlertResult> {
   const url = `${BASE_URL}?latitude=${lat}&longitude=${lon}` +
-    `&current=precipitation,rain,showers,weather_code` +
+    `&current=temperature_2m,precipitation,rain,showers,weather_code` +
     `&minutely_15=precipitation_probability,precipitation` +
     `&forecast_days=1` +
     `&timezone=America%2FSantiago`;
@@ -38,10 +53,13 @@ export async function fetchRainAlert(lat: number, lon: number): Promise<RainAler
 
   const data: OpenMeteoResponse = await response.json();
 
+  const currentTemp = data.current.temperature_2m;
+  const weatherCode = data.current.weather_code;
+
   // Check current conditions
   const current = data.current;
   if (current.precipitation > 0.1 || current.rain > 0.1 || current.showers > 0.1) {
-    return { shouldShow: true, minutesUntilRain: 0, probability: 100 };
+    return { shouldShow: true, minutesUntilRain: 0, probability: 100, currentTemp, weatherCode };
   }
 
   // Check 15-minute forecast for next 2 hours
@@ -63,10 +81,12 @@ export async function fetchRainAlert(lat: number, lon: number): Promise<RainAler
           shouldShow: true,
           minutesUntilRain: Math.round(minutesAhead),
           probability: prob,
+          currentTemp,
+          weatherCode,
         };
       }
     }
   }
 
-  return { shouldShow: false, minutesUntilRain: null, probability: 0 };
+  return { shouldShow: false, minutesUntilRain: null, probability: 0, currentTemp, weatherCode };
 }

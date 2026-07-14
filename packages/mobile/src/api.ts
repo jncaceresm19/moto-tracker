@@ -146,6 +146,7 @@ export interface Motorcycle {
   currentKilometers: number;
   imageUrl?: string;
   gpsTracker?: string;
+  color?: string;
   verificada?: boolean;
   verificadaEn?: string;
   verificadaPor?: string;
@@ -171,13 +172,14 @@ export async function createMotorcycle(data: {
   currentKilometers?: number;
   imageUrl?: string;
   gpsTracker?: string;
+  color?: string;
 }): Promise<Motorcycle> {
   return api<Motorcycle>('/api/motorcycles', { method: 'POST', body: data });
 }
 
 export async function updateMotorcycle(
   id: string,
-  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string }
+  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string; color?: string }
 ): Promise<Motorcycle> {
   return api<Motorcycle>(`/api/motorcycles/${id}`, { method: 'PUT', body: data });
 }

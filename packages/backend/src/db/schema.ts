@@ -34,6 +34,7 @@ export const motorcycles = sqliteTable('motorcycles', {
   currentKilometers: real('current_kilometers').notNull().default(0),
   imageUrl: text('image_url'),
   gpsTracker: text('gps_tracker'),
+  color: text('color'),
   // Verification fields
   verificada: integer('verificada', { mode: 'boolean' }).default(false),
   verificadaEn: integer('verificada_en', { mode: 'timestamp' }),

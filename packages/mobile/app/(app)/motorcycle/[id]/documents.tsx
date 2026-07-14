@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView, Linking } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,13 +23,13 @@ const TYPE_KEYS: Record<string, string> = {
   fines: 'fines',
 };
 
-const CATEGORY_ICONS: Record<string, string> = {
-  circulation_permit: '🚦',
-  technical_review: '🔍',
-  insurance: '🛡️',
-  padron: '📋',
-  drivers_license: '🪪',
-  fines: '💸',
+const CATEGORY_CHIPS: Record<string, { icon: keyof typeof Ionicons.glyphMap; bg: string; color: string }> = {
+  circulation_permit: { icon: 'document-text-outline', bg: '#E6F1FB', color: '#185FA5' },
+  technical_review: { icon: 'construct-outline', bg: '#E1F5EE', color: '#0F6E56' },
+  insurance: { icon: 'shield-checkmark-outline', bg: '#FBEAF0', color: '#993556' },
+  padron: { icon: 'reader-outline', bg: '#F3E8FF', color: '#6B21A8' },
+  drivers_license: { icon: 'card-outline', bg: '#FAEEDA', color: '#854F0B' },
+  fines: { icon: 'cash-outline', bg: '#FDEAEA', color: '#B42318' },
 };
 
 // Types where the title is auto-set and non-editable
@@ -74,6 +74,9 @@ export default function DocumentsScreen() {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoSide, setPhotoSide] = useState<'front' | 'back'>('front');
   const [showDocPortarModal, setShowDocPortarModal] = useState(false);
+  const [showTechReviewInstructivo, setShowTechReviewInstructivo] = useState(false);
+  const [showLicenseInstructivo, setShowLicenseInstructivo] = useState(false);
+  const [showPadronDuplicado, setShowPadronDuplicado] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({
@@ -121,6 +124,14 @@ export default function DocumentsScreen() {
   };
 
   const filteredDocs = selectedType ? docs.filter((d) => d.type === selectedType) : [];
+
+  const isCirculationPermitOpen = () => {
+    const now = new Date();
+    const month = now.getMonth() + 1; // 1-indexed
+    const day = now.getDate();
+    // Open between February 1 and March 31
+    return (month === 2 && day >= 1) || month === 3;
+  };
 
   const isTitleEditable = !FIXED_TITLE_TYPES[form.type];
 
@@ -381,6 +392,7 @@ export default function DocumentsScreen() {
           data={TYPES}
           keyExtractor={(item) => item}
           contentContainerStyle={styles.categoryList}
+          scrollEnabled={false}
           ListHeaderComponent={
             <View style={[styles.infoBanner, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}>
               <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue} />
@@ -390,11 +402,18 @@ export default function DocumentsScreen() {
           ListFooterComponent={
             <>
               <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 16 }]}
+                style={styles.linkButton}
                 onPress={() => setShowDocPortarModal(true)}
+                activeOpacity={0.7}
               >
-                <Ionicons name="help-circle-outline" size={20} color="#fff" />
-                <Text style={[styles.submitBtnText, { color: '#fff' }]}>¿Qué documentos debo portar?</Text>
+                <Ionicons
+                  name="help-circle-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text style={[styles.linkText, { color: colors.primary }]}>
+                  Documentos obligatorios en controles
+                </Text>
               </TouchableOpacity>
             </>
           }
@@ -404,11 +423,14 @@ export default function DocumentsScreen() {
             return (
               <TouchableOpacity
                 style={[styles.categoryBtn, { backgroundColor: colors.card }]}
+                activeOpacity={0.7}
                 onPress={() => {
                   setSelectedType(item);
                 }}
               >
-                <Text style={styles.categoryIcon}>{CATEGORY_ICONS[item]}</Text>
+                <View style={[styles.categoryChip, { backgroundColor: CATEGORY_CHIPS[item].bg }]}>
+                  <Ionicons name={CATEGORY_CHIPS[item].icon} size={18} color={CATEGORY_CHIPS[item].color} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.categoryText, { color: colors.text }]}>{t(TYPE_KEYS[item])}</Text>
                   <Text style={[styles.categoryCount, { color: colors.textMuted }]}>
@@ -438,8 +460,12 @@ export default function DocumentsScreen() {
               <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
                 <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
                   <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
-                    <Ionicons name="shield-outline" size={22} color={colors.primary} />
-                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>En un control policial te piden</Text>
+                    <Ionicons
+                      name="help-circle-outline"
+                      size={18}
+                      color={colors.primary}
+                    />
+                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Documentación requerida</Text>
                     <TouchableOpacity onPress={() => setShowDocPortarModal(false)}>
                       <Ionicons name="close" size={22} color={colors.textMuted} />
                     </TouchableOpacity>
@@ -470,7 +496,7 @@ export default function DocumentsScreen() {
                     <View style={[styles.infoCardDivider, { backgroundColor: colors.border, marginTop: 12 }]} />
                     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
                       <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-                      <Text style={[styles.infoCardText, { color: colors.textMuted, flex: 1 }]}>El padrón no es obligatorio portarlo físicamente, pero se recomienda</Text>
+                      <Text style={[styles.infoCardText, { color: colors.textMuted, flex: 1 }]}>El padrón no es obligatorio portarlo físicamente en un control policial, pero se recomienda</Text>
                     </View>
                   </ScrollView>
                 </View>
@@ -495,48 +521,72 @@ export default function DocumentsScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {doc ? (
-          <ScrollView contentContainerStyle={styles.detailContent}>
+          <ScrollView contentContainerStyle={styles.detailContent} scrollEnabled={doc.type !== 'circulation_permit'}>
             {/* Photo with status badge overlay */}
             <View>
               {((doc.type === 'drivers_license' || doc.type === 'technical_review') && doc.fileUrlBack) ? (
                 <View style={{ gap: 10 }}>
                   <View>
-                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{doc.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
-                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
-                      <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                    </TouchableOpacity>
+                    <Text style={[styles.pdfHint, { color: colors.textMuted }]}>{doc.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
+                    <View>
+                      <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} activeOpacity={0.9} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
+                        <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
+                      </TouchableOpacity>
+                      <View style={[styles.statusBadgeOverlay, {
+                        backgroundColor: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,
+                      }]}>
+                        <Text style={styles.statusBadgeOverlayText}>
+                          {doc.status === 'expired' ? t('expired') : doc.status === 'expiring' ? t('expiring') : t('valid')}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                   <View>
                     <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{doc.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text>
-                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('back'); setShowPhotoViewer(true); }}>
+                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} activeOpacity={0.9} onPress={() => { setViewing(doc); setViewingPhoto('back'); setShowPhotoViewer(true); }}>
                       <Image source={{ uri: doc.fileUrlBack }} style={styles.pdfPreviewImage} resizeMode="contain" />
                     </TouchableOpacity>
                   </View>
                 </View>
               ) : doc.fileUrl ? (
-                <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
-                  <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                </TouchableOpacity>
+                <View>
+                  <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} activeOpacity={0.9} onPress={() => { setViewing(doc); setViewingPhoto('front'); setShowPhotoViewer(true); }}>
+                    <Image source={{ uri: doc.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
+                  </TouchableOpacity>
+                  <View style={[styles.statusBadgeOverlay, {
+                    backgroundColor: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,
+                  }]}>
+                    <Text style={styles.statusBadgeOverlayText}>
+                      {doc.status === 'expired' ? t('expired') : doc.status === 'expiring' ? t('expiring') : t('valid')}
+                    </Text>
+                  </View>
+                </View>
               ) : (
                 <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
                   <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
                 </View>
               )}
-              {/* Status badge overlay */}
-              <View style={[styles.statusBadgeOverlay, {
-                backgroundColor: doc.status === 'expired' ? colors.danger : doc.status === 'expiring' ? colors.accent : colors.success,
-              }]}>
-                <Text style={styles.statusBadgeOverlayText}>
-                  {doc.status === 'expired' ? t('expired') : doc.status === 'expiring' ? t('expiring') : t('valid')}
-                </Text>
-              </View>
             </View>
 
             {/* Edit + Delete buttons */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
               <View>
-                {doc.issueDate && <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>{t('issued')}: {new Date(doc.issueDate).toLocaleDateString()}</Text>}
-                {doc.expiryDate && <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 4 }]}>{t('expires')}: {new Date(doc.expiryDate).toLocaleDateString()}</Text>}
+                {doc.issueDate && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 0 }}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.success} />
+                    <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                      {t('issued')}: {new Date(doc.issueDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </Text>
+                  </View>
+                )}
+                {doc.expiryDate && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.danger} />
+                    <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                      {t('expires')}: {new Date(doc.expiryDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </Text>
+                  </View>
+                )}
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
@@ -550,46 +600,57 @@ export default function DocumentsScreen() {
 
             {/* Requisitos Permiso de Circulación */}
             {doc.type === 'circulation_permit' && (
-              <View style={{
-                backgroundColor: colors.brandBlueBg,
-                borderColor: colors.brandBlue,
-                borderWidth: 1,
-                borderRadius: 10,
-                padding: 14,
-                marginTop: 16,
-              }}>
-                <View style={styles.cardRow}>
-                  <Ionicons name="document-text-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Permiso de Circulación</Text>
+              <>
+                <View style={{
+                  backgroundColor: colors.brandBlueBg,
+                  borderColor: colors.brandBlue,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 14,
+                  marginTop: 16,
+                }}>
+                  <View style={styles.cardRow}>
+                    <Ionicons name="document-text-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Permiso de Circulación</Text>
+                  </View>
+                  <View style={{ marginTop: 10 }}>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Revisión técnica al día</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>SOAP vigente (hasta 31 de marzo del año siguiente)</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Sin multas de tránsito impagas</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No estar en el Registro de Pasajeros Infractores</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Permiso de circulación del año anterior + padrón del vehículo</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Plazo: 1 feb – 31 mar</Text>
+                  </View>
                 </View>
-                <View style={{ marginTop: 10 }}>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Revisión técnica al día</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>SOAP vigente (hasta 31 de marzo del año siguiente)</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Sin multas de tránsito impagas</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No estar en el Registro de Pasajeros Infractores</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Permiso de circulación del año anterior + padrón del vehículo</Text>
-                  </View>
-                </View>
-                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.brandBlue + '99'} />
-                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Plazo: 1 feb – 31 mar</Text>
-                </View>
-              </View>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: isCirculationPermitOpen() ? colors.success : colors.textMuted + '40', marginTop: 12 }]}
+                  activeOpacity={isCirculationPermitOpen() ? 0.8 : 1}
+                  disabled={!isCirculationPermitOpen()}>
+                  <Ionicons name="wallet-outline" size={20} color={isCirculationPermitOpen() ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.submitBtnText, { color: isCirculationPermitOpen() ? '#fff' : colors.textMuted }]}>Paga tu permiso</Text>
+                </TouchableOpacity>
+                <Text style={[styles.payHint, { color: colors.textMuted }]}>Opción hábil entre el 1 de febrero y el 31 de marzo</Text>
+              </>
             )}
 
             {/* Requisitos SOAP */}
@@ -634,128 +695,171 @@ export default function DocumentsScreen() {
 
             {/* Información relevante del Padrón */}
             {doc.type === 'padron' && (
-              <View style={{
-                backgroundColor: colors.brandBlueBg,
-                borderColor: colors.brandBlue,
-                borderWidth: 1,
-                borderRadius: 10,
-                padding: 14,
-                marginTop: 16,
-              }}>
-                <View style={styles.cardRow}>
-                  <Ionicons name="document-text-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Información relevante</Text>
-                </View>
-                <View style={{ marginTop: 10 }}>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Obligatorio portarlo para circular</Text>
+              <>
+                <View style={{
+                  backgroundColor: colors.brandBlueBg,
+                  borderColor: colors.brandBlue,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 14,
+                  marginTop: 16,
+                }}>
+                  <View style={styles.cardRow}>
+                    <Ionicons name="document-text-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Información relevante</Text>
                   </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No caduca mientras no cambie de dueño</Text>
+                  <View style={{ marginTop: 10 }}>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Obligatorio portarlo para circular</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No caduca mientras no cambie de dueño</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Si se pierde, se saca duplicado online con ClaveÚnica</Text>
+                    </View>
                   </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Si se pierde, se saca duplicado online con ClaveÚnica</Text>
+                  <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="alert-circle-outline" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Multa por no portarlo: hasta 0,5 UTM</Text>
                   </View>
                 </View>
-                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="alert-circle-outline" size={16} color={colors.brandBlue + '99'} />
-                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Multa por no portarlo: hasta 0,5 UTM</Text>
-                </View>
-              </View>
+                <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Perdiste o dañaste tu padrón?</Text>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 12 }]} activeOpacity={0.8}
+                  onPress={() => setShowPadronDuplicado(true)}>
+                  <Ionicons name="document-text-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Sacar duplicado</Text>
+                </TouchableOpacity>
+                <Text style={[styles.payHint, { color: colors.textMuted }]}>Sigue los pasos para obtener tu duplicado</Text>
+              </>
             )}
 
             {/* Requisitos Licencia de Conducir */}
             {doc.type === 'drivers_license' && (
-              <View style={{
-                backgroundColor: colors.brandBlueBg,
-                borderColor: colors.brandBlue,
-                borderWidth: 1,
-                borderRadius: 10,
-                padding: 14,
-                marginTop: 16,
-              }}>
-                <View style={styles.cardRow}>
-                  <Ionicons name="card-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Licencia (Clase C)</Text>
+              <>
+                <View style={{
+                  backgroundColor: colors.brandBlueBg,
+                  borderColor: colors.brandBlue,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 14,
+                  marginTop: 16,
+                }}>
+                  <View style={styles.cardRow}>
+                    <Ionicons name="card-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Licencia (Clase C)</Text>
+                  </View>
+                  <View style={{ marginTop: 10 }}>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Cédula de identidad vigente</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Licencia anterior (para renovación)</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Exámenes de reflejos, vista y teórico</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No estar en el RPI ni con deudas de pensión de alimentos</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Vigencia: 6 años</Text>
+                  </View>
                 </View>
-                <View style={{ marginTop: 10 }}>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Cédula de identidad vigente</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Licencia anterior (para renovación)</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Exámenes de reflejos, vista y teórico</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>No estar en el RPI ni con deudas de pensión de alimentos</Text>
-                  </View>
-                </View>
-                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
-                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Vigencia: 6 años</Text>
-                </View>
-              </View>
+                <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Extravío o robo?</Text>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 12 }]} activeOpacity={0.8}
+                  onPress={() => setShowLicenseInstructivo(true)}>
+                  <Ionicons name="book-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Ver instructivo</Text>
+                </TouchableOpacity>
+                <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}>
+                  <Ionicons name="calendar-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
+                </TouchableOpacity>
+              </>
             )}
             {/* Requisitos Revisión Técnica */}
             {doc.type === 'technical_review' && (
-              <View style={{
-                backgroundColor: colors.brandBlueBg,
-                borderColor: colors.brandBlue,
-                borderWidth: 1,
-                borderRadius: 10,
-                padding: 14,
-                marginTop: 16,
-              }}>
-                <View style={styles.cardRow}>
-                  <Ionicons name="construct-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
-                  <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Revisión Técnica</Text>
+              <>
+                <View style={{
+                  backgroundColor: colors.brandBlueBg,
+                  borderColor: colors.brandBlue,
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 14,
+                  marginTop: 16,
+                }}>
+                  <View style={styles.cardRow}>
+                    <Ionicons name="construct-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+                    <Text style={[styles.cardTitle, { color: colors.text + '99' }]}>Requisitos Revisión Técnica</Text>
+                  </View>
+                  <View style={{ marginTop: 10 }}>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Certificado de revisión técnica anterior</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Certificado de emisión de gases anterior</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Permiso de circulación al día</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva sin revisión previa: certificado de homologación + padrón</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                  <View style={{ marginTop: 4 }}>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva: exenta los primeros 36-48 meses desde inscripción</Text>
+                    </View>
+                    <View style={styles.infoCardItem}>
+                      <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
+                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>5-9 años: cada 2 años · 10+ años: cada año</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Ionicons name="alert-circle-outline" size={16} color={colors.brandBlue + '99'} />
+                    <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Multa por no tenerla al día: 1 a 1,5 UTM</Text>
+                  </View>
                 </View>
-                <View style={{ marginTop: 10 }}>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Certificado de revisión técnica anterior</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Certificado de emisión de gases anterior</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Permiso de circulación al día</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva sin revisión previa: certificado de homologación + padrón</Text>
-                  </View>
-                </View>
-                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
-                <View style={{ marginTop: 4 }}>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva: exenta los primeros 36-48 meses desde inscripción</Text>
-                  </View>
-                  <View style={styles.infoCardItem}>
-                    <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
-                    <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>5-9 años: cada 2 años · 10+ años: cada año</Text>
-                  </View>
-                </View>
-                <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Ionicons name="alert-circle-outline" size={16} color={colors.brandBlue + '99'} />
-                  <Text style={[styles.cardDate, { color: colors.brandBlue + '99', fontWeight: '600' }]}>Multa por no tenerla al día: 1 a 1,5 UTM</Text>
-                </View>
-              </View>
+
+                <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Qué necesito para aprobar la revisión técnica?</Text>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 12 }]} activeOpacity={0.8}
+                  onPress={() => setShowTechReviewInstructivo(true)}>
+                  <Ionicons name="book-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Ver instructivo</Text>
+                </TouchableOpacity>
+                <Text style={[styles.payHint, { color: colors.textMuted }]}>Procura cumplir con todos estos requisitos previo a tu cita</Text>
+
+                <TouchableOpacity
+                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}>
+                  <Ionicons name="calendar-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
+                </TouchableOpacity>
+                <Text style={[styles.payHint, { color: colors.textMuted }]}>El valor de la revisión técnica puede variar según la Planta de Revisión Técnica (PRT). Consulta el precio vigente al momento de reservar tu hora.</Text>
+              </>
             )}
           </ScrollView>
         ) : (
@@ -880,6 +984,149 @@ export default function DocumentsScreen() {
         </Modal>
 
         <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+
+        {/* Modal: Instructivo Revisión Técnica */}
+        <Modal visible={showTechReviewInstructivo} transparent animationType="fade">
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowTechReviewInstructivo(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="construct-outline" size={18} color={colors.primary} />
+                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Para aprobar debes tener</Text>
+                    <TouchableOpacity onPress={() => setShowTechReviewInstructivo(false)}>
+                      <Ionicons name="close" size={22} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 450 }}>
+                    <View style={{ marginTop: 12 }}>
+                      {[
+                        'Patente visible, fijada y legible',
+                        'Carrocería sin fisuras ni soldaduras',
+                        'Apoyapiés en buen estado',
+                        'Focos, espejos retrovisores y reflectantes presentes y sin quiebres',
+                        'Asiento bien fijado',
+                        'Escape sin fugas ni roturas',
+                        'Neumáticos con surco suficiente',
+                        'Luces de viraje, freno y posición funcionando',
+                        'Luces correctamente alineadas',
+                        'Emisión de gases dentro de norma',
+                      ].map((item, i) => (
+                        <View key={i} style={styles.infoCardItem}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                          <Text style={[styles.infoCardText, { color: colors.text }]}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={[styles.infoCardDivider, { backgroundColor: colors.border, marginTop: 12 }]} />
+                    <View style={{ marginTop: 4 }}>
+                      <Text style={[styles.infoCardText, { color: colors.text, fontWeight: '600', marginBottom: 4 }]}>Defectos graves impiden aprobar hasta ser corregidos</Text>
+                      <Text style={[styles.infoCardText, { color: colors.textMuted }]}>Plazo de 15 días corridos para volver con tarifa rebajada (después, se paga revisión completa nuevamente)</Text>
+                    </View>
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Modal: Instructivo Licencia de Conducir */}
+        <Modal visible={showLicenseInstructivo} transparent animationType="fade">
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowLicenseInstructivo(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="card-outline" size={18} color={colors.primary} />
+                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Extravío o Robo de Licencia</Text>
+                    <TouchableOpacity onPress={() => setShowLicenseInstructivo(false)}>
+                      <Ionicons name="close" size={22} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 450 }}>
+                    <View style={{ marginTop: 12 }}>
+                      <View style={{ marginBottom: 16 }}>
+                        <View style={styles.infoCardItem}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                          <Text style={[styles.infoCardText, { color: colors.text, fontWeight: '600' }]}>Extravío</Text>
+                        </View>
+                        <Text style={[styles.infoCardText, { color: colors.textMuted, marginLeft: 22, marginTop: 4 }]}>Bloquea la licencia. Puedes realizar el bloqueo temporal en línea con tu ClaveÚnica a través del Registro Civil.</Text>
+                        <TouchableOpacity
+                          style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 10 }]}
+                          activeOpacity={0.8}
+                          onPress={() => Linking.openURL('https://www.registrocivil.cl')}>
+                          <Ionicons name="open-outline" size={18} color="#fff" />
+                          <Text style={[styles.submitBtnText, { color: '#fff', fontSize: 14 }]}>Ir a Registro Civil</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <View style={[styles.infoCardDivider, { backgroundColor: colors.border }]} />
+
+                      <View style={{ marginTop: 16 }}>
+                        <View style={styles.infoCardItem}>
+                          <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                          <Text style={[styles.infoCardText, { color: colors.text, fontWeight: '600' }]}>Robo</Text>
+                        </View>
+                        <Text style={[styles.infoCardText, { color: colors.textMuted, marginLeft: 22, marginTop: 4 }]}>Denuncia el robo, bloquea la licencia y solicita el duplicado en la municipalidad.</Text>
+                        <TouchableOpacity
+                          style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 10 }]}
+                          activeOpacity={0.8}
+                          onPress={() => Linking.openURL('https://www.agendarhoras.cl')}>
+                          <Ionicons name="calendar-outline" size={18} color="#fff" />
+                          <Text style={[styles.submitBtnText, { color: '#fff', fontSize: 14 }]}>Agendar hora</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Modal: Duplicado Padrón */}
+        <Modal visible={showPadronDuplicado} transparent animationType="fade">
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowPadronDuplicado(false)}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                    <Ionicons name="reader-outline" size={18} color={colors.primary} />
+                    <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Sacar duplicado del Padrón</Text>
+                    <TouchableOpacity onPress={() => setShowPadronDuplicado(false)}>
+                      <Ionicons name="close" size={22} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+                    <View style={{ marginTop: 12 }}>
+                      <Text style={[styles.infoCardText, { color: colors.text, fontWeight: '600', marginBottom: 8 }]}>El procedimiento:</Text>
+                      {[
+                        'Ingresa al portal del Registro Civil.',
+                        'Selecciona Vehículos → Certificado de inscripción (Padrón).',
+                        'Inicia sesión con tu ClaveÚnica.',
+                        'Ingresa la patente de la moto.',
+                        'Paga el valor del trámite (actualmente $1.560).',
+                        'Descarga el documento en formato PDF.',
+                      ].map((item, i) => (
+                        <View key={i} style={[styles.infoCardItem, { alignItems: 'flex-start' }]}>
+                          <Text style={{ fontSize: 11.5, lineHeight: 15, fontWeight: '700', color: colors.text, width: 16 }}>{i + 1}.</Text>
+                          <Text style={[styles.infoCardText, { color: colors.text }]}>{item}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 16 }]}
+                      activeOpacity={0.8}
+                      onPress={() => Linking.openURL('https://www.registrocivil.cl')}>
+                      <Ionicons name="open-outline" size={18} color="#fff" />
+                      <Text style={[styles.submitBtnText, { color: '#fff', fontSize: 14 }]}>Ir a Registro Civil</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
       </View>
     );
   }
@@ -892,7 +1139,12 @@ export default function DocumentsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={filteredDocs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        ListHeaderComponent={filteredDocs.length > 0 ? <View style={{ height: 8 }} /> : null}
+        ListHeaderComponent={
+          <View style={[styles.infoBanner, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue, marginHorizontal: 16, marginTop: 12 }]}>
+            <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue} />
+            <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('finesDisclaimer')}</Text>
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>📄</Text>
@@ -901,15 +1153,29 @@ export default function DocumentsScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={() => setViewing(item)}>
+          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => setViewing(item)}>
             <View style={styles.cardRow}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
               <Text style={[styles.cardStatus, item.status === 'expired' && { color: colors.danger }, item.status === 'expiring' && { color: colors.accent }, item.status === 'valid' && { color: colors.success }]}>
                 {item.status === 'expired' ? t('expired') : item.status === 'expiring' ? t('expiring') : t('valid')}
               </Text>
             </View>
-            {item.issueDate && <Text style={[styles.cardDate, { color: colors.textSecondary }]}>{t('issued')}: {new Date(item.issueDate).toLocaleDateString()}</Text>}
-            {item.expiryDate && <Text style={[styles.cardDate, { color: colors.textSecondary }]}>{t('expires')}: {new Date(item.expiryDate).toLocaleDateString()}</Text>}
+            {item.issueDate && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <Ionicons name="calendar-outline" size={13} color={colors.success} />
+                <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                  {t('issued')}: {new Date(item.issueDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+              </View>
+            )}
+            {item.expiryDate && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <Ionicons name="calendar-outline" size={13} color={colors.danger} />
+                <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                  {t('expires')}: {new Date(item.expiryDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         )}
       />
@@ -917,6 +1183,13 @@ export default function DocumentsScreen() {
       {filteredDocs.some((d) => d.fileUrl) && (
         <TouchableOpacity style={[styles.bulkFab, { backgroundColor: colors.success }]} onPress={handleBulkSaveAsPDF}>
           <Ionicons name="download-outline" size={24} color={colors.successText} />
+        </TouchableOpacity>
+      )}
+      {selectedType === 'fines' && (
+        <TouchableOpacity
+          style={[styles.bulkFab, { backgroundColor: colors.primary, bottom: 148 }]}
+          onPress={() => Linking.openURL('https://www.registrocivil.cl/consultas/multas')}>
+          <Ionicons name="search-outline" size={22} color={colors.primaryText} />
         </TouchableOpacity>
       )}
 
@@ -955,8 +1228,22 @@ export default function DocumentsScreen() {
                   </Text>
                 </View>
               </View>
-              {viewing.issueDate && <Text style={[styles.detailDate, { color: colors.textSecondary }]}>{t('issued')}: {new Date(viewing.issueDate).toLocaleDateString()}</Text>}
-              {viewing.expiryDate && <Text style={[styles.detailDate, { color: colors.textSecondary }]}>{t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString()}</Text>}
+              {viewing.issueDate && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.success} />
+                  <Text style={[styles.detailDate, { color: colors.textSecondary }]}>
+                    {t('issued')}: {new Date(viewing.issueDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </Text>
+                </View>
+              )}
+              {viewing.expiryDate && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.danger} />
+                  <Text style={[styles.detailDate, { color: colors.textSecondary }]}>
+                    {t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </Text>
+                </View>
+              )}
               {viewing.type === 'drivers_license' && viewing.fileUrlBack ? (
                 <View style={{ gap: 10, marginTop: 20 }}>
                   <View>
@@ -1127,14 +1414,14 @@ const styles = StyleSheet.create({
   detailActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   editBtn: { padding: 8 },
   deleteBtn: { padding: 8 },
-  detailContent: { padding: 20 },
+  detailContent: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 6 },
   detailTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 4 },
   detailTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   detailStatusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   detailStatusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   statusBadgeOverlay: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
   statusBadgeOverlayText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  detailDate: { fontSize: 15, marginTop: 8 },
+  detailDate: { fontSize: 12, marginTop: 8 },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1301,5 +1588,35 @@ const styles = StyleSheet.create({
   submitBtnText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  linkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+
+  linkText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  payHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  payHint2: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  categoryChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
 });

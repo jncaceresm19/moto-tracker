@@ -10,6 +10,7 @@ import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { VerificationModal } from '../../src/components/VerificationModal';
+import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
 
 export default function MotorcycleListScreen() {
   const { user } = useAuth();
@@ -19,7 +20,7 @@ export default function MotorcycleListScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '' });
+  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '', color: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -27,12 +28,12 @@ export default function MotorcycleListScreen() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertButtons, setAlertButtons] = useState<{text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[]>([]);
+  const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [verifyingMotorcycle, setVerifyingMotorcycle] = useState<Motorcycle | null>(null);
 
-  const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -72,7 +73,7 @@ export default function MotorcycleListScreen() {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      showAlert(t('permissionNeeded'), fromCamera ? t('permissionCamera') : t('permissionGallery'), [{text: 'OK'}], 'lock-closed', '#FF9500');
+      showAlert(t('permissionNeeded'), fromCamera ? t('permissionCamera') : t('permissionGallery'), [{ text: 'OK' }], 'lock-closed', '#FF9500');
       return;
     }
 
@@ -113,15 +114,16 @@ export default function MotorcycleListScreen() {
         licensePlate: form.licensePlate,
         currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
         gpsTracker: form.gpsTracker || undefined,
+        color: form.color || undefined,
         imageUrl: imageUri || undefined,
       });
       setMotorcycles((prev) => [created, ...prev]);
       setShowCreate(false);
-      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '' });
+      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '', color: '' });
       setImageUri(null);
-      showAlert(t('success'), t('motorcycleUpdated'), [{text: 'OK'}], 'checkmark-circle', '#34C759');
+      showAlert(t('success'), t('motorcycleUpdated'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
     } catch {
-      showAlert(t('error'), t('failedToCreate'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+      showAlert(t('error'), t('failedToCreate'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setSaving(false);
     }
@@ -138,7 +140,7 @@ export default function MotorcycleListScreen() {
             await deleteMotorcycle(id);
             setMotorcycles((prev) => prev.filter((m) => m.id !== id));
           } catch {
-            showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30');
+            showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
           }
         },
       },
@@ -230,6 +232,11 @@ export default function MotorcycleListScreen() {
     return <View style={dynamicStyles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
 
+  const formatPlate = (raw: string) => {
+    const { letters, numbers } = getDisplayPlateParts(raw);
+    return numbers ? `${letters}-${numbers}` : letters;
+  };
+
   return (
     <View style={dynamicStyles.container}>
       {motorcycles.length === 0 ? (
@@ -246,6 +253,7 @@ export default function MotorcycleListScreen() {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={dynamicStyles.card}
+              activeOpacity={0.9}
               onPress={() => router.push(`/(app)/motorcycle/${item.id}`)}
               onLongPress={() => handleDelete(item.id, `${item.brand} ${item.model}`)}
             >
@@ -274,7 +282,7 @@ export default function MotorcycleListScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-                <Text style={dynamicStyles.cardSub}>{item.year} · {item.licensePlate}</Text>
+                <Text style={dynamicStyles.cardSub}>{item.year} · {formatPlate(item.licensePlate)}</Text>
                 <Text style={dynamicStyles.cardKm}>{item.currentKilometers.toLocaleString()} km</Text>
               </View>
             </TouchableOpacity>
@@ -282,7 +290,7 @@ export default function MotorcycleListScreen() {
         />
       )}
 
-      <TouchableOpacity style={dynamicStyles.fab} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
+      <TouchableOpacity style={dynamicStyles.fab} activeOpacity={0.8} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
         <Text style={dynamicStyles.fabText}>+</Text>
       </TouchableOpacity>
 
@@ -312,8 +320,10 @@ export default function MotorcycleListScreen() {
             <TextInput style={dynamicStyles.input} placeholder={t('year') + ' *'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
             {errors.year ? <Text style={dynamicStyles.errorText}>{errors.year}</Text> : null}
             <TextInput style={dynamicStyles.input} placeholder={t('licensePlate') + ' *'} placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+            <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: -6, marginBottom: 10 }}>Ingresar patente del permiso de circulación o padrón</Text>
             {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
             <TextInput style={dynamicStyles.input} placeholder={t('currentKilometers') + ' (' + t('optional') + ')'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
+            <TextInput style={dynamicStyles.input} placeholder="Color" placeholderTextColor={colors.textMuted} value={form.color} onChangeText={(v) => setForm((p) => ({ ...p, color: v }))} />
             <View style={{ marginTop: 10, marginBottom: 6 }}>
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{t('gpsQuestion')}</Text>
               <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t('gpsQuestionHint')}</Text>

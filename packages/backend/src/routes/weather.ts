@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth';
 import { resolveZone } from '../services/weatherZone';
 import { getWeatherForZone } from '../services/weatherCache';
+import { weatherCodeToCondition } from '../services/openWeatherMap';
 import { createErrorResponse } from '@moto-tracker/shared';
 
 const router = Router();
@@ -24,6 +25,9 @@ router.get('/rain-alert', authenticate, async (req: Request, res: Response) => {
           shouldShow: false,
           minutesUntilRain: null,
           probability: 0,
+          currentTemp: null,
+          weatherCode: 0,
+          weatherCondition: 'Desconocido',
           message: null,
           suggestion: null,
           zoneName: null,
@@ -39,6 +43,7 @@ router.get('/rain-alert', authenticate, async (req: Request, res: Response) => {
       data: {
         ...alert,
         zoneName: zone.name,
+        weatherCondition: weatherCodeToCondition(alert.weatherCode),
         message: alert.shouldShow ? `Lluvia en ~${alert.minutesUntilRain} min` : null,
         suggestion: alert.shouldShow ? 'Considera esperar o llevar equipo impermeable' : null,
       },

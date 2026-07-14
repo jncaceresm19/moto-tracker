@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions, Modal, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,9 +23,11 @@ import { ActiveMotoModal } from '../../src/components/ActiveMotoModal';
 import { reverseGeocode } from '../../src/services/geocoding';
 import { getUnreadCount } from '../../src/services/notificationService';
 import { CustomAlert } from '../../src/components/CustomAlert';
-import { RainAlertCard } from '../../src/components/RainAlertCard';
+import { WeatherCard } from '../../src/components/WeatherCard';
 import { RainAlertData, fetchRainAlert } from '../../src/services/weatherApi';
 import { isRainAlertDismissed, dismissRainAlert } from '../../src/services/rainAlertDismiss';
+import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
+
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -48,6 +50,14 @@ export default function HomeScreen() {
   const [biometricPromptVisible, setBiometricPromptVisible] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [rainAlert, setRainAlert] = useState<RainAlertData | null>(null);
+  const [weatherCondition, setWeatherCondition] = useState<string>('Cargando...');
+  const [currentTemp, setCurrentTemp] = useState<number | null>(null);
+  const [zoneName, setZoneName] = useState<string | null>(null);
+  const [recoverModalVisible, setRecoverModalVisible] = useState(false);
+  const [recoverAlertId, setRecoverAlertId] = useState<string | null>(null);
+  const [recoverLocation, setRecoverLocation] = useState('');
+  const [recoverSaving, setRecoverSaving] = useState(false);
+  const [recoverGettingLocation, setRecoverGettingLocation] = useState(false);
 
   // Check for biometric prompt on first load
   useEffect(() => {
@@ -59,7 +69,7 @@ export default function HomeScreen() {
     const enrolled = await isBiometricEnrolled();
     const prompted = await hasBeenPrompted();
     setBiometricAvailable(hardware);
-    
+
     // Only show prompt if device has hardware AND user hasn't been prompted before
     if (hardware && !prompted) {
       setBiometricPromptVisible(true);
@@ -88,7 +98,7 @@ export default function HomeScreen() {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    
+
     if (minutes < 1) return 'ahora mismo';
     if (minutes < 60) return `hace ${minutes} min`;
     if (hours < 24) return `hace ${hours}h`;
@@ -123,17 +133,17 @@ export default function HomeScreen() {
       try {
         const { lat, lon } = await getCurrentLocation();
         console.log('[GAS] Location:', lat, lon);
-        
+
         // Detect country from location
         detectCountry(lat, lon).catch(e => console.log('[GAS] Country detection error:', e));
-        
+
         const stations = await getNearbyGasStations(lat, lon);
         console.log('[GAS] Found:', stations.length, 'stations');
         if (stations.length > 0) {
           console.log('[GAS] First station:', stations[0].brand, stations[0].address, stations[0].price93);
         }
         setGasStations(stations);
-        
+
         // Update timestamp after refresh
         const newLabel = await getLastUpdateLabel();
         setLastGasUpdate(newLabel);
@@ -179,7 +189,7 @@ export default function HomeScreen() {
     try {
       const active = await getActiveMoto();
       setActiveMoto(active);
-      
+
       // Load address in background if we have coordinates
       if (active?.activationLat && active?.activationLon) {
         reverseGeocode(active.activationLat, active.activationLon).then(address => {
@@ -204,7 +214,6 @@ export default function HomeScreen() {
 
   const loadRainAlert = useCallback(async () => {
     try {
-      // Try GPS first, fallback to Santiago center
       let lat: number;
       let lon: number;
       try {
@@ -212,18 +221,23 @@ export default function HomeScreen() {
         lat = loc.lat;
         lon = loc.lon;
       } catch {
-        // GPS failed — use Santiago center as fallback
         lat = -33.45;
         lon = -70.66;
       }
 
       const alert = await fetchRainAlert(lat, lon);
 
+      if (alert.weatherCondition) {
+        setWeatherCondition(alert.weatherCondition);
+      }
+      setCurrentTemp(alert.currentTemp);
+      setZoneName(alert.zoneName);
+
       if (alert.shouldShow && user) {
         const dismissed = await isRainAlertDismissed(user.id);
-        if (!dismissed) {
-          setRainAlert(alert);
-        }
+        setRainAlert(!dismissed ? alert : null);
+      } else {
+        setRainAlert(null);
       }
     } catch (e: any) {
       console.log('[RAIN] Error:', e?.message || 'Unknown');
@@ -273,13 +287,40 @@ export default function HomeScreen() {
   const hasGps = !!motoWithGps;
   const hasAlerts = theftAlerts.length > 0;
 
-  const handleMarkAsFound = async (alertId: string) => {
+  const handleMarkAsFound = (alertId: string) => {
+    setRecoverAlertId(alertId);
+    setRecoverLocation('');
+    setRecoverModalVisible(true);
+  };
+
+  const handleConfirmRecover = async () => {
+    if (!recoverAlertId) return;
+    setRecoverSaving(true);
     try {
-      await closeAlert(alertId, 'recovered');
-      // Refresh alerts — recovered alerts won't show in active list
+      await closeAlert(recoverAlertId, 'recovered', recoverLocation.trim() || undefined);
+      setRecoverModalVisible(false);
+      setRecoverAlertId(null);
+      setRecoverLocation('');
       await loadTheftAlerts();
     } catch (e: any) {
       console.log('[THEFT] Error marking as found:', e?.message);
+    } finally {
+      setRecoverSaving(false);
+    }
+  };
+
+  const handleUseCurrentLocationForRecover = async () => {
+    setRecoverGettingLocation(true);
+    try {
+      const { lat, lon } = await getCurrentLocation();
+      const address = await reverseGeocode(lat, lon);
+      if (address) {
+        setRecoverLocation(address);
+      }
+    } catch (e: any) {
+      console.log('[THEFT] Error getting current location:', e?.message);
+    } finally {
+      setRecoverGettingLocation(false);
     }
   };
 
@@ -294,19 +335,19 @@ export default function HomeScreen() {
         activationLon: undefined,
       };
       setActiveMoto(optimisticActive);
-      
+
       // Get location in background (don't block UI at all)
       getCurrentLocation().then(loc => {
         // Update with location
         setActiveMoto(prev => prev ? { ...prev, activationLat: loc.lat, activationLon: loc.lon } : prev);
-        
+
         // Get address
         reverseGeocode(loc.lat, loc.lon).then(address => {
           setActivationAddress(address);
         }).catch(e => {
           console.log('[ACTIVE_MOTO] Geocoding error:', e);
         });
-        
+
         // Sync with server
         activateMoto(motorcycleId, loc.lat, loc.lon).then(serverResult => {
           setActiveMoto(serverResult);
@@ -332,7 +373,7 @@ export default function HomeScreen() {
       // OPTIMISTIC UPDATE - clear state immediately
       setActiveMoto(null);
       setActivationAddress(null);
-      
+
       // Sync with server in background (don't await)
       deactivateMoto().catch(e => {
         console.log('[ACTIVE_MOTO] Server sync error:', e);
@@ -344,10 +385,10 @@ export default function HomeScreen() {
 
   const handleReportTheft = async () => {
     if (!activeMoto) return;
-    
+
     const moto = motorcycles.find(m => m.id === activeMoto.motorcycleId);
     if (!moto) return;
-    
+
     try {
       // Create theft alert with activation location
       await createTheftAlert({
@@ -356,10 +397,10 @@ export default function HomeScreen() {
         lastLongitude: activeMoto.activationLon || 0,
         lastLocationName: activationAddress || `Estacionada en ${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`,
       });
-      
+
       // Deactivate after reporting
       await handleDeactivateMoto();
-      
+
       // Refresh alerts
       await loadTheftAlerts();
     } catch (e: any) {
@@ -385,6 +426,11 @@ export default function HomeScreen() {
     );
   }
 
+  const formatPlate = (raw: string) => {
+    const { letters, numbers } = getDisplayPlateParts(raw);
+    return numbers ? `${letters}-${numbers}` : letters;
+  };
+
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.headerBg }]} edges={['top']}>
       <StatusBar style="light" />
@@ -399,7 +445,7 @@ export default function HomeScreen() {
           />
           <Text style={[styles.brandName, { color: colors.headerTintColor }]}>Moto Tracker</Text>
         </View>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.bellBtn}
           onPress={() => router.push('/profile/notifications')}
         >
@@ -421,14 +467,14 @@ export default function HomeScreen() {
         {(() => {
           // If there's an active moto, show its info
           const activeMotoMotorcycle = activeMoto ? motorcycles.find(m => m.id === activeMoto.motorcycleId) : null;
-          
+
           // Otherwise show the default moto (with GPS or first one)
           const displayMoto = activeMotoMotorcycle || defaultMoto;
-          
+
           return (
             <DashboardPanel
               motorcycleName={displayMoto ? `${displayMoto.brand} ${displayMoto.model}` : ''}
-              plate={displayMoto?.licensePlate}
+              plate={displayMoto ? formatPlate(displayMoto.licensePlate) : undefined}
               status={activeMoto ? 'safe' : 'safe'}
               lastLocationTime={activeMoto ? new Date(activeMoto.activatedAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
               activationTimeAgo={activeMoto ? formatActivationTime(activeMoto.activatedAt) : undefined}
@@ -455,13 +501,6 @@ export default function HomeScreen() {
           onReportTheft={handleReportTheft}
         />
 
-        {/* Multiple motorcycles indicator */}
-        {motorcycles.length > 1 && (
-          <Text style={[styles.motoIndicator, { color: colors.inkFaint }]}>
-            1 de {motorcycles.length} motos
-          </Text>
-        )}
-
         {/* No motorcycles placeholder */}
         {motorcycles.length === 0 && (
           <View style={styles.emptyMotoContainer}>
@@ -471,21 +510,19 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Rain Alert */}
-        {rainAlert && rainAlert.shouldShow && (
-          <View style={styles.section}>
-            <RainAlertCard
-              minutesUntilRain={rainAlert.minutesUntilRain!}
-              probability={rainAlert.probability}
-              zoneName={rainAlert.zoneName || undefined}
-              onDismiss={handleDismissRainAlert}
-              onPress={() => {
-                // MVP: show detail in CustomAlert
-                // Future: navigate to weather detail screen
-              }}
-            />
-          </View>
-        )}
+        {/* Weather Card — always visible */}
+        <View style={styles.section}>
+          <WeatherCard
+            currentTemp={currentTemp}
+            weatherCondition={weatherCondition}
+            zoneName={zoneName ?? undefined}
+            isRainAlert={!!rainAlert?.shouldShow}
+            minutesUntilRain={rainAlert?.minutesUntilRain}
+            probability={rainAlert?.probability}
+            onDismissRain={handleDismissRainAlert}
+            onPress={() => { }}
+          />
+        </View>
 
         {/* Section: Alertas de robo */}
         <View style={styles.section}>
@@ -496,7 +533,7 @@ export default function HomeScreen() {
             theftAlerts.length === 1 ? (
               <TheftAlertCard
                 key={theftAlerts[0].id}
-                title={`${theftAlerts[0].brand} ${theftAlerts[0].model} - ROBADA`}
+                title={`${theftAlerts[0].brand} ${theftAlerts[0].model} · Patente: ${formatPlate(theftAlerts[0].licensePlate)}`}
                 metadata={theftAlerts[0].lastLocationName || 'Ubicación desconocida'}
                 timeAgo={formatTimeAgo(theftAlerts[0].createdAt)}
                 photoUrl={theftAlerts[0].photoUrl}
@@ -535,7 +572,7 @@ export default function HomeScreen() {
                 {theftAlerts.map((alert) => (
                   <View key={alert.id} style={{ width: Dimensions.get('window').width - 56, marginRight: 12 }}>
                     <TheftAlertCard
-                      title={`${alert.brand} ${alert.model} - ROBADA`}
+                      title={`${alert.brand} ${alert.model} · Patente: ${formatPlate(alert.licensePlate)}`}
                       metadata={alert.lastLocationName || 'Ubicación desconocida'}
                       timeAgo={formatTimeAgo(alert.createdAt)}
                       photoUrl={alert.photoUrl}
@@ -641,14 +678,16 @@ export default function HomeScreen() {
         icon="logo-instagram"
         iconColor="#E4405F"
         buttons={[
-          { text: 'Abrir Instagram', onPress: async () => {
-            const Linking = require('expo-linking');
-            try {
-              await Linking.openURL('instagram://');
-            } catch {
-              await Linking.openURL('https://www.instagram.com');
+          {
+            text: 'Abrir Instagram', onPress: async () => {
+              const Linking = require('expo-linking');
+              try {
+                await Linking.openURL('instagram://');
+              } catch {
+                await Linking.openURL('https://www.instagram.com');
+              }
             }
-          }},
+          },
           { text: 'Cerrar', style: 'cancel' },
         ]}
         onClose={() => setInstagramAlertVisible(false)}
@@ -664,13 +703,13 @@ export default function HomeScreen() {
             <Text style={[styles.modalTitle, { color: colors.ink }]}>{t('biometricPromptTitle')}</Text>
             <Text style={[styles.modalMessage, { color: colors.inkSoft }]}>{t('biometricPromptMessage')}</Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.primary }]}
                 onPress={() => handleBiometricResponse(true)}
               >
                 <Text style={styles.modalBtnText}>Activar</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }]}
                 onPress={() => handleBiometricResponse(false)}
               >
@@ -679,6 +718,69 @@ export default function HomeScreen() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Recover Location Modal */}
+      <Modal visible={recoverModalVisible} transparent animationType="fade" onRequestClose={() => setRecoverModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.recoverOverlay}
+        >
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} activeOpacity={1} onPress={() => setRecoverModalVisible(false)} />
+          <View style={[styles.recoverCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.recoverIconWrap}>
+              <Ionicons name="checkmark-circle" size={36} color="#22C55E" />
+            </View>
+            <Text style={[styles.recoverTitle, { color: colors.ink }]}>Marcar como recuperada</Text>
+            <Text style={[styles.recoverSubtitle, { color: colors.inkFaint }]}>
+              ¿Dónde se encontró la moto? Esta ubicación se guardará en la publicación.
+            </Text>
+            <TextInput
+              style={[styles.recoverInput, { color: colors.ink, borderColor: colors.border }]}
+              placeholder="Ej: Av. Providencia 1234, Providencia"
+              placeholderTextColor={colors.inkFaint}
+              value={recoverLocation}
+              onChangeText={setRecoverLocation}
+              onSubmitEditing={Keyboard.dismiss}
+              returnKeyType="done"
+            />
+            <TouchableOpacity
+              style={[styles.recoverLocationBtn, { borderColor: colors.primary }]}
+              onPress={handleUseCurrentLocationForRecover}
+              disabled={recoverGettingLocation}
+              activeOpacity={0.8}
+            >
+              {recoverGettingLocation ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <Ionicons name="location" size={18} color={colors.primary} />
+              )}
+              <Text style={[styles.recoverLocationBtnText, { color: colors.primary }]}>
+                Usar ubicación actual
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.recoverActions}>
+              <TouchableOpacity
+                style={[styles.recoverBtn, { borderColor: colors.border }]}
+                onPress={() => setRecoverModalVisible(false)}
+                disabled={recoverSaving}
+              >
+                <Text style={[styles.recoverBtnText, { color: colors.ink }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.recoverBtn, { backgroundColor: '#22C55E', borderColor: '#22C55E' }]}
+                onPress={handleConfirmRecover}
+                disabled={recoverSaving}
+              >
+                {recoverSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={[styles.recoverBtnText, { color: '#fff' }]}>Confirmar</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -747,4 +849,27 @@ const styles = StyleSheet.create({
   modalButtons: { width: '100%', gap: 12 },
   modalBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  recoverOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  recoverCard: { width: '100%', maxWidth: 340, borderRadius: 16, padding: 20, alignItems: 'center' },
+  recoverIconWrap: { marginBottom: 8 },
+  recoverTitle: { fontSize: 17, fontWeight: '700', marginBottom: 6, textAlign: 'center' },
+  recoverSubtitle: { fontSize: 13, textAlign: 'center', marginBottom: 16, lineHeight: 18 },
+  recoverInput: { width: '100%', borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 14, marginBottom: 16 },
+  recoverLocationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    width: '100%',
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginTop: -6,
+    marginBottom: 16,
+  },
+  recoverLocationBtnText: { fontSize: 14, fontWeight: '600' },
+  recoverActions: { flexDirection: 'row', gap: 10, width: '100%' },
+  recoverBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  recoverBtnText: { fontSize: 15, fontWeight: '600' },
 });
