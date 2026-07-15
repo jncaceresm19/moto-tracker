@@ -14,7 +14,10 @@ export interface NearbyPlace {
 const API_URL = 'http://192.168.100.9:3001';
 const CACHE_KEY = 'moto-tracker-nearby-places';
 const CACHE_KEY_TIME = 'moto-tracker-nearby-places-time';
+const CACHE_KEY_LAT = 'moto-tracker-nearby-places-lat';
+const CACHE_KEY_LON = 'moto-tracker-nearby-places-lon';
 const CACHE_TTL = 30 * 60 * 1000;
+const RADIUS_KM = 5;
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371;
@@ -27,6 +30,28 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Location persistence helpers
+async function saveLastQueriedLocation(lat: number, lon: number): Promise<void> {
+  try {
+    await AsyncStorage.setItem(CACHE_KEY_LAT, lat.toString());
+    await AsyncStorage.setItem(CACHE_KEY_LON, lon.toString());
+  } catch {}
+}
+
+async function getLastQueriedLocation(): Promise<{ lat: number; lon: number } | null> {
+  try {
+    const latStr = await AsyncStorage.getItem(CACHE_KEY_LAT);
+    const lonStr = await AsyncStorage.getItem(CACHE_KEY_LON);
+    if (!latStr || !lonStr) return null;
+    const lat = parseFloat(latStr);
+    const lon = parseFloat(lonStr);
+    if (isNaN(lat) || isNaN(lon)) return null;
+    return { lat, lon };
+  } catch {
+    return null;
+  }
 }
 
 // Backend Places API proxy
@@ -64,26 +89,27 @@ export async function getNearbyPlaces(
 ): Promise<NearbyPlace[]> {
   console.log('[NEARBY] === Google Places Search ===');
 
-  // Clear old cache
-  try {
-    await AsyncStorage.removeItem(CACHE_KEY);
-    await AsyncStorage.removeItem(CACHE_KEY_TIME);
-  } catch {}
-
-  // Check cache
-  try {
-    const cachedTime = await AsyncStorage.getItem(CACHE_KEY_TIME);
-    if (cachedTime && Date.now() - parseInt(cachedTime) < CACHE_TTL) {
-      const cached = await AsyncStorage.getItem(CACHE_KEY);
-      if (cached) {
-        const places: NearbyPlace[] = JSON.parse(cached);
-        console.log('[NEARBY] Using cached places:', places.length);
-        return places
-          .map((p) => ({ ...p, distance: haversineDistance(lat, lon, p.latitude, p.longitude) }))
-          .sort((a, b) => a.distance - b.distance);
-      }
+  // Check if we're within the radius of the last query location
+  const lastLocation = await getLastQueriedLocation();
+  if (lastLocation) {
+    const distance = haversineDistance(lat, lon, lastLocation.lat, lastLocation.lon);
+    if (distance <= RADIUS_KM) {
+      // Check cache validity
+      try {
+        const cachedTime = await AsyncStorage.getItem(CACHE_KEY_TIME);
+        if (cachedTime && Date.now() - parseInt(cachedTime) < CACHE_TTL) {
+          const cached = await AsyncStorage.getItem(CACHE_KEY);
+          if (cached) {
+            const places: NearbyPlace[] = JSON.parse(cached);
+            console.log('[NEARBY] Within 5km radius, using cache:', places.length, 'places');
+            return places
+              .map((p) => ({ ...p, distance: haversineDistance(lat, lon, p.latitude, p.longitude) }))
+              .sort((a, b) => a.distance - b.distance);
+          }
+        }
+      } catch {}
     }
-  } catch {}
+  }
 
   const radiusMeters = radiusKm * 1000;
 
@@ -211,6 +237,7 @@ export async function getNearbyPlaces(
   try {
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(result));
     await AsyncStorage.setItem(CACHE_KEY_TIME, Date.now().toString());
+    await saveLastQueriedLocation(lat, lon);
   } catch {}
 
   return result;
