@@ -603,7 +603,7 @@ export default function MaintenanceScreen() {
 
     return (
       <ScrollView
-        key={rec.id}
+        key={`${rec.id}-${kmEntries.length}`}
         style={{ width: screenWidth }}
         contentContainerStyle={styles.detailContent}
         showsVerticalScrollIndicator={false}
@@ -1198,7 +1198,7 @@ const styles = StyleSheet.create({
   emptySub: { fontSize: 13, marginTop: 4, textAlign: 'center' },
 
   // Detail view (estilo documentos)
-  detailContent: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 6 },
+  detailContent: { paddingHorizontal: 20, paddingBottom: 40, paddingTop: 6 },
   detailTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 12 },
   detailDate: { fontSize: 12 },
   pdfThumbnail: {
