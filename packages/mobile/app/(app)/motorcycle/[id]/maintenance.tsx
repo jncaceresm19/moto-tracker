@@ -808,9 +808,11 @@ export default function MaintenanceScreen() {
         <>
           <FlatList
             data={filteredRecords}
+            extraData={kmEntries}
             keyExtractor={(item) => item.id}
             horizontal
             pagingEnabled
+            removeClippedSubviews={false}
             showsHorizontalScrollIndicator={false}
             initialScrollIndex={Math.min(pageIdx, filteredRecords.length - 1)}
             getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
