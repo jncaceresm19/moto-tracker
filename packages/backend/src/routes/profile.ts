@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
-import { users } from '../db/schema';
+import { users, motorcycles, notifications, activeMotos, documents, maintenanceRecords, kilometerHistory, fuelRecords } from '../db/schema';
 import { authenticate } from '../middleware/auth';
 import { validateBody } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
@@ -125,6 +125,41 @@ router.put('/location', authenticate, async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Update location error:', err);
     res.status(500).json({ error: 'Failed to update location' });
+  }
+});
+
+// --- DELETE /api/profile ---
+router.delete('/', authenticate, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get all user motorcycles
+    const userMotorcycles = await db.select({ id: motorcycles.id }).from(motorcycles).where(eq(motorcycles.userId, userId));
+
+    // Delete related data for each motorcycle
+    for (const moto of userMotorcycles) {
+      await db.delete(documents).where(eq(documents.motorcycleId, moto.id));
+      await db.delete(maintenanceRecords).where(eq(maintenanceRecords.motorcycleId, moto.id));
+      await db.delete(kilometerHistory).where(eq(kilometerHistory.motorcycleId, moto.id));
+      await db.delete(fuelRecords).where(eq(fuelRecords.motorcycleId, moto.id));
+    }
+
+    // Delete user's motorcycles
+    await db.delete(motorcycles).where(eq(motorcycles.userId, userId));
+
+    // Delete user's notifications
+    await db.delete(notifications).where(eq(notifications.userId, userId));
+
+    // Delete user's active motos
+    await db.delete(activeMotos).where(eq(activeMotos.userId, userId));
+
+    // Delete the user
+    await db.delete(users).where(eq(users.id, userId));
+
+    res.json({ success: true, message: 'Account deleted' });
+  } catch (err) {
+    console.error('Delete account error:', err);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 

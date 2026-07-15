@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
-import { changePassword, updateProfile, listMotorcycles } from '../../src/api';
+import { changePassword, updateProfile, listMotorcycles, deleteAccount } from '../../src/api';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
 import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric, resetBiometricPreference, authenticateWithBiometrics } from '../../src/services/biometric';
@@ -214,7 +214,16 @@ export default function ProfileScreen() {
       'Esta acción es permanente y no se puede deshacer. Se eliminarán todos tus datos, motos y registros asociados.',
       [
         { text: t('cancel'), style: 'cancel' },
-        { text: 'Eliminar', style: 'destructive', onPress: () => {/* TODO: implementar llamada a la API */ } },
+        {
+          text: 'Eliminar', style: 'destructive', onPress: async () => {
+            try {
+              await deleteAccount();
+              await signOut();
+            } catch (e: any) {
+              showAlert(t('error'), e?.message || 'No se pudo eliminar la cuenta', [{ text: 'OK' }], 'close-circle', '#FF3B30');
+            }
+          }
+        },
       ],
       'warning',
       colors.danger
@@ -271,7 +280,6 @@ export default function ProfileScreen() {
           </View>
         )}
         <Text style={dynamicStyles.name}>{user?.name || user?.email?.split('@')[0] || 'User'}</Text>
-        <Text style={dynamicStyles.email}>{user?.email || 'Not logged in'}</Text>
       </View>
 
       {/* Account Section */}
@@ -623,6 +631,11 @@ export default function ProfileScreen() {
 
             {/* Account Info */}
             <View style={dynamicStyles.accountInfo}>
+              <View style={[dynamicStyles.accountInfoRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+                <Ionicons name="mail-outline" size={16} color={colors.textMuted} />
+                <Text style={dynamicStyles.accountInfoLabel}>{t('email')}</Text>
+                <Text style={dynamicStyles.accountInfoValue}>{user?.email || '—'}</Text>
+              </View>
               <View style={[dynamicStyles.accountInfoRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
                 <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
                 <Text style={dynamicStyles.accountInfoLabel}>Miembro desde</Text>

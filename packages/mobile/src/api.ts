@@ -136,6 +136,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
   });
 }
 
+export async function deleteAccount() {
+  await api<{ message: string }>('/api/profile', { method: 'DELETE' });
+  await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+}
+
 // Motorcycles
 export interface Motorcycle {
   id: string;
@@ -290,6 +295,43 @@ export async function updateKilometer(
 
 export async function deleteKilometer(motorcycleId: string, entryId: string): Promise<void> {
   await api(`/api/motorcycles/${motorcycleId}/kilometers/${entryId}`, { method: 'DELETE' });
+}
+
+// Fuel Records
+export interface FuelRecord {
+  id: string;
+  motorcycleId: string;
+  stationName?: string;
+  liters: number;
+  pricePerLiter: number;
+  totalCost: number;
+  location?: string;
+  recordedAt: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export async function listFuelRecords(motorcycleId: string): Promise<FuelRecord[]> {
+  return api<FuelRecord[]>(`/api/motorcycles/${motorcycleId}/fuel`);
+}
+
+export async function createFuelRecord(
+  motorcycleId: string,
+  data: { stationName?: string; liters: number; pricePerLiter: number; location?: string; recordedAt: string; notes?: string }
+): Promise<FuelRecord> {
+  return api<FuelRecord>(`/api/motorcycles/${motorcycleId}/fuel`, { method: 'POST', body: data });
+}
+
+export async function updateFuelRecord(
+  motorcycleId: string,
+  entryId: string,
+  data: { stationName?: string | null; liters?: number; pricePerLiter?: number; location?: string | null; recordedAt?: string; notes?: string | null }
+): Promise<FuelRecord> {
+  return api<FuelRecord>(`/api/motorcycles/${motorcycleId}/fuel/${entryId}`, { method: 'PUT', body: data });
+}
+
+export async function deleteFuelRecord(motorcycleId: string, entryId: string): Promise<void> {
+  await api(`/api/motorcycles/${motorcycleId}/fuel/${entryId}`, { method: 'DELETE' });
 }
 
 // Profile
