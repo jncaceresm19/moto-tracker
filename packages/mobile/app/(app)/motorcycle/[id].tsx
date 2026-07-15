@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle, listDocuments, Document, listMaintenance, MaintenanceRecord } from '../../../src/api';
+import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle, listDocuments, Document, listMaintenance, MaintenanceRecord, listKilometers, KilometerEntry } from '../../../src/api';
 import { useLanguage } from '../../../src/language-context';
 import { CustomAlert } from '../../../src/components/CustomAlert';
 import { getDueRemindersByKm, getReminderMessage, dismissReminder, getOilInterval, OilType } from '../../../src/services/reminderService';
@@ -26,6 +26,7 @@ export default function MotorcycleDetailScreen() {
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
+  const [kmEntries, setKmEntries] = useState<KilometerEntry[]>([]);
 
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -45,9 +46,10 @@ export default function MotorcycleDetailScreen() {
         setGpsEnabled(!!moto.gpsTracker);
 
         try {
-          const [docs, records] = await Promise.all([listDocuments(id), listMaintenance(id)]);
+          const [docs, records, kms] = await Promise.all([listDocuments(id), listMaintenance(id), listKilometers(id)]);
           setDocuments(docs);
           setMaintenance(records);
+          setKmEntries(kms.slice(0, 5));
         } catch { }
 
         if (moto.currentKilometers) {
@@ -231,8 +233,8 @@ export default function MotorcycleDetailScreen() {
         subColor: isDue ? '#9C3A2E' : '#1C6FA5',
         title: isDue ? 'Cambio de aceite atrasado' : 'Próximo cambio de aceite',
         subtitle: isDue
-          ? 'Ya alcanzaste el kilometraje o fecha estimada'
-          : `En ${kmRemaining.toLocaleString('es-CL')} km o el ${nextDate.toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+          ? `Debiste cambiarlo a los ${nextKm.toLocaleString('es-CL')} km`
+          : `Cambialo a los ${nextKm.toLocaleString('es-CL')} km`,
         route: `/(app)/motorcycle/${id}/maintenance`,
         priority: isDue ? 0 : 2,
       });
@@ -242,14 +244,45 @@ export default function MotorcycleDetailScreen() {
   alerts.sort((a, b) => a.priority - b.priority);
   const topAlerts = alerts.slice(0, 3);
 
+  const COLOR_MAP: Record<string, string> = {
+    negro: '#1a1a1a',
+    blanco: '#e8e8e8',
+    rojo: '#8B1E1E',
+    azul: '#1a3a6b',
+    verde: '#1E5C3A',
+    gris: '#4a4a4a',
+    amarillo: '#8B7A1E',
+    naranja: '#8B4A1E',
+    plateado: '#6b6b6b',
+    celeste: '#2E5C8B',
+  };
+
+  const getHeroColor = (colorName?: string): string => {
+    if (!colorName) return '#1a1a1a';
+    const normalized = colorName.trim().toLowerCase();
+    return COLOR_MAP[normalized] || '#1a1a1a';
+  };
+
+  const isLightColor = (hex: string): boolean => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance > 0.6;
+  };
+
+  const heroColor = getHeroColor(motorcycle.color);
+  const heroTextColor = isLightColor(heroColor) ? '#1a1a1a' : '#FFFFFF';
+  const heroSubTextColor = isLightColor(heroColor) ? '#3a3a3a' : '#cfe0f7';
+
   return (
     <ScrollView style={styles.container}>
       {/* Hero card: brand/model/year + edit/delete + plate/odo */}
-      <View style={[styles.heroCard, motorcycle.color ? { backgroundColor: motorcycle.color, borderColor: motorcycle.color } : {}]}>
+      <View style={[styles.heroCard, { backgroundColor: heroColor }]}>
         <View style={styles.heroTopRow}>
           <View>
-            <Text style={styles.heroBrand}>{motorcycle.brand}</Text>
-            <Text style={styles.heroModel}>{motorcycle.model} · {motorcycle.year}</Text>
+            <Text style={[styles.heroBrand, { color: heroTextColor }]}>{motorcycle.brand}</Text>
+            <Text style={[styles.heroModel, { color: heroSubTextColor }]}>{motorcycle.model} · {motorcycle.year}</Text>
           </View>
           <View style={styles.heroActions}>
             <TouchableOpacity style={styles.heroIconBtn} onPress={openEdit}>
@@ -347,6 +380,25 @@ export default function MotorcycleDetailScreen() {
         )}
       </View>
 
+      {/* Kilometer History Preview */}
+      {kmEntries.length > 0 && (
+        <View style={[styles.section, { paddingTop: 0 }]}>
+          <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}>
+            <Text style={styles.sectionTitle}>{t('kilometerHistory')}</Text>
+            <Ionicons name="chevron-forward" size={18} color="#999" />
+          </TouchableOpacity>
+          {kmEntries.slice(0, 5).map((entry) => (
+            <View key={entry.id} style={styles.kmEntry}>
+              <View style={styles.kmEntryRow}>
+                <Text style={styles.kmEntryValue}>{entry.readingKm.toLocaleString('es-CL')} km</Text>
+                <Text style={styles.kmEntryDate}>{new Date(entry.recordedAt).toLocaleDateString()}</Text>
+              </View>
+              {entry.notes ? <Text style={styles.kmEntryNotes}>{entry.notes}</Text> : null}
+            </View>
+          ))}
+        </View>
+      )}
+
       {/* Próximos vencimientos */}
       {topAlerts.length > 0 && (
         <View style={[styles.section, { paddingTop: 0 }]}>
@@ -382,8 +434,14 @@ export default function MotorcycleDetailScreen() {
             {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
             <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(txt) => { setForm((p) => ({ ...p, year: txt })); setErrors((p) => ({ ...p, year: '' })); }} />
             {errors.year ? <Text style={styles.errorText}>{errors.year}</Text> : null}
-            <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} onChangeText={(txt) => { setForm((p) => ({ ...p, licensePlate: txt })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
             {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
+            {motorcycle?.verificada ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: -4 }}>
+                <Ionicons name="lock-closed" size={14} color="#999" />
+                <Text style={{ fontSize: 12, color: '#999' }}>{t('plateVerifiedCantEdit')}</Text>
+              </View>
+            ) : null}
+            <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, licensePlate: txt })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
             <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} onChangeText={(txt) => setForm((p) => ({ ...p, currentKilometers: txt }))} />
             <TextInput style={styles.input} placeholder="Color" value={form.color} onChangeText={(txt) => setForm((p) => ({ ...p, color: txt }))} />
             <View style={{ marginTop: 10, marginBottom: 6 }}>
@@ -391,6 +449,7 @@ export default function MotorcycleDetailScreen() {
               <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
             </View>
             <TextInput style={styles.input} placeholder={t('gpsIdPlaceholder')} value={form.gpsTracker} onChangeText={(txt) => setForm((p) => ({ ...p, gpsTracker: txt }))} />
+            <Text style={{ fontSize: 12, color: '#666', marginTop: 4, marginBottom: 4 }}>{t('gpsQuestionHint2')}</Text>
             <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
               {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
             </TouchableOpacity>
@@ -421,7 +480,6 @@ const styles = StyleSheet.create({
 
   // Hero card
   heroCard: {
-    backgroundColor: '#1a3a6b',
     borderRadius: 14,
     padding: 16,
     margin: 16,
@@ -540,6 +598,33 @@ const styles = StyleSheet.create({
   },
   sectionText: { fontSize: 15, flex: 1 },
 
+  // Kilometer History Preview
+  kmEntry: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 6,
+  },
+  kmEntryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kmEntryValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  kmEntryDate: {
+    fontSize: 12,
+    color: '#666',
+  },
+  kmEntryNotes: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+
   // Alerts (próximos vencimientos)
   alertBtn: {
     flexDirection: 'row',
@@ -560,7 +645,7 @@ const styles = StyleSheet.create({
   cancel: { color: '#007AFF', fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
-  saveBtn: { backgroundColor: '#007AFF', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtn: { backgroundColor: '#1F9D63', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   mapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1F9D63', borderRadius: 10, padding: 12, marginTop: 4, marginBottom: 8 },
   mapBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },

@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, updateMotorcycle, getMotorcycle, MaintenanceRecord } from '../../../../src/api';
+import { listMaintenance, createMaintenance, updateMaintenance, deleteMaintenance, updateMotorcycle, getMotorcycle, MaintenanceRecord, listKilometers, KilometerEntry } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
 import { useTheme } from '../../../../src/theme-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
@@ -141,7 +141,7 @@ export default function MaintenanceScreen() {
   const [editing, setEditing] = useState<MaintenanceRecord | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [pageIdx, setPageIdx] = useState(0);
-  const [form, setForm] = useState({ type: 'motor_oil', description: '', kilometersAtService: '', serviceDate: '', cost: '' });
+  const [form, setForm] = useState({ type: 'motor_oil', description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -149,6 +149,7 @@ export default function MaintenanceScreen() {
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const [kmEntries, setKmEntries] = useState<KilometerEntry[]>([]);
 
   // Custom types (user-created)
   const [customTypes, setCustomTypes] = useState<{ key: string; label: string }[]>([]);
@@ -251,9 +252,10 @@ export default function MaintenanceScreen() {
   const load = async () => {
     if (!id) return;
     try {
-      const [records, moto] = await Promise.all([listMaintenance(id), getMotorcycle(id)]);
+      const [records, moto, kms] = await Promise.all([listMaintenance(id), getMotorcycle(id), listKilometers(id)]);
       setRecords(records);
       setMotorcycleKm(moto.currentKilometers);
+      setKmEntries(kms.slice(0, 5));
     }
     catch { showAlert(t('error'), t('failedToLoad'), [{ text: 'OK' }], 'close-circle', colors.danger); }
     finally { setLoading(false); }
@@ -283,12 +285,12 @@ export default function MaintenanceScreen() {
   };
 
   const resetForm = (type: string = 'motor_oil') => {
-    setForm({ type, description: '', kilometersAtService: '', serviceDate: '', cost: '' });
+    setForm({ type, description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
     setImageUri(null);
   };
 
   const openCreate = () => {
-    setForm({ type: selectedType || 'motor_oil', description: '', kilometersAtService: String(motorcycleKm || ''), serviceDate: '', cost: '' });
+    setForm({ type: selectedType || 'motor_oil', description: '', kilometersAtService: String(motorcycleKm || ''), serviceDate: '', cost: '', notes: '' });
     setImageUri(null);
     setErrors({});
     setShowCreate(true);
@@ -302,6 +304,7 @@ export default function MaintenanceScreen() {
       kilometersAtService: String(record.kilometersAtService),
       serviceDate: record.serviceDate.split('T')[0],
       cost: record.cost != null ? String(record.cost) : '',
+      notes: record.notes || '',
     });
     setImageUri(record.photoUrl || null);
     setEditing(record);
@@ -339,12 +342,15 @@ export default function MaintenanceScreen() {
       setShowCreate(false);
       resetForm();
 
-      // Actualiza el km de la moto SIEMPRE, sin importar el tipo de mantenimiento.
-      // El km ingresado en cualquier registro pasa a ser el km actual de la moto.
-      if (id) {
+      // Actualiza el km de la moto SOLO si el km ingresado es mayor al actual,
+      // para que no retroceda el kilometraje global (y con él, todas las barras
+      // de progreso de otros tipos de mantenimiento) al registrar un servicio
+      // pasado o con un km menor al real.
+      const enteredKm = Number(form.kilometersAtService);
+      if (id && enteredKm > motorcycleKm) {
         try {
-          await updateMotorcycle(id as string, { currentKilometers: Number(form.kilometersAtService) });
-          setMotorcycleKm(Number(form.kilometersAtService));
+          await updateMotorcycle(id as string, { currentKilometers: enteredKm });
+          setMotorcycleKm(enteredKm);
         } catch { }
       }
 
@@ -397,11 +403,12 @@ export default function MaintenanceScreen() {
       setRecords((prev) => prev.map((r) => r.id === updated.id ? updated : r));
       setEditing(null);
 
-      // Actualiza el km de la moto siempre, igual que en handleCreate
-      if (id) {
+      // Actualiza el km de la moto solo si avanza, igual que en handleCreate
+      const enteredKmUpdate = Number(form.kilometersAtService);
+      if (id && enteredKmUpdate > motorcycleKm) {
         try {
-          await updateMotorcycle(id as string, { currentKilometers: Number(form.kilometersAtService) });
-          setMotorcycleKm(Number(form.kilometersAtService));
+          await updateMotorcycle(id as string, { currentKilometers: enteredKmUpdate });
+          setMotorcycleKm(enteredKmUpdate);
         } catch { }
       }
 
@@ -772,6 +779,25 @@ export default function MaintenanceScreen() {
             </View>
           );
         })()}
+
+        {/* Historial de Kilómetros */}
+        {kmEntries.length > 0 && (
+          <View style={{ marginTop: 16 }}>
+            <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kilometerHistory')}</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            </TouchableOpacity>
+            {kmEntries.slice(0, 5).map((entry) => (
+              <View key={entry.id} style={[styles.kmEntry, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                <View style={styles.kmEntryRow}>
+                  <Text style={[styles.kmEntryValue, { color: colors.primary }]}>{entry.readingKm.toLocaleString('es-CL')} km</Text>
+                  <Text style={[styles.kmEntryDate, { color: colors.textSecondary }]}>{new Date(entry.recordedAt).toLocaleDateString()}</Text>
+                </View>
+                {entry.notes ? <Text style={[styles.kmEntryNotes, { color: colors.textMuted }]}>{entry.notes}</Text> : null}
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
     );
   };
@@ -1195,6 +1221,30 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   cardDate: { fontSize: 11, marginTop: 2 },
   infoCardDivider: { height: 1, marginVertical: 6 },
+
+  // Kilometer History
+  kmEntry: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 10,
+    marginTop: 6,
+  },
+  kmEntryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  kmEntryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  kmEntryDate: {
+    fontSize: 11,
+  },
+  kmEntryNotes: {
+    fontSize: 11,
+    marginTop: 3,
+  },
 
   // Photo Viewer
   photoViewerContainer: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
