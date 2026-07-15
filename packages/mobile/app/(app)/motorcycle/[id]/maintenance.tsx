@@ -597,6 +597,7 @@ export default function MaintenanceScreen() {
   const currentRecord = filteredRecords.length > 0 ? filteredRecords[Math.min(pageIdx, filteredRecords.length - 1)] : null;
   const oilLabel = currentRecord ? MOTOR_OIL_OPTIONS.find((o) => o.label === currentRecord.description) : null;
   const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
 
   const renderRecordPage = ({ item: rec }: { item: MaintenanceRecord }) => {
     const recOilLabel = rec.type === 'motor_oil' ? MOTOR_OIL_OPTIONS.find((o) => o.label === rec.description) : null;
@@ -795,6 +796,7 @@ export default function MaintenanceScreen() {
             pagingEnabled
             removeClippedSubviews={false}
             showsHorizontalScrollIndicator={false}
+            style={{ height: screenHeight * 0.55 }}
             initialScrollIndex={Math.min(pageIdx, filteredRecords.length - 1)}
             getItemLayout={(_, index) => ({ length: screenWidth, offset: screenWidth * index, index })}
             onMomentumScrollEnd={(e) => {
@@ -849,19 +851,22 @@ export default function MaintenanceScreen() {
         </View>
       )}
 
-      {/* FAB: + (visible when no records OR when limit not reached for brakes/tires) */}
+      {/* FAB: + */}
       {(() => {
-        const hasNoRecords = filteredRecords.length === 0;
         const currentCount = filteredRecords.length;
         const isBrakes = selectedType === 'brakes';
         const isTires = selectedType === 'tires';
-        const isAtLimit = (isBrakes && currentCount >= MAX_BRAKE_RECORDS) || (isTires && currentCount >= MAX_TIRE_RECORDS);
-        const canAdd = hasNoRecords || (!isBrakes && !isTires) || !isAtLimit;
-        return canAdd ? (
+        const isMultiRecord = isBrakes || isTires;
+
+        if (isBrakes && currentCount >= MAX_BRAKE_RECORDS) return null;
+        if (isTires && currentCount >= MAX_TIRE_RECORDS) return null;
+        if (!isMultiRecord && currentCount >= 1) return null;
+
+        return (
           <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
             <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
           </TouchableOpacity>
-        ) : null;
+        );
       })()}
 
       {/* Create/Edit Modal */}

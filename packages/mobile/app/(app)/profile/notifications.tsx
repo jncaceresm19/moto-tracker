@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../../src/theme-context';
 import { useLanguage } from '../../../src/language-context';
 import { Notification, getNotifications, markAsRead, markAllAsRead } from '../../../src/services/notificationService';
@@ -29,6 +29,24 @@ export default function NotificationsScreen() {
   useEffect(() => {
     loadNotifications();
   }, [loadNotifications]);
+
+  // Auto-mark all as read when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const markRead = async () => {
+        const unread = notifications.filter(n => !n.isRead);
+        if (unread.length > 0) {
+          try {
+            await markAllAsRead();
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+          } catch (e: any) {
+            console.log('[NOTIFICATIONS] Auto mark read error:', e?.message);
+          }
+        }
+      };
+      markRead();
+    }, [notifications])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -117,7 +135,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={[]}>
       {/* Custom header matching app style */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => router.back()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('notifications')}</Text>
@@ -138,7 +156,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ paddingBottom: 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <TouchableOpacity activeOpacity={0.8}
               style={[
                 styles.notificationItem,
                 { backgroundColor: item.isRead ? colors.surface : colors.primary + '10' },
