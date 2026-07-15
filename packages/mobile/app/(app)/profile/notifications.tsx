@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useTheme } from '../../../src/theme-context';
 import { useLanguage } from '../../../src/language-context';
-import { Notification, getNotifications, markAsRead, markAllAsRead } from '../../../src/services/notificationService';
+import { Notification, getNotifications, markAsRead, markAllAsRead, deleteNotification } from '../../../src/services/notificationService';
 
 export default function NotificationsScreen() {
   const { colors } = useTheme();
@@ -70,6 +71,37 @@ export default function NotificationsScreen() {
     // No navigation - stay on notifications page
   };
 
+  const handleDelete = async (notificationId: string) => {
+    try {
+      await deleteNotification(notificationId);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (e: any) {
+      console.log('[NOTIFICATIONS] Error deleting:', e?.message);
+    }
+  };
+
+  const renderRightActions = (
+    progress: Animated.AnimatedInterpolation<number>,
+    item: Notification
+  ) => {
+    const translateX = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [100, 0],
+    });
+
+    return (
+      <Animated.View style={[styles.deleteAction, { transform: [{ translateX }] }]}>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDelete(item.id)}
+        >
+          <Ionicons name="trash" size={20} color="#fff" />
+          <Text style={styles.deleteText}>{t('delete')}</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
   const formatTime = (date: Date): string => {
     const now = new Date();
     const diff = now.getTime() - date.getTime();
@@ -127,7 +159,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={[]}>
       {/* Custom header matching app style */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/(app)/profile')} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('notifications')}</Text>
@@ -148,14 +180,18 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ paddingBottom: 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           renderItem={({ item }) => (
-            <TouchableOpacity activeOpacity={0.8}
-              style={[
-                styles.notificationItem,
-                { backgroundColor: item.isRead ? colors.surface : colors.primary + '10' },
-                { borderBottomColor: colors.border }
-              ]}
-              onPress={() => handleNotificationPress(item)}
+            <Swipeable
+              renderRightActions={(progress: Animated.AnimatedInterpolation<number>) => renderRightActions(progress, item)}
+              overshootRight={false}
             >
+              <TouchableOpacity activeOpacity={0.8}
+                style={[
+                  styles.notificationItem,
+                  { backgroundColor: item.isRead ? colors.surface : colors.primary + '10' },
+                  { borderBottomColor: colors.border }
+                ]}
+                onPress={() => handleNotificationPress(item)}
+              >
               {/* Avatar for comments, icon for theft/recovery */}
               {item.type === 'alert_response' && item.senderAvatar ? (
                 <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
@@ -189,6 +225,7 @@ export default function NotificationsScreen() {
               </View>
               {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
             </TouchableOpacity>
+            </Swipeable>
           )}
         />
       )}
@@ -261,5 +298,23 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginLeft: 8,
+  },
+  deleteAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+  },
+  deleteButton: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FF3B30',
+    width: 80,
+  },
+  deleteText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

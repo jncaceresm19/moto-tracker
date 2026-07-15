@@ -147,11 +147,27 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="motorcycle/[id]/verification"
+        options={{
+          href: null,
+          title: 'Verificación',
+          headerLeft: () => <BackButton />,
+        }}
+      />
+      <Tabs.Screen
+        name="motorcycle/[id]/fuel"
+        options={{
+          href: null,
+          title: 'Combustible',
+          headerLeft: () => <BackButton />,
+        }}
+      />
+      <Tabs.Screen
         name="my-publications"
         options={{
           href: null,
           title: t('myPublications'),
-          headerLeft: () => <BackButton />,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -159,6 +175,30 @@ export default function AppLayout() {
         options={{
           href: null,
           title: t('notifications'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/tracker"
+        options={{
+          href: null,
+          title: t('protocolTrakerConfig'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/subscriptions"
+        options={{
+          href: null,
+          title: t('subscription'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="profile/admin"
+        options={{
+          href: null,
+          title: t('admin'),
           headerShown: false,
         }}
       />

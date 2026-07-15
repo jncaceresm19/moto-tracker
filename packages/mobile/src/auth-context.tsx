@@ -11,6 +11,7 @@ interface User {
   rut?: string;
   verificadoClaveunica?: boolean;
   identidadVerificada?: boolean;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -47,7 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const profile = await getProfile();
-      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, email: profile.email } : prev);
+      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, email: profile.email, createdAt: (profile as any)?.createdAt } : prev);
     } catch (e: any) {
       if (e?.message === 'SESSION_EXPIRED') {
         await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
@@ -67,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Fetch full profile in background
           try {
             const profile = await getProfile();
-              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl });
+              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, createdAt: (profile as any)?.createdAt });
           } catch (e: any) {
             if (e?.message === 'SESSION_EXPIRED') {
               await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);

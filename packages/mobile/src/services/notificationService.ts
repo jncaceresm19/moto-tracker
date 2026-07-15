@@ -37,3 +37,8 @@ export async function markAsRead(notificationId: string): Promise<void> {
 export async function markAllAsRead(): Promise<void> {
   await api('/api/notifications/read-all', { method: 'PATCH' });
 }
+
+// Delete notification
+export async function deleteNotification(notificationId: string): Promise<void> {
+  await api(`/api/notifications/${notificationId}`, { method: 'DELETE' });
+}

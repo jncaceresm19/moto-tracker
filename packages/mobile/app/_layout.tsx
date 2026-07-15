@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, AppState, AppStateStat
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '../src/auth-context';
 import { ThemeProvider, useTheme } from '../src/theme-context';
 import { LanguageProvider, useLanguage } from '../src/language-context';
@@ -348,13 +349,15 @@ const onboardingStyles = StyleSheet.create({
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <ThemedStatusBar />
-          <RootLayoutInner />
-        </AuthProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ThemedStatusBar />
+            <RootLayoutInner />
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }
