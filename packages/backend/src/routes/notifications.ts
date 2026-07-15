@@ -132,6 +132,9 @@ router.get('/unread-count', authenticate, async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Clean old notifications (same as list endpoint)
+    await cleanupOldNotifications();
+
     const [result] = await db
       .select({ count: sql<number>`count(*)` })
       .from(notifications)
