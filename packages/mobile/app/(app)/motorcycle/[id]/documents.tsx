@@ -394,10 +394,17 @@ export default function DocumentsScreen() {
           contentContainerStyle={styles.categoryList}
           scrollEnabled={false}
           ListHeaderComponent={
-            <View style={[styles.infoBanner, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue} />
-              <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('documentsDisclaimer')}</Text>
-            </View>
+            <>
+              <View style={[styles.headerCard, { backgroundColor: '#E6F1FB', borderColor: '#185FA5' }]}>
+                <View style={[styles.headerIcon, { backgroundColor: '#185FA5' }]}>
+                  <Ionicons name="document-text" size={28} color="#FFFFFF" />
+                </View>
+                <View style={styles.headerInfo}>
+                  <Text style={[styles.headerTitle, { color: '#0C447C' }]}>Documentos</Text>
+                  <Text style={[styles.headerSubtitle, { color: '#1C6FA5' }]}>Gestiona los documentos de tu moto</Text>
+                </View>
+              </View>
+            </>
           }
           ListFooterComponent={
             <>
@@ -415,6 +422,8 @@ export default function DocumentsScreen() {
                   Documentos obligatorios en controles
                 </Text>
               </TouchableOpacity>
+              <Text style={[styles.payHint, { color: colors.textMuted }]}>{t('documentsDisclaimer')}</Text>
+
             </>
           }
           renderItem={({ item }) => {
@@ -1619,4 +1628,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
+  headerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 14,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerInfo: { flex: 1 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerSubtitle: { fontSize: 13, marginTop: 2 },
 });

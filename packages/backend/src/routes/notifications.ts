@@ -198,6 +198,27 @@ router.patch('/read-all', authenticate, async (req, res) => {
   }
 });
 
+// Delete notification
+router.delete('/:id', authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    await db
+      .delete(notifications)
+      .where(and(eq(notifications.id, id), eq(notifications.userId, userId)));
+
+    res.json({ success: true, message: 'Notification deleted' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
+});
+
 // Save push token
 router.post('/push-token', authenticate, async (req, res) => {
   try {

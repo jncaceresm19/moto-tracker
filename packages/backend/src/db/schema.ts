@@ -94,6 +94,20 @@ export const kilometerHistory = sqliteTable('kilometer_history', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
+// Fuel records table
+export const fuelRecords = sqliteTable('fuel_records', {
+  id: text('id').primaryKey(),
+  motorcycleId: text('motorcycle_id').notNull().references(() => motorcycles.id),
+  stationName: text('station_name'),
+  liters: real('liters').notNull(),
+  pricePerLiter: real('price_per_liter').notNull(),
+  totalCost: real('total_cost').notNull(),
+  location: text('location'),
+  recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
+  notes: text('notes'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 // Motorcycle catalog brands
 export const motorcycleCatalogBrands = sqliteTable('motorcycle_catalog_brands', {
   id: text('id').primaryKey(),

@@ -42,7 +42,7 @@ export function PlaceCard({ place }: PlaceCardProps) {
 
       {/* Ver ruta button */}
       <TouchableOpacity
-        style={[styles.viewBtn, { backgroundColor: colors.primary }]}
+        style={[styles.viewBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}
         onPress={handleVerRuta}
       >
         <Ionicons name="navigate" size={14} color="#fff" />

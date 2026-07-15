@@ -41,6 +41,21 @@ export default function ProfileScreen() {
   const [motorcyclesCount, setMotorcyclesCount] = useState<number | null>(null);
   const [motorcyclesVerifiedCount, setMotorcyclesVerifiedCount] = useState<number | null>(null);
 
+  // --- Delete account flow (Paso 1: motivo, Paso 2: rating, Paso 3: confirmación) ---
+  const [showDeleteFlow, setShowDeleteFlow] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<1 | 2>(1);
+  const [deleteReason, setDeleteReason] = useState<string | null>(null);
+  const [deleteReasonText, setDeleteReasonText] = useState('');
+  const [deleteRating, setDeleteRating] = useState(0);
+
+  const deleteReasons = [
+    'No encontré lo que buscaba',
+    'Problemas técnicos o errores',
+    'No uso la app seguido',
+    'Encontré otra app',
+    'Otro motivo',
+  ];
+
   useEffect(() => {
     loadBiometricStatus();
     loadMotorcyclesCount();
@@ -122,6 +137,23 @@ export default function ProfileScreen() {
     setAlertVisible(true);
   };
 
+  // --- Password requirement checks (used by the checklist + strength bar) ---
+  const passwordChecks = {
+    minLength: passwords.newPass.length >= 8,
+    hasUpper: /[A-Z]/.test(passwords.newPass),
+    hasNumber: /[0-9]/.test(passwords.newPass),
+    hasSpecial: /[^A-Za-z0-9]/.test(passwords.newPass),
+  };
+  const passwordScore = Object.values(passwordChecks).filter(Boolean).length;
+  const strengthLevels: { label: string; color: string; width: `${number}%` }[] = [
+    { label: '', color: colors.border, width: '0%' },
+    { label: 'Débil', color: colors.danger, width: '25%' },
+    { label: 'Media', color: '#FF9500', width: '50%' },
+    { label: 'Buena', color: '#FF9500', width: '75%' },
+    { label: 'Fuerte', color: colors.success, width: '100%' },
+  ];
+  const strengthMeta = strengthLevels[passwordScore];
+
   const handleChangePassword = async () => {
     const newErrors: Record<string, string> = {};
     if (!passwords.current) newErrors.current = t('currentPassword') + ' required';
@@ -143,6 +175,16 @@ export default function ProfileScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleForgotCurrentPassword = () => {
+    showAlert(
+      'Olvidaste tu contraseña',
+      'Cierra sesión y usa la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión para restablecerla por correo o numero telefónico.',
+      [{ text: 'OK' }],
+      'help-circle',
+      '#007AFF'
+    );
   };
 
   const handleSaveProfile = async () => {
@@ -208,6 +250,7 @@ export default function ProfileScreen() {
     ], 'log-out-outline', '#FF3B30');
   };
 
+  // --- Paso 3: confirmación final (sin cambios respecto al original) ---
   const handleDeleteAccount = () => {
     showAlert(
       'Eliminar cuenta',
@@ -228,6 +271,34 @@ export default function ProfileScreen() {
       'warning',
       colors.danger
     );
+  };
+
+  // --- Helpers del nuevo flujo de 3 pasos ---
+  const resetDeleteFlow = () => {
+    setShowDeleteFlow(false);
+    setDeleteStep(1);
+    setDeleteReason(null);
+    setDeleteReasonText('');
+    setDeleteRating(0);
+  };
+
+  const openDeleteFlow = () => {
+    setDeleteStep(1);
+    setShowDeleteFlow(true);
+  };
+
+  const goToStep2 = () => setDeleteStep(2);
+
+  // Se llama al terminar (u omitir) el Paso 2. Cierra este modal y abre el Paso 3 existente.
+  const finishSurveyAndConfirm = () => {
+    setShowDeleteFlow(false);
+    handleDeleteAccount();
+    // Los campos del formulario se limpian después, por si el usuario cancela el Paso 3
+    // y vuelve a abrir el flujo desde cero.
+    setDeleteStep(1);
+    setDeleteReason(null);
+    setDeleteReasonText('');
+    setDeleteRating(0);
   };
 
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?';
@@ -266,6 +337,36 @@ export default function ProfileScreen() {
     accountInfoValue: { fontSize: 13, fontWeight: '500', color: colors.text },
     deleteAccountBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 20, paddingVertical: 14, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.danger },
     deleteAccountBtnText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
+    // --- Password card / requirements / strength / tip / forgot-password ---
+    passwordCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16, marginBottom: 5 },
+    requirementsTitle: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 8, marginTop: 20 },
+    requirementRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+    requirementText: { fontSize: 13 },
+    strengthTrack: { height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 4, marginBottom: 4, overflow: 'hidden' },
+    strengthFill: { height: 4, borderRadius: 2 },
+    strengthLabel: { fontSize: 12, marginBottom: 12 },
+    securityTip: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: mode === 'dark' ? 'rgba(10,132,255,0.15)' : '#EAF2FE', borderRadius: 8, padding: 12, marginTop: 24, borderColor: colors.primary, borderWidth: 1 },
+    securityTipText: { fontSize: 12, color: colors.primary, flex: 1 },
+    forgotPassword: { alignItems: 'center', marginTop: 25 },
+    forgotPasswordText: { fontSize: 13, color: colors.primary },
+    // --- Edit profile card ---
+    profileCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16 },
+    // --- Delete account survey (Pasos 1 y 2) ---
+    deleteFlowOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+    deleteFlowCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 20 },
+    deleteFlowStep: { fontSize: 12, color: colors.textMuted, fontWeight: '500' },
+    deleteFlowTitle: { fontSize: 16, fontWeight: '500', color: colors.text, marginTop: 6, marginBottom: 4 },
+    deleteFlowSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 14 },
+    reasonOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, marginBottom: 8 },
+    reasonRadioOuter: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
+    reasonLabel: { fontSize: 13 },
+    deleteFlowTextarea: { textAlignVertical: 'top', height: 60, marginTop: 4 },
+    deleteFlowActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    deleteFlowSecondaryBtn: { flex: 1, alignItems: 'center', paddingVertical: 12 },
+    deleteFlowSecondaryBtnText: { color: colors.textSecondary },
+    deleteFlowPrimaryBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 8 },
+    deleteFlowPrimaryBtnText: { color: colors.primaryText, fontWeight: '600' },
+    starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
   });
 
   return (
@@ -467,7 +568,10 @@ export default function ProfileScreen() {
             <Ionicons name="people-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('admin')}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <View style={styles.rowRight}>
+            <Ionicons name="lock-closed-outline" size={14} color={colors.textMuted} style={{ marginRight: 4 }} />
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -489,74 +593,119 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              style={[dynamicStyles.input, { paddingRight: 44 }]}
-              placeholder={t('currentPassword')}
-              placeholderTextColor={colors.textMuted}
-              value={passwords.current}
-              onChangeText={(t2) => { setPasswords((p) => ({ ...p, current: t2 })); setErrors((p) => ({ ...p, current: '' })); }}
-              secureTextEntry={!showCurrent}
-            />
-            <TouchableOpacity
-              onPress={() => setShowCurrent(!showCurrent)}
-              style={{ position: 'absolute', right: 12, top: 12 }}
-            >
-              <Ionicons
-                name={showCurrent ? 'eye-off' : 'eye'}
-                size={20}
-                color={colors.textMuted}
+          <View style={dynamicStyles.passwordCard}>
+            <View style={{ position: 'relative' }}>
+              <TextInput
+                style={[dynamicStyles.input, { paddingRight: 44 }]}
+                placeholder={t('currentPassword')}
+                placeholderTextColor={colors.textMuted}
+                value={passwords.current}
+                onChangeText={(t2) => { setPasswords((p) => ({ ...p, current: t2 })); setErrors((p) => ({ ...p, current: '' })); }}
+                secureTextEntry={!showCurrent}
               />
+              <TouchableOpacity
+                onPress={() => setShowCurrent(!showCurrent)}
+                style={{ position: 'absolute', right: 12, top: 12 }}
+              >
+                <Ionicons
+                  name={showCurrent ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+            {errors.current ? <Text style={dynamicStyles.errorText}>{errors.current}</Text> : null}
+            <Text style={[styles.payHint, { color: colors.textMuted }]}>La nueva contraseña no puede ser igual a la actual</Text>
+
+            <View style={{ position: 'relative' }}>
+              <TextInput
+                style={[dynamicStyles.input, { paddingRight: 44 }]}
+                placeholder={t('newPassword')}
+                placeholderTextColor={colors.textMuted}
+                value={passwords.newPass}
+                onChangeText={(t2) => { setPasswords((p) => ({ ...p, newPass: t2 })); setErrors((p) => ({ ...p, newPass: '' })); }}
+                secureTextEntry={!showNew}
+              />
+              <TouchableOpacity
+                onPress={() => setShowNew(!showNew)}
+                style={{ position: 'absolute', right: 12, top: 12 }}
+              >
+                <Ionicons
+                  name={showNew ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+            {errors.newPass ? <Text style={dynamicStyles.errorText}>{errors.newPass}</Text> : null}
+
+            {/* Password strength bar — only shown once the user starts typing */}
+            {passwords.newPass.length > 0 && (
+              <>
+                <View style={dynamicStyles.strengthTrack}>
+                  <View style={[dynamicStyles.strengthFill, { width: strengthMeta.width, backgroundColor: strengthMeta.color }]} />
+                </View>
+                <Text style={[dynamicStyles.strengthLabel, { color: strengthMeta.color }]}>Fortaleza: {strengthMeta.label}</Text>
+              </>
+            )}
+
+            <View style={{ position: 'relative' }}>
+              <TextInput
+                style={[dynamicStyles.input, { paddingRight: 44 }]}
+                placeholder={t('confirmPassword')}
+                placeholderTextColor={colors.textMuted}
+                value={passwords.confirm}
+                onChangeText={(t2) => { setPasswords((p) => ({ ...p, confirm: t2 })); setErrors((p) => ({ ...p, confirm: '' })); }}
+                secureTextEntry={!showConfirm}
+              />
+              <TouchableOpacity
+                onPress={() => setShowConfirm(!showConfirm)}
+                style={{ position: 'absolute', right: 12, top: 12 }}
+              >
+                <Ionicons
+                  name={showConfirm ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+            {errors.confirm ? <Text style={dynamicStyles.errorText}>{errors.confirm}</Text> : null}
+
+            <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleChangePassword} disabled={saving}>
+              {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
             </TouchableOpacity>
           </View>
-          {errors.current ? <Text style={dynamicStyles.errorText}>{errors.current}</Text> : null}
-
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              style={[dynamicStyles.input, { paddingRight: 44 }]}
-              placeholder={t('newPassword')}
-              placeholderTextColor={colors.textMuted}
-              value={passwords.newPass}
-              onChangeText={(t2) => { setPasswords((p) => ({ ...p, newPass: t2 })); setErrors((p) => ({ ...p, newPass: '' })); }}
-              secureTextEntry={!showNew}
-            />
-            <TouchableOpacity
-              onPress={() => setShowNew(!showNew)}
-              style={{ position: 'absolute', right: 12, top: 12 }}
-            >
+          <View style={dynamicStyles.divider} />
+          {/* Password requirements checklist */}
+          <Text style={dynamicStyles.requirementsTitle}>Tu contraseña debe tener</Text>
+          {[
+            { ok: passwordChecks.minLength, label: 'Mínimo 8 caracteres' },
+            { ok: passwordChecks.hasUpper, label: 'Una letra mayúscula' },
+            { ok: passwordChecks.hasNumber, label: 'Un número' },
+            { ok: passwordChecks.hasSpecial, label: 'Un carácter especial' },
+          ].map((req) => (
+            <View key={req.label} style={dynamicStyles.requirementRow}>
               <Ionicons
-                name={showNew ? 'eye-off' : 'eye'}
-                size={20}
-                color={colors.textMuted}
+                name={req.ok ? 'checkmark-circle' : 'ellipse-outline'}
+                size={16}
+                color={req.ok ? colors.success : colors.textMuted}
               />
-            </TouchableOpacity>
-          </View>
-          {errors.newPass ? <Text style={dynamicStyles.errorText}>{errors.newPass}</Text> : null}
+              <Text style={[dynamicStyles.requirementText, { color: req.ok ? colors.success : colors.textMuted }]}>
+                {req.label}
+              </Text>
+            </View>
+          ))}
+          <View style={dynamicStyles.divider} />
 
-          <View style={{ position: 'relative' }}>
-            <TextInput
-              style={[dynamicStyles.input, { paddingRight: 44 }]}
-              placeholder={t('confirmPassword')}
-              placeholderTextColor={colors.textMuted}
-              value={passwords.confirm}
-              onChangeText={(t2) => { setPasswords((p) => ({ ...p, confirm: t2 })); setErrors((p) => ({ ...p, confirm: '' })); }}
-              secureTextEntry={!showConfirm}
-            />
-            <TouchableOpacity
-              onPress={() => setShowConfirm(!showConfirm)}
-              style={{ position: 'absolute', right: 12, top: 12 }}
-            >
-              <Ionicons
-                name={showConfirm ? 'eye-off' : 'eye'}
-                size={20}
-                color={colors.textMuted}
-              />
-            </TouchableOpacity>
+          {/* Security tip */}
+          <View style={dynamicStyles.securityTip}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+            <Text style={dynamicStyles.securityTipText}>Por tu seguridad, cambia tu contraseña cada 6 meses</Text>
           </View>
-          {errors.confirm ? <Text style={dynamicStyles.errorText}>{errors.confirm}</Text> : null}
 
-          <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleChangePassword} disabled={saving}>
-            {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
+          {/* Forgot current password link */}
+          <TouchableOpacity style={dynamicStyles.forgotPassword} activeOpacity={0.6} onPress={handleForgotCurrentPassword}>
+            <Text style={dynamicStyles.forgotPasswordText}>¿Olvidaste tu contraseña actual?</Text>
           </TouchableOpacity>
         </View>
       </Modal>
@@ -572,59 +721,61 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Avatar Picker */}
-            <TouchableOpacity style={styles.avatarPicker} activeOpacity={0.8} onPress={() => setShowPhotoModal(true)}>
-              <View style={styles.avatarWrapper}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatarPreview} />
-                ) : user?.avatarUrl ? (
-                  <Image source={{ uri: user.avatarUrl }} style={styles.avatarPreview} />
-                ) : (
-                  <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                    <Text style={{ color: colors.primaryText, fontSize: 32, fontWeight: 'bold' }}>{userInitial}</Text>
+            <View style={dynamicStyles.profileCard}>
+              {/* Avatar Picker */}
+              <TouchableOpacity style={styles.avatarPicker} activeOpacity={0.8} onPress={() => setShowPhotoModal(true)}>
+                <View style={styles.avatarWrapper}>
+                  {avatarUri ? (
+                    <Image source={{ uri: avatarUri }} style={styles.avatarPreview} />
+                  ) : user?.avatarUrl ? (
+                    <Image source={{ uri: user.avatarUrl }} style={styles.avatarPreview} />
+                  ) : (
+                    <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={{ color: colors.primaryText, fontSize: 32, fontWeight: 'bold' }}>{userInitial}</Text>
+                    </View>
+                  )}
+                  <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
+                    <Ionicons name="camera" size={16} color={colors.primaryText} />
                   </View>
-                )}
-                <View style={[styles.cameraBadge, { backgroundColor: colors.primary, borderColor: colors.background }]}>
-                  <Ionicons name="camera" size={16} color={colors.primaryText} />
                 </View>
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
 
-            {/* Name Input */}
-            <TextInput
-              style={dynamicStyles.input}
-              placeholder={t('name')}
-              placeholderTextColor={colors.textMuted}
-              value={profileForm.name}
-              onChangeText={(v) => { setProfileForm(p => ({ ...p, name: v })); setProfileErrors(p => ({ ...p, name: '' })); }}
-            />
-            {profileErrors.name ? <Text style={dynamicStyles.errorText}>{profileErrors.name}</Text> : null}
+              {/* Name Input */}
+              <TextInput
+                style={dynamicStyles.input}
+                placeholder={t('name')}
+                placeholderTextColor={colors.textMuted}
+                value={profileForm.name}
+                onChangeText={(v) => { setProfileForm(p => ({ ...p, name: v })); setProfileErrors(p => ({ ...p, name: '' })); }}
+              />
+              {profileErrors.name ? <Text style={dynamicStyles.errorText}>{profileErrors.name}</Text> : null}
 
-            {/* Email Input */}
-            <TextInput
-              style={dynamicStyles.input}
-              placeholder={t('email')}
-              placeholderTextColor={colors.textMuted}
-              value={profileForm.email}
-              onChangeText={(v) => { setProfileForm(p => ({ ...p, email: v })); setProfileErrors(p => ({ ...p, email: '' })); }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            {profileErrors.email ? <Text style={dynamicStyles.errorText}>{profileErrors.email}</Text> : null}
+              {/* Email Input */}
+              <TextInput
+                style={dynamicStyles.input}
+                placeholder={t('email')}
+                placeholderTextColor={colors.textMuted}
+                value={profileForm.email}
+                onChangeText={(v) => { setProfileForm(p => ({ ...p, email: v })); setProfileErrors(p => ({ ...p, email: '' })); }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {profileErrors.email ? <Text style={dynamicStyles.errorText}>{profileErrors.email}</Text> : null}
 
-            {/* Phone Input */}
-            <TextInput
-              style={dynamicStyles.input}
-              placeholder={t('phone')}
-              placeholderTextColor={colors.textMuted}
-              value={profileForm.phone}
-              onChangeText={(v) => { setProfileForm(p => ({ ...p, phone: v })); }}
-              keyboardType="phone-pad"
-            />
+              {/* Phone Input */}
+              <TextInput
+                style={dynamicStyles.input}
+                placeholder={t('phone')}
+                placeholderTextColor={colors.textMuted}
+                value={profileForm.phone}
+                onChangeText={(v) => { setProfileForm(p => ({ ...p, phone: v })); }}
+                keyboardType="phone-pad"
+              />
 
-            <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleSaveProfile} disabled={savingProfile}>
-              {savingProfile ? <ActivityIndicator color={colors.success} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
-            </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleSaveProfile} disabled={savingProfile}>
+                {savingProfile ? <ActivityIndicator color={colors.success} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
+              </TouchableOpacity>
+            </View>
 
             {/* Divider */}
             <View style={dynamicStyles.divider} />
@@ -657,12 +808,106 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            {/* Delete Account */}
-            <TouchableOpacity style={dynamicStyles.deleteAccountBtn} activeOpacity={0.7} onPress={handleDeleteAccount}>
+            {/* Delete Account — ahora abre el flujo de 3 pasos */}
+            <TouchableOpacity style={dynamicStyles.deleteAccountBtn} activeOpacity={0.7} onPress={openDeleteFlow}>
               <Ionicons name="trash-outline" size={20} color={colors.danger} />
               <Text style={dynamicStyles.deleteAccountBtnText}>Eliminar cuenta</Text>
             </TouchableOpacity>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Delete Account Flow Modal — Paso 1 (motivo) y Paso 2 (rating) */}
+      <Modal visible={showDeleteFlow} animationType="fade" transparent presentationStyle="overFullScreen">
+        <View style={dynamicStyles.deleteFlowOverlay}>
+          <View style={dynamicStyles.deleteFlowCard}>
+
+            {deleteStep === 1 && (
+              <>
+                <Text style={dynamicStyles.deleteFlowStep}>Paso 1 de 3</Text>
+                <Text style={dynamicStyles.deleteFlowTitle}>¿Por qué eliminas tu cuenta?</Text>
+                <Text style={dynamicStyles.deleteFlowSubtitle}>Ayúdanos a mejorar. Es opcional.</Text>
+
+                {deleteReasons.map((reason) => {
+                  const selected = deleteReason === reason;
+                  return (
+                    <TouchableOpacity
+                      key={reason}
+                      style={[
+                        dynamicStyles.reasonOption,
+                        {
+                          borderWidth: selected ? 1 : 0.5,
+                          borderColor: selected ? colors.primary : colors.border,
+                          backgroundColor: selected ? (mode === 'dark' ? 'rgba(10,132,255,0.15)' : '#EAF2FE') : 'transparent',
+                        },
+                      ]}
+                      onPress={() => setDeleteReason(reason)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[
+                        dynamicStyles.reasonRadioOuter,
+                        {
+                          borderColor: selected ? colors.primary : colors.textMuted,
+                          backgroundColor: selected ? colors.primary : 'transparent',
+                        },
+                      ]} />
+                      <Text style={[dynamicStyles.reasonLabel, { color: selected ? colors.primary : colors.textSecondary }]}>
+                        {reason}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                <TextInput
+                  style={[dynamicStyles.input, dynamicStyles.deleteFlowTextarea]}
+                  placeholder="Cuéntanos más (opcional)"
+                  placeholderTextColor={colors.textMuted}
+                  value={deleteReasonText}
+                  onChangeText={setDeleteReasonText}
+                  multiline
+                />
+
+                <View style={dynamicStyles.deleteFlowActions}>
+                  <TouchableOpacity style={dynamicStyles.deleteFlowSecondaryBtn} activeOpacity={0.7} onPress={resetDeleteFlow}>
+                    <Text style={dynamicStyles.deleteFlowSecondaryBtnText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={dynamicStyles.deleteFlowPrimaryBtn} activeOpacity={0.8} onPress={goToStep2}>
+                    <Text style={dynamicStyles.deleteFlowPrimaryBtnText}>Continuar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {deleteStep === 2 && (
+              <>
+                <Text style={dynamicStyles.deleteFlowStep}>Paso 2 de 3</Text>
+                <Text style={dynamicStyles.deleteFlowTitle}>¿Cómo calificarías tu experiencia?</Text>
+                <Text style={dynamicStyles.deleteFlowSubtitle}>También es opcional.</Text>
+
+                <View style={dynamicStyles.starsRow}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <TouchableOpacity key={n} onPress={() => setDeleteRating(n)} activeOpacity={0.7}>
+                      <Ionicons
+                        name={n <= deleteRating ? 'star' : 'star-outline'}
+                        size={28}
+                        color={n <= deleteRating ? '#FAC775' : colors.textMuted}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <View style={dynamicStyles.deleteFlowActions}>
+                  <TouchableOpacity style={dynamicStyles.deleteFlowSecondaryBtn} activeOpacity={0.7} onPress={finishSurveyAndConfirm}>
+                    <Text style={dynamicStyles.deleteFlowSecondaryBtnText}>Omitir</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={dynamicStyles.deleteFlowPrimaryBtn} activeOpacity={0.8} onPress={finishSurveyAndConfirm}>
+                    <Text style={dynamicStyles.deleteFlowPrimaryBtnText}>Continuar</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+          </View>
         </View>
       </Modal>
 
@@ -747,5 +992,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
+  },
+  payHint: {
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

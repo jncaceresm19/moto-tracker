@@ -85,10 +85,11 @@ export async function respondToAlert(
 export async function closeAlert(
   alertId: string,
   status: 'closed' | 'recovered'
+  , lastLocationName?: string
 ): Promise<TheftAlert> {
   return api<TheftAlert>(`/api/theft-alerts/${alertId}/close`, {
     method: 'PATCH',
-    body: { status },
+    body: { status, lastLocationName },
   });
 }
 

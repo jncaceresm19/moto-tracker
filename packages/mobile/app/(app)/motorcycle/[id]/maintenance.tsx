@@ -493,6 +493,17 @@ export default function MaintenanceScreen() {
           data={allTypes}
           keyExtractor={(item) => item.key}
           contentContainerStyle={styles.categoryList}
+          ListHeaderComponent={
+            <View style={[styles.headerCard, { backgroundColor: '#E1F5EE', borderColor: '#0F6E56', margin: 0, marginBottom: 16 }]}>
+              <View style={[styles.headerIcon, { backgroundColor: '#0F6E56' }]}>
+                <Ionicons name="build" size={28} color="#FFFFFF" />
+              </View>
+              <View style={styles.headerInfo}>
+                <Text style={[styles.headerTitle, { color: '#085041' }]}>Registro de Mantenimiento</Text>
+                <Text style={[styles.headerSubtitle, { color: '#0F6E56' }]}>Gestiona el mantenimiento de tu moto</Text>
+              </View>
+            </View>
+          }
           renderItem={({ item }) => {
             const count = records.filter((r) => r.type === item.key).length;
             const isCustom = isCustomType(item.key);
@@ -780,6 +791,32 @@ export default function MaintenanceScreen() {
             </View>
           );
         })()}
+
+        {/* Historial de kilometraje */}
+        <View style={{ marginTop: 16 }}>
+          <TouchableOpacity
+            style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary }]}
+            activeOpacity={0.7}
+            onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}
+          >
+            <View style={[styles.sectionChip, { backgroundColor: '#FBEAF0' }]}>
+              <Ionicons name="stats-chart-outline" size={18} color="#993556" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sectionText, { color: colors.text }]}>{t('kilometerHistory')}</Text>
+              {kmEntries.length > 0 ? (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  Último: {kmEntries[0].readingKm.toLocaleString('es-CL')} km · {new Date(kmEntries[0].recordedAt).toLocaleDateString()}
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  Sin registros
+                </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     );
   };
@@ -1229,6 +1266,24 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   cardDate: { fontSize: 11, marginTop: 2 },
   infoCardDivider: { height: 1, marginVertical: 6 },
+  section: { padding: 16 },
+  sectionTitle: { fontSize: 15, fontWeight: '600' },
+  sectionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    gap: 12,
+  },
+  sectionChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionText: { fontSize: 15, flex: 1 },
+
 
   // Kilometer History
   kmEntry: {
@@ -1384,4 +1439,24 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     fontStyle: 'italic',
   },
+  headerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    margin: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 14,
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerInfo: { flex: 1 },
+  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerSubtitle: { fontSize: 13, marginTop: 2 },
 });

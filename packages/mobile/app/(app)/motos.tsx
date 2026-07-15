@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
@@ -194,10 +194,10 @@ export default function MotorcycleListScreen() {
     cancel: { color: colors.primary, fontSize: 16 },
     photoBtn: {
       width: '100%',
-      height: 160,
+      height: 90,
       borderRadius: 10,
       overflow: 'hidden',
-      marginBottom: 16,
+      marginBottom: 10,
       backgroundColor: colors.surfaceSecondary,
     },
     photoPlaceholder: {
@@ -208,10 +208,11 @@ export default function MotorcycleListScreen() {
       borderColor: colors.border,
       borderStyle: 'dashed',
       borderRadius: 10,
+      gap: 10,
     },
     photoPlaceholderText: {
       color: colors.textMuted,
-      fontSize: 14,
+      fontSize: 12,
     },
     input: {
       borderWidth: 1,
@@ -224,8 +225,8 @@ export default function MotorcycleListScreen() {
       color: colors.text,
     },
     errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
-    saveBtn: { backgroundColor: colors.accent, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
-    saveBtnText: { color: colors.accentText, fontSize: 16, fontWeight: '600' },
+    saveBtn: { backgroundColor: colors.success, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+    saveBtnText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
   });
 
   if (loading) {
@@ -302,36 +303,43 @@ export default function MotorcycleListScreen() {
               <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={dynamicStyles.cancel}>X</Text></TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={dynamicStyles.photoBtn} onPress={showImageOptions}>
-              {imageUri ? (
-                <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
-              ) : (
-                <View style={dynamicStyles.photoPlaceholder}>
-                  <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                  <Text style={dynamicStyles.photoPlaceholderText}>{t('tapToAddMotoPhoto')}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 24 }}
+            >
+              <TouchableOpacity style={dynamicStyles.photoBtn} onPress={showImageOptions}>
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
+                ) : (
+                  <View style={dynamicStyles.photoPlaceholder}>
+                    <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                    <Text style={dynamicStyles.photoPlaceholderText}>{t('tapToAddMotoPhoto')}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-            <TextInput style={dynamicStyles.input} placeholder={t('brand') + ' *'} placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
-            {errors.brand ? <Text style={dynamicStyles.errorText}>{errors.brand}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder={t('model') + ' *'} placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
-            {errors.model ? <Text style={dynamicStyles.errorText}>{errors.model}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder={t('year') + ' *'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
-            {errors.year ? <Text style={dynamicStyles.errorText}>{errors.year}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder={t('licensePlate') + ' *'} placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
-            <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: -6, marginBottom: 10 }}>Ingresar patente del permiso de circulación o padrón</Text>
-            {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
-            <TextInput style={dynamicStyles.input} placeholder={t('currentKilometers') + ' (' + t('optional') + ')'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
-            <TextInput style={dynamicStyles.input} placeholder="Color" placeholderTextColor={colors.textMuted} value={form.color} onChangeText={(v) => setForm((p) => ({ ...p, color: v }))} />
-            <View style={{ marginTop: 10, marginBottom: 6 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{t('gpsQuestion')}</Text>
-              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
-            </View>
-            <TextInput style={dynamicStyles.input} placeholder={t('gpsIdPlaceholder')} placeholderTextColor={colors.textMuted} value={form.gpsTracker} onChangeText={(v) => setForm((p) => ({ ...p, gpsTracker: v }))} />
-            <TouchableOpacity style={dynamicStyles.saveBtn} onPress={handleCreate} disabled={saving}>
-              {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
-            </TouchableOpacity>
+              <TextInput style={dynamicStyles.input} placeholder={t('brand') + ' *'} placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
+              {errors.brand ? <Text style={dynamicStyles.errorText}>{errors.brand}</Text> : null}
+              <TextInput style={dynamicStyles.input} placeholder={t('model') + ' *'} placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
+              {errors.model ? <Text style={dynamicStyles.errorText}>{errors.model}</Text> : null}
+              <TextInput style={dynamicStyles.input} placeholder={t('year') + ' *'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
+              {errors.year ? <Text style={dynamicStyles.errorText}>{errors.year}</Text> : null}
+              <TextInput style={dynamicStyles.input} placeholder={t('licensePlate') + ' *'} placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: -6, marginBottom: 10 }}>Ingresar patente del permiso de circulación o padrón</Text>
+              {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
+              <TextInput style={dynamicStyles.input} placeholder={t('currentKilometers')} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
+              <TextInput style={dynamicStyles.input} placeholder="Color" placeholderTextColor={colors.textMuted} value={form.color} onChangeText={(v) => setForm((p) => ({ ...p, color: v }))} />
+              <View style={{ marginTop: 10, marginBottom: 6 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{t('gpsQuestion')}</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
+              </View>
+              <TextInput style={dynamicStyles.input} placeholder={t('gpsIdPlaceholder')} placeholderTextColor={colors.textMuted} value={form.gpsTracker} onChangeText={(v) => setForm((p) => ({ ...p, gpsTracker: v }))} />
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, marginBottom: 4 }}>{t('gpsQuestionHint2')}</Text>
+              <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleCreate} disabled={saving}>
+                {saving ? <ActivityIndicator color={colors.successText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -434,8 +442,8 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   photoPlaceholderIcon: {
-    fontSize: 36,
-    marginBottom: 8,
+    fontSize: 22,
+    marginBottom: 0,
   },
   photoModalOverlay: {
     flex: 1,

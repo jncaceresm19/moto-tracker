@@ -29,6 +29,7 @@ const respondSchema = z.object({
 
 const closeSchema = z.object({
   status: z.enum(['closed', 'recovered']),
+  lastLocationName: z.string().max(200).optional(),
 });
 
 const alertIdParam = z.object({
@@ -199,6 +200,7 @@ router.get('/my', async (req: Request, res: Response) => {
         model: theftAlerts.model,
         licensePlate: theftAlerts.licensePlate,
         photoUrl: theftAlerts.photoUrl,
+        lastLocationName: theftAlerts.lastLocationName,
         status: theftAlerts.status,
         createdAt: theftAlerts.createdAt,
         closedAt: theftAlerts.closedAt,
@@ -349,7 +351,7 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, lastLocationName } = req.body;
 
     // Verify ownership
     const alert = await db
@@ -373,6 +375,9 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
     };
     if (status === 'recovered') {
       updateData.recoveredAt = now;
+    }
+    if (lastLocationName) {
+      updateData.lastLocationName = lastLocationName;
     }
 
     await db

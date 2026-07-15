@@ -160,11 +160,18 @@ export default function MotorcycleDetailScreen() {
       chipColor: '#0F6E56',
     },
     {
-      title: t('kilometerHistory'),
-      route: `/(app)/motorcycle/${id}/kilometers`,
-      icon: 'stats-chart-outline' as const,
-      chipBg: '#FBEAF0',
-      chipColor: '#993556',
+      title: 'Verificación',
+      route: `/(app)/motorcycle/${id}/verification`,
+      icon: motorcycle.verificada ? 'shield-checkmark' as const : 'shield-checkmark-outline' as const,
+      chipBg: motorcycle.verificada ? '#EAF3E6' : '#FBEAF0',
+      chipColor: motorcycle.verificada ? '#3D7A2E' : '#993556',
+    },
+    {
+      title: 'Combustible',
+      route: `/(app)/motorcycle/${id}/fuel`,
+      icon: 'water-outline' as const,
+      chipBg: '#FFF6D9',
+      chipColor: '#8A6D00',
     },
   ];
 
@@ -322,8 +329,30 @@ export default function MotorcycleDetailScreen() {
         </View>
       </View>
 
+      {/* Próximos vencimientos */}
+      {topAlerts.length > 0 && (
+        <View style={[styles.section, { paddingTop: 0 }]}>
+          <Text style={styles.sectionTitle}>Próximos vencimientos</Text>
+          {topAlerts.map((a) => (
+            <TouchableOpacity
+              key={a.key}
+              activeOpacity={0.7}
+              style={[styles.alertBtn, { backgroundColor: a.bg, borderLeftColor: a.border }]}
+              onPress={() => router.push(a.route as any)}
+            >
+              <Ionicons name={a.icon} size={18} color={a.iconColor} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.alertTitle, { color: a.titleColor }]}>{a.title}</Text>
+                <Text style={[styles.alertSubtitle, { color: a.subColor }]}>{a.subtitle}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={a.iconColor} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
       {/* Sections */}
-      <View style={styles.section}>
+      <View style={[styles.section, { paddingTop: 4, paddingBottom: 8 }]}>
         <Text style={styles.sectionTitle}>{t('sections')}</Text>
 
         {sections.map((s) => (
@@ -379,47 +408,6 @@ export default function MotorcycleDetailScreen() {
           </View>
         )}
       </View>
-
-      {/* Kilometer History Preview */}
-      {kmEntries.length > 0 && (
-        <View style={[styles.section, { paddingTop: 0 }]}>
-          <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}>
-            <Text style={styles.sectionTitle}>{t('kilometerHistory')}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#999" />
-          </TouchableOpacity>
-          {kmEntries.slice(0, 5).map((entry) => (
-            <View key={entry.id} style={styles.kmEntry}>
-              <View style={styles.kmEntryRow}>
-                <Text style={styles.kmEntryValue}>{entry.readingKm.toLocaleString('es-CL')} km</Text>
-                <Text style={styles.kmEntryDate}>{new Date(entry.recordedAt).toLocaleDateString()}</Text>
-              </View>
-              {entry.notes ? <Text style={styles.kmEntryNotes}>{entry.notes}</Text> : null}
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Próximos vencimientos */}
-      {topAlerts.length > 0 && (
-        <View style={[styles.section, { paddingTop: 0 }]}>
-          <Text style={styles.sectionTitle}>Próximos vencimientos</Text>
-          {topAlerts.map((a) => (
-            <TouchableOpacity
-              key={a.key}
-              activeOpacity={0.7}
-              style={[styles.alertBtn, { backgroundColor: a.bg, borderLeftColor: a.border }]}
-              onPress={() => router.push(a.route as any)}
-            >
-              <Ionicons name={a.icon} size={18} color={a.iconColor} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.alertTitle, { color: a.titleColor }]}>{a.title}</Text>
-                <Text style={[styles.alertSubtitle, { color: a.subColor }]}>{a.subtitle}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={a.iconColor} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
@@ -483,7 +471,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     margin: 16,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -633,7 +621,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderLeftWidth: 4,
-    marginBottom: 8,
+    marginBottom: 0,
   },
   alertTitle: { fontSize: 14, fontWeight: '600' },
   alertSubtitle: { fontSize: 12, marginTop: 2 },

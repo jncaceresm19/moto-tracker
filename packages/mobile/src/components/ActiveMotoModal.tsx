@@ -5,6 +5,7 @@ import { useTheme } from '../theme-context';
 import { useLanguage } from '../language-context';
 import { Motorcycle } from '../api';
 import { ActiveMoto, formatActivationTime } from '../services/activeMoto';
+import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
 
 interface ActiveMotoModalProps {
   visible: boolean;
@@ -33,6 +34,12 @@ export function ActiveMotoModal({
   const activeMotorcycle = activeMoto
     ? motorcycles.find(m => m.id === activeMoto.motorcycleId)
     : null;
+
+
+  const formatPlate = (raw: string) => {
+    const { letters, numbers } = getDisplayPlateParts(raw);
+    return numbers ? `${letters}-${numbers}` : letters;
+  };
 
   return (
     <Modal
@@ -73,15 +80,15 @@ export function ActiveMotoModal({
                   {activeMotorcycle.brand} {activeMotorcycle.model}
                 </Text>
                 <Text style={[styles.plate, { color: colors.inkFaint }]}>
-                  {activeMotorcycle.licensePlate}
+                  {formatPlate(activeMotorcycle.licensePlate)}
                 </Text>
                 <Text style={[styles.time, { color: colors.inkFaint }]}>
                   {t('activeSince')} {formatActivationTime(activeMoto.activatedAt)}
                 </Text>
                 {activeMoto.activationLat && activeMoto.activationLon && (
-                <Text style={[styles.location, { color: colors.inkFaint }]}>
-                  {t('parkedAt')} {activationAddress || `${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`}
-                </Text>
+                  <Text style={[styles.location, { color: colors.inkFaint }]}>
+                    {t('parkedAt')} {activationAddress || `${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`}
+                  </Text>
                 )}
               </View>
 
@@ -123,7 +130,7 @@ export function ActiveMotoModal({
                         {moto.brand} {moto.model}
                       </Text>
                       <Text style={[styles.motoOptionPlate, { color: colors.inkFaint }]}>
-                        {moto.licensePlate}
+                        {formatPlate(moto.licensePlate)}
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={colors.inkFaint} />

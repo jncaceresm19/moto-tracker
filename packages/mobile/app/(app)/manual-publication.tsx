@@ -21,6 +21,7 @@ import { Motorcycle, listMotorcycles } from '../../src/api';
 import { createManualPublication } from '../../src/services/theftAlertService';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
+import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
 
 export default function ManualPublicationScreen() {
   const { colors } = useTheme();
@@ -185,9 +186,14 @@ export default function ManualPublicationScreen() {
       </SafeAreaView>
     );
   }
+  const formatPlate = (raw: string) => {
+    const { letters, numbers } = getDisplayPlateParts(raw);
+    return numbers ? `${letters}-${numbers}` : letters;
+  };
+
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -220,12 +226,12 @@ export default function ManualPublicationScreen() {
             ) : (
               <>
                 <TouchableOpacity
-                  style={[styles.picker, { borderColor: colors.border, backgroundColor: colors.inputBg }]}
+                  style={[styles.picker, { borderColor: colors.border, backgroundColor: colors.inputBg }]} activeOpacity={0.8}
                   onPress={() => setShowMotoPicker(!showMotoPicker)}
                 >
                   <Text style={[styles.pickerText, { color: selectedMoto ? colors.ink : colors.inkFaint }]}>
                     {selectedMoto
-                      ? `${selectedMoto.brand} ${selectedMoto.model} - ${selectedMoto.licensePlate}`
+                      ? `${selectedMoto.brand} ${selectedMoto.model} - ${formatPlate(selectedMoto.licensePlate)}`
                       : t('selectMotorcycle')}
                   </Text>
                   <Ionicons
@@ -244,7 +250,7 @@ export default function ManualPublicationScreen() {
                           styles.pickerOption,
                           { borderBottomColor: colors.borderLight },
                           selectedMoto?.id === moto.id && { backgroundColor: colors.brandBlueBg },
-                        ]}
+                        ]} activeOpacity={0.7}
                         onPress={() => {
                           setSelectedMoto(moto);
                           setShowMotoPicker(false);
@@ -255,7 +261,7 @@ export default function ManualPublicationScreen() {
                             {moto.brand} {moto.model}
                           </Text>
                           <Text style={[styles.pickerOptionSubtitle, { color: colors.inkSoft }]}>
-                            {moto.licensePlate} · {moto.year}
+                            {formatPlate(moto.licensePlate)} · {moto.year}
                           </Text>
                         </View>
                         {selectedMoto?.id === moto.id && (
@@ -295,6 +301,7 @@ export default function ManualPublicationScreen() {
               style={[styles.locationBtn, { borderColor: colors.primary }]}
               onPress={handleUseCurrentLocation}
               disabled={gettingLocation}
+              activeOpacity={0.8}
             >
               {gettingLocation ? (
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -330,6 +337,7 @@ export default function ManualPublicationScreen() {
               (!selectedMoto || submitting) && { opacity: 0.6 },
             ]}
             onPress={handleSubmit}
+            activeOpacity={0.8}
             disabled={!selectedMoto || submitting}
           >
             {submitting ? (
