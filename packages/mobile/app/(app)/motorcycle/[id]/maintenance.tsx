@@ -779,25 +779,6 @@ export default function MaintenanceScreen() {
             </View>
           );
         })()}
-
-        {/* Historial de Kilómetros */}
-        {kmEntries.length > 0 && (
-          <View style={{ marginTop: 16 }}>
-            <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kilometerHistory')}</Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-            {kmEntries.slice(0, 5).map((entry) => (
-              <View key={entry.id} style={[styles.kmEntry, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                <View style={styles.kmEntryRow}>
-                  <Text style={[styles.kmEntryValue, { color: colors.primary }]}>{entry.readingKm.toLocaleString('es-CL')} km</Text>
-                  <Text style={[styles.kmEntryDate, { color: colors.textSecondary }]}>{new Date(entry.recordedAt).toLocaleDateString()}</Text>
-                </View>
-                {entry.notes ? <Text style={[styles.kmEntryNotes, { color: colors.textMuted }]}>{entry.notes}</Text> : null}
-              </View>
-            ))}
-          </View>
-        )}
       </ScrollView>
     );
   };
@@ -822,6 +803,26 @@ export default function MaintenanceScreen() {
             }}
             renderItem={renderRecordPage}
           />
+
+          {/* Historial de Kilómetros */}
+          {kmEntries.length > 0 && (
+            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
+              <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }} onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kilometerHistory')}</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+              {kmEntries.slice(0, 5).map((entry) => (
+                <View key={entry.id} style={[styles.kmEntry, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                  <View style={styles.kmEntryRow}>
+                    <Text style={[styles.kmEntryValue, { color: colors.primary }]}>{entry.readingKm.toLocaleString('es-CL')} km</Text>
+                    <Text style={[styles.kmEntryDate, { color: colors.textSecondary }]}>{new Date(entry.recordedAt).toLocaleDateString()}</Text>
+                  </View>
+                  {entry.notes ? <Text style={[styles.kmEntryNotes, { color: colors.textMuted }]}>{entry.notes}</Text> : null}
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* Page dots */}
           {filteredRecords.length > 1 && (
             <View style={{ flexDirection: 'row', justifyContent: 'center', paddingVertical: 8, gap: 6 }}>
