@@ -14,6 +14,7 @@ export const users = sqliteTable('users', {
   otpAttempts: integer('otp_attempts').default(0),
   otpLockedUntil: integer('otp_locked_until', { mode: 'timestamp' }),
   avatarUrl: text('avatar_url'),
+  role: text('role').notNull().default('user'),
   pushToken: text('push_token'),
   lastLatitude: real('last_latitude'),
   lastLongitude: real('last_longitude'),
@@ -103,6 +104,7 @@ export const fuelRecords = sqliteTable('fuel_records', {
   pricePerLiter: real('price_per_liter').notNull(),
   totalCost: real('total_cost').notNull(),
   location: text('location'),
+  octane: text('octane'),
   recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
   notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -246,6 +248,30 @@ export const otps = sqliteTable('otps', {
 
 export const idxOtpsUserId = index('idx_otps_user_id').on(otps.userId);
 
+// Pending users table (registration OTP verification)
+export const pendingUsers = sqliteTable('pending_users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  name: text('name').notNull(),
+  phone: text('phone'),
+  rut: text('rut').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+});
+
+// Pending OTPs table (for registration verification)
+export const pendingOtps = sqliteTable('pending_otps', {
+  id: text('id').primaryKey(),
+  pendingUserId: text('pending_user_id').notNull().references(() => pendingUsers.id),
+  code: text('code').notNull(),
+  tipo: text('tipo').notNull().default('email'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  used: integer('used', { mode: 'boolean' }).default(false),
+  attempts: integer('attempts').default(0),
+});
+
 // Pending verifications table (for manual review)
 export const verificacionesPendientes = sqliteTable('verificaciones_pendientes', {
   id: text('id').primaryKey(),
@@ -265,3 +291,17 @@ export const idxVerificacionesUserId = index('idx_verificaciones_user_id').on(ve
 // Indexes for verification
 export const idxMotorcyclesVerificada = index('idx_motorcycles_verificada').on(motorcycles.verificada);
 export const idxUsersRut = uniqueIndex('idx_users_rut').on(users.rut);
+
+// GPS Trackers table
+export const gpsTrackers = sqliteTable('gps_trackers', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id),
+  motorcycleId: text('motorcycle_id').references(() => motorcycles.id),
+  imei: text('imei').notNull(),
+  name: text('name').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const idxGpsTrackersUserId = index('idx_gps_trackers_user_id').on(gpsTrackers.userId);
+export const idxGpsTrackersImei = index('idx_gps_trackers_imei').on(gpsTrackers.imei);

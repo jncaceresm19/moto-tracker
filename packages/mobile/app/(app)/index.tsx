@@ -50,6 +50,8 @@ export default function HomeScreen() {
   const [biometricPromptVisible, setBiometricPromptVisible] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [rainAlert, setRainAlert] = useState<RainAlertData | null>(null);
+  const [rainProbability, setRainProbability] = useState<number | null>(null);
+  const [rainMinutes, setRainMinutes] = useState<number | null>(null);
   const [weatherCondition, setWeatherCondition] = useState<string>('Cargando...');
   const [currentTemp, setCurrentTemp] = useState<number | null>(null);
   const [zoneName, setZoneName] = useState<string | null>(null);
@@ -232,6 +234,10 @@ export default function HomeScreen() {
       }
       setCurrentTemp(alert.currentTemp);
       setZoneName(alert.zoneName);
+
+      // Always store probability/minutes for WeatherCard display
+      setRainProbability(alert.probability > 0 ? alert.probability : null);
+      setRainMinutes(alert.minutesUntilRain);
 
       if (alert.shouldShow && user) {
         const dismissed = await isRainAlertDismissed(user.id);
@@ -501,34 +507,22 @@ export default function HomeScreen() {
           onReportTheft={handleReportTheft}
         />
 
-        {/* No motorcycles placeholder */}
-        {motorcycles.length === 0 && (
-          <View style={styles.emptyMotoContainer}>
-            <Text style={[styles.emptyMotoText, { color: colors.inkSoft }]}>
-              {t('registerFirstMoto')}
-            </Text>
-          </View>
-        )}
-
         {/* Weather Card — always visible */}
         <View style={styles.section}>
           <WeatherCard
             currentTemp={currentTemp}
             weatherCondition={weatherCondition}
             zoneName={zoneName ?? undefined}
-            isRainAlert={!!rainAlert?.shouldShow}
-            minutesUntilRain={rainAlert?.minutesUntilRain}
-            probability={rainAlert?.probability}
-            onDismissRain={handleDismissRainAlert}
+            rainProbability={rainProbability}
+            minutesUntilRain={rainMinutes}
             onPress={() => { }}
           />
         </View>
 
+
         {/* Section: Alertas de robo */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('theftAlerts')}</Text>
-          </View>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('theftAlerts')}</Text>
           {hasAlerts ? (
             theftAlerts.length === 1 ? (
               <TheftAlertCard
@@ -615,7 +609,7 @@ export default function HomeScreen() {
 
         {/* Section: Ahorra en tu ruta */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('saveOnRoute')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('saveOnRoute')}</Text>
           {gasStations.length > 0 ? (
             <>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
@@ -651,7 +645,7 @@ export default function HomeScreen() {
 
         {/* Section: Servicios cercanos */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.ink }]}>{t('nearbyServices')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('nearbyServices')}</Text>
           {nearbyPlaces.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
               {nearbyPlaces.map((place) => (
@@ -831,9 +825,18 @@ const styles = StyleSheet.create({
   emptyMotoContainer: { alignItems: 'center', paddingVertical: 24, paddingHorizontal: 32 },
   emptyMotoText: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
   section: { marginTop: 24, paddingHorizontal: 16 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 15, fontWeight: '700' },
-
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
   emptyCard: { borderRadius: 16, borderWidth: 1, padding: 24, alignItems: 'center' },
   emptyCardIcon: { fontSize: 32, marginBottom: 10 },
   emptyCardTitle: { fontSize: 15, fontWeight: '600', marginBottom: 6 },

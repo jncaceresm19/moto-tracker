@@ -27,7 +27,7 @@ export function RainAlertCard({
       activeOpacity={0.7}
     >
       <View style={styles.iconContainer}>
-        <Ionicons name="cloudy-night" size={28} color={colors.amber} />
+        <Ionicons name="rainy" size={28} color={colors.amber} />
       </View>
 
       <View style={styles.content}>

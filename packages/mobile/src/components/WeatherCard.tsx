@@ -7,11 +7,9 @@ import { useTheme } from '../theme-context';
 interface WeatherCardProps {
   currentTemp: number | null;
   weatherCondition: string;
-  isRainAlert: boolean;
-  minutesUntilRain?: number | null;
-  probability?: number;
   zoneName?: string;
-  onDismissRain?: () => void;
+  rainProbability?: number | null;
+  minutesUntilRain?: number | null;
   onPress?: () => void;
 }
 
@@ -55,55 +53,18 @@ function getWeatherIcon(condition: string): keyof typeof Ionicons.glyphMap {
 export function WeatherCard({
   currentTemp,
   weatherCondition,
-  isRainAlert,
-  minutesUntilRain,
-  probability,
   zoneName,
-  onDismissRain,
+  rainProbability,
+  minutesUntilRain,
   onPress,
 }: WeatherCardProps) {
   const { colors } = useTheme();
 
-  if (isRainAlert && minutesUntilRain != null) {
-    return (
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.amberBg, borderColor: colors.amber }]}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <View style={[styles.iconContainer, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
-          <Ionicons name="cloudy-night" size={28} color={colors.amber} />
-        </View>
-
-        <View style={styles.content}>
-          <Text style={[styles.title, { color: colors.ink }]}>
-            Lluvia en ~{minutesUntilRain} min
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.inkSoft }]}>
-            {currentTemp != null ? `${Math.round(currentTemp)}°C · ` : ''}
-            Probabilidad: {probability}%{zoneName ? ` · ${zoneName}` : ''}
-          </Text>
-        </View>
-
-        {onDismissRain && (
-          <TouchableOpacity
-            style={styles.dismissBtn}
-            onPress={(e) => {
-              e.stopPropagation?.();
-              onDismissRain();
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close" size={18} color={colors.inkFaint} />
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
-  }
-
   const icon = getWeatherIcon(weatherCondition);
   const mood = getWeatherMood(weatherCondition);
   const [gradientStart, gradientEnd] = getWeatherGradient(mood, colors.surface);
+
+  const hasRain = rainProbability != null && rainProbability > 0;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
@@ -121,9 +82,14 @@ export function WeatherCard({
           <Text style={[styles.title, { color: colors.ink }]}>
             {currentTemp != null ? `${Math.round(currentTemp)}°C` : '--°C'}
           </Text>
-          <Text style={[styles.subtitle, { color: colors.inkSoft }]}>
+          <Text style={[styles.subtitle, { color: colors.headerBg }]}>
             {weatherCondition}{zoneName ? ` · ${zoneName}` : ''}
           </Text>
+          {hasRain && (
+            <Text style={[styles.rainInfo, { color: colors.textSecondary }]}>
+              Lluvia {minutesUntilRain != null ? `en ~${minutesUntilRain} min · ` : ''}{rainProbability}%
+            </Text>
+          )}
         </View>
       </LinearGradient>
     </TouchableOpacity>
@@ -157,7 +123,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 2,
   },
-  dismissBtn: {
-    padding: 4,
+  rainInfo: {
+    fontSize: 12,
+    marginTop: 2,
+    fontWeight: '500',
   },
 });

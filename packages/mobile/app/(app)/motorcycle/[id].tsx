@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../../src/theme-context';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle, listDocuments, Document, listMaintenance, MaintenanceRecord, listKilometers, KilometerEntry } from '../../../src/api';
 import { useLanguage } from '../../../src/language-context';
 import { CustomAlert } from '../../../src/components/CustomAlert';
@@ -10,6 +11,7 @@ import { getDisplayPlateParts } from '../../../../backend/src/services/plateVali
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { colors } = useTheme();
   const { t } = useLanguage();
   const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
   const [loading, setLoading] = useState(true);
@@ -332,7 +334,7 @@ export default function MotorcycleDetailScreen() {
       {/* Próximos vencimientos */}
       {topAlerts.length > 0 && (
         <View style={[styles.section, { paddingTop: 0 }]}>
-          <Text style={styles.sectionTitle}>Próximos vencimientos</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Próximos vencimientos</Text>
           {topAlerts.map((a) => (
             <TouchableOpacity
               key={a.key}
@@ -353,7 +355,7 @@ export default function MotorcycleDetailScreen() {
 
       {/* Sections */}
       <View style={[styles.section, { paddingTop: 4, paddingBottom: 8 }]}>
-        <Text style={styles.sectionTitle}>{t('sections')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('sections')}</Text>
 
         {sections.map((s) => (
           <TouchableOpacity key={s.route} style={styles.sectionBtn} activeOpacity={0.7} onPress={() => router.push(s.route as any)}>
@@ -416,22 +418,25 @@ export default function MotorcycleDetailScreen() {
               <Text style={styles.modalTitle}>{t('editMotorcycle')}</Text>
               <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
             </View>
-            <TextInput style={styles.input} placeholder="Brand *" value={form.brand} onChangeText={(txt) => { setForm((p) => ({ ...p, brand: txt })); setErrors((p) => ({ ...p, brand: '' })); }} />
+
+            {motorcycle?.verificada && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, padding: 10, borderRadius: 8, backgroundColor: colors.amberBg, borderWidth: 1, borderColor: colors.amber }}>
+                <Ionicons name="lock-closed" size={16} color={colors.amber} />
+                <Text style={{ fontSize: 13, color: colors.amber, flex: 1 }}>Moto verificada — datos bloqueados por seguridad</Text>
+              </View>
+            )}
+
+            <TextInput style={styles.input} placeholder="Brand *" value={form.brand} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, brand: txt })); setErrors((p) => ({ ...p, brand: '' })); }} />
             {errors.brand ? <Text style={styles.errorText}>{errors.brand}</Text> : null}
-            <TextInput style={styles.input} placeholder="Model *" value={form.model} onChangeText={(txt) => { setForm((p) => ({ ...p, model: txt })); setErrors((p) => ({ ...p, model: '' })); }} />
+            <TextInput style={styles.input} placeholder="Model *" value={form.model} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, model: txt })); setErrors((p) => ({ ...p, model: '' })); }} />
             {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
-            <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} onChangeText={(txt) => { setForm((p) => ({ ...p, year: txt })); setErrors((p) => ({ ...p, year: '' })); }} />
+            <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, year: txt })); setErrors((p) => ({ ...p, year: '' })); }} />
             {errors.year ? <Text style={styles.errorText}>{errors.year}</Text> : null}
             {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
-            {motorcycle?.verificada ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10, marginTop: -4 }}>
-                <Ionicons name="lock-closed" size={14} color="#999" />
-                <Text style={{ fontSize: 12, color: '#999' }}>{t('plateVerifiedCantEdit')}</Text>
-              </View>
-            ) : null}
+
             <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, licensePlate: txt })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
-            <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} onChangeText={(txt) => setForm((p) => ({ ...p, currentKilometers: txt }))} />
-            <TextInput style={styles.input} placeholder="Color" value={form.color} onChangeText={(txt) => setForm((p) => ({ ...p, color: txt }))} />
+            <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} editable={!motorcycle?.verificada} onChangeText={(txt) => setForm((p) => ({ ...p, currentKilometers: txt }))} />
+            <TextInput style={styles.input} placeholder="Color" value={form.color} editable={!motorcycle?.verificada} onChangeText={(txt) => setForm((p) => ({ ...p, color: txt }))} />
             <View style={{ marginTop: 10, marginBottom: 6 }}>
               <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('gpsQuestion')}</Text>
               <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
@@ -567,7 +572,12 @@ const styles = StyleSheet.create({
 
   // Sections
   section: { padding: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
   sectionBtn: {
     flexDirection: 'row',
     alignItems: 'center',

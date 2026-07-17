@@ -7,12 +7,15 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useTheme } from '../../../src/theme-context';
 import { useLanguage } from '../../../src/language-context';
 import { Notification, getNotifications, markAsRead, markAllAsRead, deleteNotification } from '../../../src/services/notificationService';
+import { RainAlertData, fetchRainAlert } from '../../../src/services/weatherApi';
+import { getCurrentLocation } from '../../../src/services/gasStations';
 
 export default function NotificationsScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [rainAlert, setRainAlert] = useState<RainAlertData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -37,13 +40,33 @@ export default function NotificationsScreen() {
     }
   }, []);
 
+  const loadRainAlert = useCallback(async () => {
+    try {
+      let lat: number;
+      let lon: number;
+      try {
+        const loc = await getCurrentLocation();
+        lat = loc.lat;
+        lon = loc.lon;
+      } catch {
+        lat = -33.45;
+        lon = -70.66;
+      }
+      const alert = await fetchRainAlert(lat, lon);
+      setRainAlert(alert.shouldShow ? alert : null);
+    } catch (e: any) {
+      console.log('[NOTIFICATIONS] Rain alert error:', e?.message);
+    }
+  }, []);
+
   useEffect(() => {
     loadNotifications();
-  }, [loadNotifications]);
+    loadRainAlert();
+  }, [loadNotifications, loadRainAlert]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadNotifications();
+    await Promise.all([loadNotifications(), loadRainAlert()]);
     setRefreshing(false);
   };
 
@@ -64,7 +87,7 @@ export default function NotificationsScreen() {
         setNotifications(prev =>
           prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n)
         );
-      } catch (e) {
+      } catch (e: any) {
         console.log('[NOTIFICATIONS] Error marking as read:', e?.message);
       }
     }
@@ -147,27 +170,23 @@ export default function NotificationsScreen() {
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['bottom']}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={[]}>
-      {/* Custom header matching app style */}
+      {/* Custom header matching app style — siempre visible, cargando o no */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/(app)/profile')} style={styles.headerBtn}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => router.back()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('notifications')}</Text>
         <View style={styles.headerBtn} />
       </View>
 
-      {/* Notifications list */}
-      {notifications.length === 0 ? (
+      {/* Área de contenido: spinner, vacío o lista, sin desmontar el header */}
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : notifications.length === 0 && !rainAlert?.shouldShow ? (
         <View style={styles.emptyState}>
           <Ionicons name="notifications-off-outline" size={48} color={colors.inkFaint} />
           <Text style={[styles.emptyTitle, { color: colors.ink }]}>{t('noNotifications')}</Text>
@@ -179,6 +198,31 @@ export default function NotificationsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingBottom: 0 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          ListHeaderComponent={
+            rainAlert?.shouldShow && rainAlert.minutesUntilRain != null ? (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.notificationItem, { backgroundColor: colors.amberBg, borderBottomColor: colors.border }]}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: 'rgba(245, 166, 35, 0.15)' }]}>
+                  <Ionicons name="rainy" size={20} color={colors.amber} />
+                </View>
+                <View style={styles.notificationContent}>
+                  <View style={styles.notificationHeader}>
+                    <Text style={[styles.notificationTitle, { color: colors.ink }]} numberOfLines={1}>
+                      Lluvia en ~{rainAlert.minutesUntilRain} min
+                    </Text>
+                    <Text style={[styles.notificationTime, { color: colors.inkFaint }]}>
+                      ahora
+                    </Text>
+                  </View>
+                  <Text style={[styles.notificationMessage, { color: colors.inkSoft }]} numberOfLines={2}>
+                    Probabilidad: {rainAlert.probability}%{rainAlert.zoneName ? ` · ${rainAlert.zoneName}` : ''}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ) : null
+          }
           renderItem={({ item }) => (
             <Swipeable
               renderRightActions={(progress: Animated.AnimatedInterpolation<number>) => renderRightActions(progress, item)}
@@ -192,39 +236,39 @@ export default function NotificationsScreen() {
                 ]}
                 onPress={() => handleNotificationPress(item)}
               >
-              {/* Avatar for comments, icon for theft/recovery */}
-              {item.type === 'alert_response' && item.senderAvatar ? (
-                <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
-              ) : item.type === 'alert_response' ? (
-                <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.avatarText}>
-                    {item.senderName ? item.senderName.charAt(0).toUpperCase() : '?'}
+                {/* Avatar for comments, icon for theft/recovery */}
+                {item.type === 'alert_response' && item.senderAvatar ? (
+                  <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
+                ) : item.type === 'alert_response' ? (
+                  <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.avatarText}>
+                      {item.senderName ? item.senderName.charAt(0).toUpperCase() : '?'}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
+                    <Ionicons
+                      name={getNotificationIcon(item.type) as any}
+                      size={20}
+                      color={getNotificationColor(item.type)}
+                    />
+                  </View>
+                )}
+                <View style={styles.notificationContent}>
+                  <View style={styles.notificationHeader}>
+                    <Text style={[styles.notificationTitle, { color: colors.ink }]} numberOfLines={1}>
+                      {item.senderName || item.title}
+                    </Text>
+                    <Text style={[styles.notificationTime, { color: colors.inkFaint }]}>
+                      {formatTime(item.createdAt)}
+                    </Text>
+                  </View>
+                  <Text style={[styles.notificationMessage, { color: colors.inkSoft }]} numberOfLines={2}>
+                    {item.message}
                   </Text>
                 </View>
-              ) : (
-                <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) + '20' }]}>
-                  <Ionicons
-                    name={getNotificationIcon(item.type) as any}
-                    size={20}
-                    color={getNotificationColor(item.type)}
-                  />
-                </View>
-              )}
-              <View style={styles.notificationContent}>
-                <View style={styles.notificationHeader}>
-                  <Text style={[styles.notificationTitle, { color: colors.ink }]} numberOfLines={1}>
-                    {item.senderName || item.title}
-                  </Text>
-                  <Text style={[styles.notificationTime, { color: colors.inkFaint }]}>
-                    {formatTime(item.createdAt)}
-                  </Text>
-                </View>
-                <Text style={[styles.notificationMessage, { color: colors.inkSoft }]} numberOfLines={2}>
-                  {item.message}
-                </Text>
-              </View>
-              {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
-            </TouchableOpacity>
+                {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
+              </TouchableOpacity>
             </Swipeable>
           )}
         />

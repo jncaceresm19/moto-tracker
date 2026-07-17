@@ -1,22 +1,64 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
-import { sendOtp, verifyOtpCode } from '../../src/services/verificationApi';
+import { resendRegistrationOtp } from '../../src/api';
+
+// --- RUT validation (modulo 11) ---
+function validateRutInline(rut: string): boolean {
+  const clean = rut.replace(/[\.\-\s]/g, '').toUpperCase();
+  if (!/^\d+[0-9K]$/.test(clean)) return false;
+  const body = clean.slice(0, -1);
+  const dv = clean.slice(-1);
+  let sum = 0;
+  let mul = 2;
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += parseInt(body[i]) * mul;
+    mul = mul === 7 ? 2 : mul + 1;
+  }
+  const rest = 11 - (sum % 11);
+  const expected = rest === 11 ? '0' : rest === 10 ? 'K' : rest.toString();
+  return dv === expected;
+}
+
+// --- Password strength checker ---
+function getPasswordChecks(password: string) {
+  return {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password),
+  };
+}
 
 export default function RegisterScreen() {
-  const { signUp } = useAuth();
+  const { signUp, completeRegistration } = useAuth();
   const { colors } = useTheme();
   const { t } = useLanguage();
+
+  // Step control
+  const [step, setStep] = useState<1 | 2>(1);
+
+  // Step 1 fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
   const [rut, setRut] = useState('');
+  const [phone, setPhone] = useState('');
+
+  // Step 2 fields
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Validation errors (shown after pressing Next)
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
   const [loading, setLoading] = useState(false);
 
   // OTP flow state
@@ -42,29 +84,64 @@ export default function RegisterScreen() {
     setAlertVisible(true);
   };
 
+  // --- Step 1 validation ---
+  const validateStep1 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!name.trim()) {
+      newErrors.name = 'El nombre es obligatorio';
+    }
+
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      newErrors.email = 'Ingresa un correo válido';
+    }
+
+    if (!rut.trim() || !validateRutInline(rut)) {
+      newErrors.rut = 'RUT inválido';
+    }
+
+    if (!phone.trim()) {
+      newErrors.phone = 'Ingresa un número telefónico';
+    } else if (phone.length !== 8) {
+      newErrors.phone = 'El teléfono debe tener 8 dígitos';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // --- Step 2 validation ---
+  const validateStep2 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    const checks = getPasswordChecks(password);
+
+    if (!checks.length || !checks.uppercase || !checks.number || !checks.special) {
+      newErrors.password = 'La contraseña no cumple los requisitos';
+    }
+
+    if (password !== confirmPassword) {
+      newErrors.confirmPassword = 'Las contraseñas no coinciden';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // --- Handle Next (Step 1 → Step 2) ---
+  const handleNext = () => {
+    if (validateStep1()) {
+      setErrors({});
+      setStep(2);
+    }
+  };
+
+  // --- Handle Register (Step 2 → OTP) ---
   const handleRegister = async () => {
-    if (!name || !email || !password || !rut) {
-      showAlert(t('error'), t('fillAllFields'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
-      return;
-    }
-
-    // Validate RUT format (basic check)
-    const rutClean = rut.replace(/[\.\-\s]/g, '').toUpperCase();
-    if (!/^\d+[0-9K]$/.test(rutClean)) {
-      showAlert(t('error'), 'RUT inválido', [{ text: 'OK' }], 'close-circle', '#FF3B30');
-      return;
-    }
-
-    // Validate phone format if provided (Chilean format: +569XXXXXXXX)
-    if (phone && !/^\+569\d{8}$/.test(phone.replace(/[\s\-\(\)]/g, ''))) {
-      showAlert(t('error'), t('invalidPhone'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
-      return;
-    }
+    if (!validateStep2()) return;
 
     setLoading(true);
     try {
-      await signUp(email, password, name, phone || undefined, rut);
-      // Registration successful — show OTP method chooser
+      await signUp(email, password, name, phone ? `+569${phone}` : undefined, rut);
       setOtpStep('choose');
     } catch (err) {
       showAlert(t('error'), err instanceof Error ? err.message : t('registrationFailed'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
@@ -73,11 +150,12 @@ export default function RegisterScreen() {
     }
   };
 
+  // --- OTP handlers (unchanged from original) ---
   const handleChooseMethod = async (method: 'email' | 'phone') => {
     setOtpMethod(method);
     setOtpLoading(true);
     try {
-      await sendOtp(email, method, phone || undefined);
+      await resendRegistrationOtp(email, method);
       setOtpStep('code');
     } catch (err) {
       showAlert(t('error'), 'No se pudo enviar el código', [{ text: 'OK' }], 'close-circle', '#FF3B30');
@@ -93,7 +171,7 @@ export default function RegisterScreen() {
     }
     setOtpLoading(true);
     try {
-      await verifyOtpCode(otpCode);
+      await completeRegistration(email, otpCode);
       setOtpStep('success');
     } catch (err) {
       showAlert(t('error'), 'Código inválido o expirado', [{ text: 'OK' }], 'close-circle', '#FF3B30');
@@ -102,31 +180,58 @@ export default function RegisterScreen() {
     }
   };
 
+  const handleResendOtp = async () => {
+    setOtpLoading(true);
+    try {
+      await resendRegistrationOtp(email, otpMethod);
+      showAlert('Código reenviado', 'Revisa tu correo electrónico', [{ text: 'OK' }]);
+    } catch (err) {
+      showAlert(t('error'), 'No se pudo reenviar el código', [{ text: 'OK' }], 'close-circle', '#FF3B30');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
   const handleSuccessClose = () => {
     setOtpStep('idle');
     setOtpCode('');
-    router.replace('/(auth)/login');
+    router.replace('/(app)');
   };
+
+  // --- Password checks for live display ---
+  const passwordChecks = getPasswordChecks(password);
 
   const dynamicStyles = StyleSheet.create({
     container: {
       flex: 1,
-      justifyContent: 'center',
-      padding: 24,
       backgroundColor: colors.background,
     },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      padding: 24,
+    },
     title: {
-      fontSize: 32,
+      fontSize: 28,
       fontWeight: 'bold',
       textAlign: 'center',
-      marginBottom: 8,
+      marginBottom: 4,
       color: colors.text,
     },
     subtitle: {
-      fontSize: 16,
+      fontSize: 14,
       color: colors.textSecondary,
       textAlign: 'center',
       marginBottom: 5,
+    },
+    stepIndicator: {
+      textAlign: 'center',
+      fontSize: 13,
+      color: colors.textMuted,
+      marginBottom: 20,
+    },
+    inputWrapper: {
+      marginBottom: 4,
     },
     input: {
       borderWidth: 1,
@@ -134,9 +239,60 @@ export default function RegisterScreen() {
       borderRadius: 8,
       padding: 14,
       fontSize: 16,
-      marginBottom: 12,
       backgroundColor: colors.inputBg,
       color: colors.text,
+    },
+    inputError: {
+      borderColor: '#FF3B30',
+    },
+    errorText: {
+      color: '#FF3B30',
+      fontSize: 12,
+      marginTop: 4,
+      marginBottom: 12,
+      marginLeft: 4,
+    },
+    inputSpace: {
+      marginBottom: 12,
+    },
+    phoneContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 8,
+      backgroundColor: colors.inputBg,
+      overflow: 'hidden',
+    },
+    phonePrefix: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 12,
+      borderRightWidth: 1,
+      borderRightColor: colors.inputBorder,
+      height: 48,
+      backgroundColor: colors.inputBg,
+    },
+    phoneFlag: {
+      fontSize: 18,
+    },
+    phoneCode: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    phoneInput: {
+      flex: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 14,
+      fontSize: 16,
+      color: colors.text,
+    },
+    passwordToggle: {
+      position: 'absolute',
+      left: 12,
+      top: 12,
     },
     button: {
       backgroundColor: colors.primary,
@@ -150,6 +306,22 @@ export default function RegisterScreen() {
       fontSize: 16,
       fontWeight: '600',
     },
+    buttonDisabled: {
+      opacity: 0.5,
+    },
+    backBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      marginTop: 16,
+      padding: 8,
+    },
+    backBtnText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '500',
+    },
     link: {
       color: colors.accent,
       textAlign: 'center',
@@ -157,85 +329,207 @@ export default function RegisterScreen() {
       fontSize: 14,
       fontWeight: '600',
     },
+    // Password rules
+    rulesContainer: {
+      marginTop: 4,
+      marginBottom: 12,
+      paddingHorizontal: 4,
+    },
+    ruleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
+    ruleText: {
+      fontSize: 12,
+    },
   });
 
+  // ========================================
+  // STEP 1: Personal Data
+  // ========================================
+  if (step === 1) {
+    return (
+      <View style={dynamicStyles.container}>
+        <ScrollView contentContainerStyle={dynamicStyles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.brandBlock}>
+            <Image source={require('../../assets/icon.png')} style={styles.icon} resizeMode="contain" />
+            <Image source={require('../../assets/nombre.jpeg')} style={styles.logo} resizeMode="contain" />
+            <Text style={dynamicStyles.subtitle}>{t('signUpSubtitle')}</Text>
+          </View>
+
+          {/* Name */}
+          <View style={dynamicStyles.inputWrapper}>
+            <TextInput
+              style={[dynamicStyles.input, errors.name && dynamicStyles.inputError]}
+              placeholder={t('name')}
+              placeholderTextColor={colors.textMuted}
+              value={name}
+              onChangeText={(v) => { setName(v); if (errors.name) setErrors(prev => ({ ...prev, name: '' })); }}
+            />
+            {errors.name ? <Text style={dynamicStyles.errorText}>{errors.name}</Text> : <View style={{ marginBottom: 12 }} />}
+          </View>
+
+          {/* Email */}
+          <View style={dynamicStyles.inputWrapper}>
+            <TextInput
+              style={[dynamicStyles.input, errors.email && dynamicStyles.inputError]}
+              placeholder={t('email')}
+              placeholderTextColor={colors.textMuted}
+              value={email}
+              onChangeText={(v) => { setEmail(v); if (errors.email) setErrors(prev => ({ ...prev, email: '' })); }}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+            {errors.email ? <Text style={dynamicStyles.errorText}>{errors.email}</Text> : <View style={{ marginBottom: 12 }} />}
+          </View>
+
+          {/* RUT */}
+          <View style={dynamicStyles.inputWrapper}>
+            <TextInput
+              style={[dynamicStyles.input, errors.rut && dynamicStyles.inputError]}
+              placeholder="RUT (ej: 12345678-5)"
+              placeholderTextColor={colors.textMuted}
+              value={rut}
+              onChangeText={(v) => { setRut(v); if (errors.rut) setErrors(prev => ({ ...prev, rut: '' })); }}
+              autoCapitalize="characters"
+            />
+            {errors.rut ? <Text style={dynamicStyles.errorText}>{errors.rut}</Text> : <View style={{ marginBottom: 12 }} />}
+          </View>
+
+          {/* Phone */}
+          <View style={dynamicStyles.inputWrapper}>
+            <View style={[dynamicStyles.phoneContainer, errors.phone && dynamicStyles.inputError]}>
+              <View style={dynamicStyles.phonePrefix}>
+                <Text style={dynamicStyles.phoneFlag}>🇨🇱</Text>
+                <Text style={dynamicStyles.phoneCode}>+569</Text>
+              </View>
+              <TextInput
+                style={dynamicStyles.phoneInput}
+                placeholder="12345678"
+                placeholderTextColor={colors.textMuted}
+                value={phone}
+                onChangeText={(v) => { setPhone(v.replace(/[^0-9]/g, '').slice(0, 8)); if (errors.phone) setErrors(prev => ({ ...prev, phone: '' })); }}
+                keyboardType="phone-pad"
+                maxLength={8}
+              />
+            </View>
+            {errors.phone ? (
+              <Text style={dynamicStyles.errorText}>{errors.phone}</Text>
+            ) : (
+              <View style={{ marginBottom: 12 }} />
+            )}
+          </View>
+
+          <TouchableOpacity style={dynamicStyles.button} onPress={handleNext}>
+            <Text style={dynamicStyles.buttonText}>Siguiente</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          buttons={alertButtons}
+          icon={alertIcon}
+          iconColor={alertIconColor}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
+
+  // ========================================
+  // STEP 2: Password
+  // ========================================
   return (
     <View style={dynamicStyles.container}>
-      <View style={styles.brandBlock}>
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.icon}
-          resizeMode="contain"
-        />
-        <Image
-          source={require('../../assets/nombre.jpeg')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={dynamicStyles.subtitle}>{t('signUpSubtitle')}</Text>
-      </View>
+      <ScrollView contentContainerStyle={dynamicStyles.scrollContent} keyboardShouldPersistTaps="handled">
+        <View style={styles.brandBlock}>
+          <Image source={require('../../assets/icon.png')} style={styles.icon} resizeMode="contain" />
+          <Image source={require('../../assets/nombre.jpeg')} style={styles.logo} resizeMode="contain" />
+          <Text style={dynamicStyles.subtitle}>{t('signUpSubtitle')}</Text>
+        </View>
 
-      <TextInput
-        style={dynamicStyles.input}
-        placeholder={t('name')}
-        placeholderTextColor={colors.textMuted}
-        value={name}
-        onChangeText={setName}
-      />
+        {/* Password */}
+        <View style={dynamicStyles.inputWrapper}>
+          <View>
+            <TextInput
+              style={[dynamicStyles.input, errors.password && dynamicStyles.inputError, { paddingLeft: 40 }]}
+              placeholder={t('password')}
+              placeholderTextColor={colors.textMuted}
+              value={password}
+              onChangeText={(v) => { setPassword(v); if (errors.password) setErrors(prev => ({ ...prev, password: '' })); }}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity style={dynamicStyles.passwordToggle} onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
 
-      <TextInput
-        style={dynamicStyles.input}
-        placeholder={t('email')}
-        placeholderTextColor={colors.textMuted}
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+          {/* Password rules (live) */}
+          {password.length > 0 && (
+            <View style={dynamicStyles.rulesContainer}>
+              {[
+                { key: 'length', label: 'Mínimo 8 caracteres', met: passwordChecks.length },
+                { key: 'uppercase', label: 'Una letra mayúscula', met: passwordChecks.uppercase },
+                { key: 'number', label: 'Un número', met: passwordChecks.number },
+                { key: 'special', label: 'Un carácter especial (!@#$%^&*)', met: passwordChecks.special },
+              ].map(rule => (
+                <View key={rule.key} style={dynamicStyles.ruleRow}>
+                  <Ionicons
+                    name={rule.met ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={16}
+                    color={rule.met ? '#34C759' : '#FF3B30'}
+                  />
+                  <Text style={[dynamicStyles.ruleText, { color: rule.met ? '#34C759' : '#FF3B30' }]}>
+                    {rule.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          {password.length === 0 && <View style={{ marginBottom: 12 }} />}
+        </View>
 
-      <TextInput
-        style={dynamicStyles.input}
-        placeholder="RUT"
-        placeholderTextColor={colors.textMuted}
-        value={rut}
-        onChangeText={setRut}
-        autoCapitalize="characters"
-      />
+        {/* Confirm Password */}
+        <View style={dynamicStyles.inputWrapper}>
+          <View>
+            <TextInput
+              style={[dynamicStyles.input, errors.confirmPassword && dynamicStyles.inputError, { paddingLeft: 40 }]}
+              placeholder="Repetir contraseña"
+              placeholderTextColor={colors.textMuted}
+              value={confirmPassword}
+              onChangeText={(v) => { setConfirmPassword(v); if (errors.confirmPassword) setErrors(prev => ({ ...prev, confirmPassword: '' })); }}
+              secureTextEntry={!showConfirm}
+            />
+            <TouchableOpacity style={dynamicStyles.passwordToggle} onPress={() => setShowConfirm(!showConfirm)}>
+              <Ionicons name={showConfirm ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+          {errors.confirmPassword ? (
+            <Text style={dynamicStyles.errorText}>{errors.confirmPassword}</Text>
+          ) : confirmPassword.length > 0 && password !== confirmPassword ? (
+            <Text style={dynamicStyles.errorText}>Las contraseñas no coinciden</Text>
+          ) : (
+            <View style={{ marginBottom: 12 }} />
+          )}
+        </View>
 
-      <TextInput
-        style={dynamicStyles.input}
-        placeholder={t('phone')}
-        placeholderTextColor={colors.textMuted}
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
-      {phone ? null : (
-        <Text style={[styles.phoneHint, { color: colors.textMuted }]}>+569XXXXXXXX</Text>
-      )}
-
-      <TextInput
-        style={dynamicStyles.input}
-        placeholder={t('password')}
-        placeholderTextColor={colors.textMuted}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-
-      <TouchableOpacity
-        style={dynamicStyles.button}
-        onPress={handleRegister}
-        disabled={loading}
-      >
-        <Text style={dynamicStyles.buttonText}>{loading ? t('signUpLoading') : t('signUpButton')}</Text>
-      </TouchableOpacity>
-
-      <Link href="/(auth)/login" asChild>
-        <TouchableOpacity>
-          <Text style={dynamicStyles.link}>{t('hasAccount')}</Text>
+        <TouchableOpacity
+          style={[dynamicStyles.button, loading && dynamicStyles.buttonDisabled]}
+          onPress={handleRegister}
+          disabled={loading}
+        >
+          <Text style={dynamicStyles.buttonText}>{loading ? t('signUpLoading') : t('signUpButton')}</Text>
         </TouchableOpacity>
-      </Link>
+
+        <TouchableOpacity style={dynamicStyles.backBtn} onPress={() => { setStep(1); setErrors({}); }}>
+          <Ionicons name="arrow-back" size={16} color={colors.textSecondary} />
+          <Text style={dynamicStyles.backBtnText}>Volver a datos personales</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <CustomAlert
         visible={alertVisible}
@@ -247,14 +541,19 @@ export default function RegisterScreen() {
         onClose={() => setAlertVisible(false)}
       />
 
-      {/* MODAL: Choose OTP Method */}
+      {/* ===== OTP MODALS (unchanged from original) ===== */}
+
+      {/* MODAL: Choose OTP Method — Email only */}
       <Modal visible={otpStep === 'choose'} transparent animationType="fade">
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[styles.otpModal, { backgroundColor: colors.surface }]}>
+                <TouchableOpacity style={styles.otpCloseBtn} onPress={() => setOtpStep('idle')}>
+                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                </TouchableOpacity>
                 <Text style={[styles.otpModalTitle, { color: colors.text }]}>Validar cuenta</Text>
-                <Text style={[styles.otpModalSubtitle, { color: colors.textSecondary }]}>¿Cómo deseas recibir tu código de verificación?</Text>
+                <Text style={[styles.otpModalSubtitle, { color: colors.textSecondary }]}>Te enviaremos un código de verificación a tu correo electrónico</Text>
 
                 <TouchableOpacity
                   style={[styles.otpMethodBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
@@ -268,21 +567,6 @@ export default function RegisterScreen() {
                   </View>
                   {otpLoading && <ActivityIndicator size="small" color={colors.primary} />}
                 </TouchableOpacity>
-
-                {phone ? (
-                  <TouchableOpacity
-                    style={[styles.otpMethodBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
-                    onPress={() => handleChooseMethod('phone')}
-                    disabled={otpLoading}
-                  >
-                    <Ionicons name="phone-portrait" size={24} color={colors.primary} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.otpMethodTitle, { color: colors.text }]}>SMS</Text>
-                      <Text style={[styles.otpMethodDesc, { color: colors.textMuted }]}>{phone}</Text>
-                    </View>
-                    {otpLoading && <ActivityIndicator size="small" color={colors.primary} />}
-                  </TouchableOpacity>
-                ) : null}
               </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -291,13 +575,16 @@ export default function RegisterScreen() {
 
       {/* MODAL: Enter OTP Code */}
       <Modal visible={otpStep === 'code'} transparent animationType="fade">
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { }}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[styles.otpModal, { backgroundColor: colors.surface }]}>
+                <TouchableOpacity style={styles.otpCloseBtn} onPress={() => { setOtpStep('idle'); setOtpCode(''); }}>
+                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                </TouchableOpacity>
                 <Text style={[styles.otpModalTitle, { color: colors.text }]}>Código de verificación</Text>
                 <Text style={[styles.otpModalSubtitle, { color: colors.textSecondary }]}>
-                  Ingresa el código de 6 dígitos enviado a tu {otpMethod === 'email' ? 'correo' : 'celular'}
+                  Ingresa el código de 6 dígitos enviado a tu correo
                 </Text>
 
                 <TextInput
@@ -323,20 +610,12 @@ export default function RegisterScreen() {
                   )}
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.otpResendBtn}
-                  onPress={() => handleChooseMethod(otpMethod)}
-                  disabled={otpLoading}
-                >
-                  <Text style={[styles.otpResendText, { color: colors.primary }]}>Reenviar código</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.otpBackBtn}
-                  onPress={() => { setOtpStep('choose'); setOtpCode(''); }}
-                >
-                  <Text style={[styles.otpBackText, { color: colors.textMuted }]}>Cambiar método</Text>
-                </TouchableOpacity>
+                <View style={styles.otpResendRow}>
+                  <TouchableOpacity style={styles.otpResendBtn} onPress={handleResendOtp} disabled={otpLoading}>
+                    <Ionicons name="mail-outline" size={14} color={colors.primary} />
+                    <Text style={[styles.otpResendText, { color: colors.primary }]}>Reenviar por correo</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </TouchableOpacity>
           </KeyboardAvoidingView>
@@ -345,19 +624,19 @@ export default function RegisterScreen() {
 
       {/* MODAL: Success */}
       <Modal visible={otpStep === 'success'} transparent animationType="fade">
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => {}}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { }}>
+          <TouchableOpacity activeOpacity={1} onPress={() => { }}>
             <View style={[styles.otpModal, { backgroundColor: colors.surface }]}>
               <Ionicons name="checkmark-circle" size={64} color={colors.success} />
               <Text style={[styles.otpModalTitle, { color: colors.text, marginTop: 12 }]}>¡Cuenta creada con éxito!</Text>
               <Text style={[styles.otpModalSubtitle, { color: colors.textSecondary }]}>
-                Tu cuenta ha sido verificada. Ya puedes iniciar sesión.
+                Tu cuenta ha sido verificada. Ya puedes usar la app.
               </Text>
               <TouchableOpacity
                 style={[styles.otpVerifyBtn, { backgroundColor: colors.primary, marginTop: 16 }]}
                 onPress={handleSuccessClose}
               >
-                <Text style={[styles.otpVerifyBtnText, { color: colors.primaryText }]}>Ir al login</Text>
+                <Text style={[styles.otpVerifyBtnText, { color: colors.primaryText }]}>Ir a la app</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -370,7 +649,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   brandBlock: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   icon: {
     width: 80,
@@ -382,13 +661,6 @@ const styles = StyleSheet.create({
     height: 180,
     marginBottom: -60,
   },
-  phoneHint: {
-    fontSize: 12,
-    marginTop: -8,
-    marginBottom: 12,
-    marginLeft: 4,
-  },
-  // OTP Modals
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -399,6 +671,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
+  },
+  otpCloseBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    padding: 4,
+    zIndex: 1,
   },
   otpModalTitle: {
     fontSize: 20,
@@ -450,19 +729,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  otpResendBtn: {
+  otpResendRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
     marginTop: 16,
+  },
+  otpResendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     padding: 8,
   },
   otpResendText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-  },
-  otpBackBtn: {
-    marginTop: 8,
-    padding: 8,
-  },
-  otpBackText: {
-    fontSize: 14,
   },
 });
