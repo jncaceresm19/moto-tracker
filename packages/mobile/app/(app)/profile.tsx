@@ -369,7 +369,7 @@ export default function ProfileScreen() {
     header: { alignItems: 'center', paddingVertical: 32, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     name: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
     email: { fontSize: 14, color: colors.textSecondary },
-    requirementsLogoImage: { width: 32, height: 32, resizeMode: 'contain' },
+    requirementsLogoImage: { width: 100, height: 100, resizeMode: 'contain' },
     planBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -420,7 +420,7 @@ export default function ProfileScreen() {
     requirementsList: { flex: 1, justifyContent: 'center' },
     requirementsDivider: { width: 1, alignSelf: 'stretch' },
     requirementsLogoWrap: { width: 76, alignItems: 'center', justifyContent: 'center' },
-    requirementsLogoCircle: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    requirementsLogoCircle: { width: 100, height: 100, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
     requirementsLogoText: { fontSize: 15, fontWeight: '600', letterSpacing: -0.5 },
     requirementRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
     requirementText: { fontSize: 13 },
@@ -458,6 +458,8 @@ export default function ProfileScreen() {
     tutorialDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 20 },
     tutorialDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
     tutorialDotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: colors.primary },
+    tutorialActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
+    tutorialCancelText: { color: colors.primary, fontSize: 16, fontWeight: '600', paddingVertical: 8 },
   });
 
   return (
@@ -692,17 +694,9 @@ export default function ProfileScreen() {
 
           <View style={dynamicStyles.passwordCard}>
             <View style={{ position: 'relative' }}>
-              <TextInput
-                style={[dynamicStyles.input, { paddingRight: 44 }]}
-                placeholder={t('currentPassword')}
-                placeholderTextColor={colors.textMuted}
-                value={passwords.current}
-                onChangeText={(t2) => { setPasswords((p) => ({ ...p, current: t2 })); setErrors((p) => ({ ...p, current: '' })); }}
-                secureTextEntry={!showCurrent}
-              />
               <TouchableOpacity
                 onPress={() => setShowCurrent(!showCurrent)}
-                style={{ position: 'absolute', right: 12, top: 12 }}
+                style={{ position: 'absolute', left: 12, top: 12, zIndex: 1 }}
               >
                 <Ionicons
                   name={showCurrent ? 'eye-off' : 'eye'}
@@ -710,22 +704,22 @@ export default function ProfileScreen() {
                   color={colors.textMuted}
                 />
               </TouchableOpacity>
+              <TextInput
+                style={[dynamicStyles.input, { paddingLeft: 44 }]}
+                placeholder={t('currentPassword')}
+                placeholderTextColor={colors.textMuted}
+                value={passwords.current}
+                onChangeText={(t2) => { setPasswords((p) => ({ ...p, current: t2 })); setErrors((p) => ({ ...p, current: '' })); }}
+                secureTextEntry={!showCurrent}
+              />
             </View>
             {errors.current ? <Text style={dynamicStyles.errorText}>{errors.current}</Text> : null}
             <Text style={[styles.payHint, { color: colors.textMuted }]}>La nueva contraseña no puede ser igual a la actual</Text>
 
             <View style={{ position: 'relative' }}>
-              <TextInput
-                style={[dynamicStyles.input, { paddingRight: 44 }]}
-                placeholder={t('newPassword')}
-                placeholderTextColor={colors.textMuted}
-                value={passwords.newPass}
-                onChangeText={(t2) => { setPasswords((p) => ({ ...p, newPass: t2 })); setErrors((p) => ({ ...p, newPass: '' })); }}
-                secureTextEntry={!showNew}
-              />
               <TouchableOpacity
                 onPress={() => setShowNew(!showNew)}
-                style={{ position: 'absolute', right: 12, top: 12 }}
+                style={{ position: 'absolute', left: 12, top: 12, zIndex: 1 }}
               >
                 <Ionicons
                   name={showNew ? 'eye-off' : 'eye'}
@@ -733,6 +727,14 @@ export default function ProfileScreen() {
                   color={colors.textMuted}
                 />
               </TouchableOpacity>
+              <TextInput
+                style={[dynamicStyles.input, { paddingLeft: 44 }]}
+                placeholder={t('newPassword')}
+                placeholderTextColor={colors.textMuted}
+                value={passwords.newPass}
+                onChangeText={(t2) => { setPasswords((p) => ({ ...p, newPass: t2 })); setErrors((p) => ({ ...p, newPass: '' })); }}
+                secureTextEntry={!showNew}
+              />
             </View>
             {errors.newPass ? <Text style={dynamicStyles.errorText}>{errors.newPass}</Text> : null}
 
@@ -747,17 +749,9 @@ export default function ProfileScreen() {
             )}
 
             <View style={{ position: 'relative' }}>
-              <TextInput
-                style={[dynamicStyles.input, { paddingRight: 44 }]}
-                placeholder={t('confirmPassword')}
-                placeholderTextColor={colors.textMuted}
-                value={passwords.confirm}
-                onChangeText={(t2) => { setPasswords((p) => ({ ...p, confirm: t2 })); setErrors((p) => ({ ...p, confirm: '' })); }}
-                secureTextEntry={!showConfirm}
-              />
               <TouchableOpacity
                 onPress={() => setShowConfirm(!showConfirm)}
-                style={{ position: 'absolute', right: 12, top: 12 }}
+                style={{ position: 'absolute', left: 12, top: 12, zIndex: 1 }}
               >
                 <Ionicons
                   name={showConfirm ? 'eye-off' : 'eye'}
@@ -765,6 +759,14 @@ export default function ProfileScreen() {
                   color={colors.textMuted}
                 />
               </TouchableOpacity>
+              <TextInput
+                style={[dynamicStyles.input, { paddingLeft: 44 }]}
+                placeholder={t('confirmPassword')}
+                placeholderTextColor={colors.textMuted}
+                value={passwords.confirm}
+                onChangeText={(t2) => { setPasswords((p) => ({ ...p, confirm: t2 })); setErrors((p) => ({ ...p, confirm: '' })); }}
+                secureTextEntry={!showConfirm}
+              />
             </View>
             {errors.confirm ? <Text style={dynamicStyles.errorText}>{errors.confirm}</Text> : null}
 
@@ -798,15 +800,10 @@ export default function ProfileScreen() {
               </View>
 
               <View style={[dynamicStyles.requirementsDivider, { backgroundColor: colors.border }]} />
-
-              <View style={dynamicStyles.requirementsLogoWrap}>
-                <View style={[dynamicStyles.requirementsLogoCircle, { backgroundColor: colors.primary + '15' }]}>
-                  <Image
-                    source={require('../../assets/logo.jpeg')}
-                    style={dynamicStyles.requirementsLogoImage}
-                  />
-                </View>
-              </View>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={dynamicStyles.requirementsLogoImage}
+              />
             </View>
           </View>
           <View style={dynamicStyles.divider} />
@@ -938,7 +935,6 @@ export default function ProfileScreen() {
 
             {deleteStep === 1 && (
               <>
-                <Text style={dynamicStyles.deleteFlowStep}>Paso 1 de 3</Text>
                 <Text style={dynamicStyles.deleteFlowTitle}>¿Por qué eliminas tu cuenta?</Text>
                 <Text style={dynamicStyles.deleteFlowSubtitle}>Ayúdanos a mejorar. Es opcional.</Text>
 
@@ -994,7 +990,6 @@ export default function ProfileScreen() {
 
             {deleteStep === 2 && (
               <>
-                <Text style={dynamicStyles.deleteFlowStep}>Paso 2 de 3</Text>
                 <Text style={dynamicStyles.deleteFlowTitle}>¿Cómo calificarías tu experiencia?</Text>
                 <Text style={dynamicStyles.deleteFlowSubtitle}>También es opcional.</Text>
 
@@ -1046,9 +1041,9 @@ export default function ProfileScreen() {
               ))}
             </View>
 
-            <View style={dynamicStyles.deleteFlowActions}>
-              <TouchableOpacity style={dynamicStyles.deleteFlowSecondaryBtn} activeOpacity={0.7} onPress={closeTutorial}>
-                <Text style={dynamicStyles.deleteFlowSecondaryBtnText}>
+            <View style={dynamicStyles.tutorialActions}>
+              <TouchableOpacity activeOpacity={0.7} onPress={closeTutorial}>
+                <Text style={dynamicStyles.tutorialCancelText}>
                   {tutorialStep === tutorialSteps.length - 1 ? 'Cerrar' : 'Omitir'}
                 </Text>
               </TouchableOpacity>
