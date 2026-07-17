@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, TextInput, ActivityIndicator, Switch, Image, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { File } from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
@@ -17,6 +17,10 @@ export default function ProfileScreen() {
   const { mode, colors, toggleTheme } = useTheme();
   const { language, t, setLanguage } = useLanguage();
   const router = useRouter();
+
+  // TODO: reemplazar por el plan real del usuario (ver PR #9 - Perfil / access_type)
+  const CURRENT_PLAN = { name: 'Piloto', icon: 'bicycle-outline' as const };
+
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: user?.email?.split('@')[0] || '', email: user?.email || '', phone: (user as any)?.phone || '' });
@@ -55,6 +59,59 @@ export default function ProfileScreen() {
     'Encontré otra app',
     'Otro motivo',
   ];
+
+  // --- App tutorial (onboarding de 4 pasos) ---
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+
+  const tutorialSteps: { icon: keyof typeof Ionicons.glyphMap; iconColor: string; iconBg: string; title: string; text: string }[] = [
+    {
+      icon: 'warning-outline',
+      iconColor: colors.danger,
+      iconBg: mode === 'dark' ? 'rgba(255,59,48,0.15)' : '#FDEBEA',
+      title: 'Alertas de robos',
+      text: 'Recibe avisos en tiempo real cuando se reporten robos de motos cerca de ti.',
+    },
+    {
+      icon: 'location-outline',
+      iconColor: colors.primary,
+      iconBg: mode === 'dark' ? 'rgba(10,132,255,0.15)' : '#EAF2FE',
+      title: 'Servicios cercanos',
+      text: 'Encuentra bencineras, talleres, hospitales y vulcanizaciones en un rango de 5 km.',
+    },
+    {
+      icon: 'flag-outline',
+      iconColor: colors.danger,
+      iconBg: mode === 'dark' ? 'rgba(255,59,48,0.15)' : '#FDEBEA',
+      title: 'Publica un robo',
+      text: 'Si tu moto o la de alguien más fue robada, publícalo para alertar a la comunidad.',
+    },
+    {
+      icon: 'bicycle-outline',
+      iconColor: colors.primary,
+      iconBg: mode === 'dark' ? 'rgba(10,132,255,0.15)' : '#EAF2FE',
+      title: 'Registra tu moto',
+      text: 'Guarda documentos, mantenciones, combustible y la ubicación GPS de tu motocicleta.',
+    },
+  ];
+
+  const openTutorial = () => {
+    setTutorialStep(0);
+    setShowTutorial(true);
+  };
+
+  const closeTutorial = () => {
+    setShowTutorial(false);
+    setTutorialStep(0);
+  };
+
+  const handleTutorialNext = () => {
+    if (tutorialStep < tutorialSteps.length - 1) {
+      setTutorialStep(tutorialStep + 1);
+    } else {
+      closeTutorial();
+    }
+  };
 
   useEffect(() => {
     loadBiometricStatus();
@@ -207,8 +264,12 @@ export default function ProfileScreen() {
       }
 
       if (avatarUri) {
-        const file = new File(avatarUri);
-        const base64 = await file.base64();
+        // File.base64() from the "new" expo-file-system module was added incrementally
+        // across v19 patch releases and can be missing depending on installed version.
+        // The legacy readAsStringAsync API is stable across versions, so we use it here.
+        const base64 = await FileSystemLegacy.readAsStringAsync(avatarUri, {
+          encoding: 'base64',
+        });
         updateData.avatarUrl = `data:image/jpeg;base64,${base64}`;
       }
 
@@ -308,6 +369,20 @@ export default function ProfileScreen() {
     header: { alignItems: 'center', paddingVertical: 32, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     name: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 4 },
     email: { fontSize: 14, color: colors.textSecondary },
+    requirementsLogoImage: { width: 32, height: 32, resizeMode: 'contain' },
+    planBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceSecondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    planBadgeText: { fontSize: 13, fontWeight: '600', color: colors.text },
     sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', marginTop: 24, marginBottom: 8, marginHorizontal: 16 },
     section: { backgroundColor: colors.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
@@ -318,7 +393,7 @@ export default function ProfileScreen() {
     modal: { flex: 1, backgroundColor: colors.background },
     modalScroll: { padding: 20 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
-    cancel: { color: colors.primary, fontSize: 16 },
+    cancel: { color: colors.textSecondary, fontSize: 16 },
     input: { borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10, backgroundColor: colors.inputBg, color: colors.text },
     errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
     saveBtn: { backgroundColor: colors.success, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
@@ -339,7 +414,14 @@ export default function ProfileScreen() {
     deleteAccountBtnText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
     // --- Password card / requirements / strength / tip / forgot-password ---
     passwordCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16, marginBottom: 5 },
-    requirementsTitle: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 8, marginTop: 20 },
+    requirementsCard: { marginTop: 20, borderRadius: 10, padding: 14, backgroundColor: colors.surfaceSecondary },
+    requirementsCardTitle: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 12 },
+    requirementsCardRow: { flexDirection: 'row', alignItems: 'stretch', gap: 14 },
+    requirementsList: { flex: 1, justifyContent: 'center' },
+    requirementsDivider: { width: 1, alignSelf: 'stretch' },
+    requirementsLogoWrap: { width: 76, alignItems: 'center', justifyContent: 'center' },
+    requirementsLogoCircle: { width: 52, height: 52, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    requirementsLogoText: { fontSize: 15, fontWeight: '600', letterSpacing: -0.5 },
     requirementRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
     requirementText: { fontSize: 13 },
     strengthTrack: { height: 4, borderRadius: 2, backgroundColor: colors.border, marginTop: 4, marginBottom: 4, overflow: 'hidden' },
@@ -367,6 +449,15 @@ export default function ProfileScreen() {
     deleteFlowPrimaryBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 8 },
     deleteFlowPrimaryBtnText: { color: colors.primaryText, fontWeight: '600' },
     starsRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 16 },
+    // --- App tutorial (onboarding) ---
+    tutorialClose: { alignItems: 'flex-end', marginBottom: 4 },
+    tutorialStepLabel: { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginBottom: 16 },
+    tutorialIconWrapper: { alignSelf: 'center', width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+    tutorialTitle: { fontSize: 18, fontWeight: '600', color: colors.text, textAlign: 'center', marginBottom: 8 },
+    tutorialText: { fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+    tutorialDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 20 },
+    tutorialDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
+    tutorialDotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: colors.primary },
   });
 
   return (
@@ -381,6 +472,12 @@ export default function ProfileScreen() {
           </View>
         )}
         <Text style={dynamicStyles.name}>{user?.name || user?.email?.split('@')[0] || 'User'}</Text>
+
+        {/* Plan actual — card informativa */}
+        <View style={dynamicStyles.planBadge}>
+          <Ionicons name={CURRENT_PLAN.icon} size={14} color={colors.primary} />
+          <Text style={dynamicStyles.planBadgeText}>{CURRENT_PLAN.name}</Text>
+        </View>
       </View>
 
       {/* Account Section */}
@@ -428,8 +525,8 @@ export default function ProfileScreen() {
             <Ionicons name="shield-checkmark-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('motoTrakerAccount')}</Text>
           </View>
-          <View style={[dynamicStyles.badge, motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? { backgroundColor: colors.success } : { backgroundColor: colors.surfaceSecondary }]}>
-            <Text style={[dynamicStyles.badgeText, !(motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0) && { color: colors.textSecondary }]}>
+          <View style={[dynamicStyles.badge, { backgroundColor: colors.success }]}>
+            <Text style={dynamicStyles.badgeText}>
               {motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? 'Verificado' : t('connected')}
             </Text>
           </View>
@@ -517,7 +614,7 @@ export default function ProfileScreen() {
       {/* Support Section */}
       <Text style={dynamicStyles.sectionTitle}>{t('support')}</Text>
       <View style={dynamicStyles.section}>
-        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={() => showAlert(t('helpTitle'), t('helpMessage'), [{ text: 'OK' }], 'help-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={() => showAlert(t('helpTitle'), t('helpMessage'), [{ text: 'OK' }], 'help-circle', colors.primary)}>
           <View style={styles.rowLeft}>
             <Ionicons name="help-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('helpSupport')}</Text>
@@ -525,7 +622,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={() => showAlert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`, [{ text: 'OK' }], 'information-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={() => showAlert(t('aboutTitle'), `${t('aboutVersion')}\n\n${t('aboutDescription')}`, [{ text: 'OK' }], 'information-circle', colors.primary)}>
           <View style={styles.rowLeft}>
             <Ionicons name="information-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('about')}</Text>
@@ -533,7 +630,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={() => showAlert(t('comingSoon'), t('appTutorialComingSoon'), [{ text: 'OK' }], 'information-circle', '#007AFF')}>
+        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={openTutorial}>
           <View style={styles.rowLeft}>
             <Ionicons name="play-circle-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('appTutorial')}</Text>
@@ -552,7 +649,7 @@ export default function ProfileScreen() {
                 { text: t('viewExample'), onPress: () => Linking.openURL('https://es.aliexpress.com/item/1005006121921125.html') },
               ],
               'locate',
-              '#007AFF'
+              colors.primary
             )
           }
         >
@@ -676,25 +773,42 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
           <View style={dynamicStyles.divider} />
-          {/* Password requirements checklist */}
-          <Text style={dynamicStyles.requirementsTitle}>Tu contraseña debe tener</Text>
-          {[
-            { ok: passwordChecks.minLength, label: 'Mínimo 8 caracteres' },
-            { ok: passwordChecks.hasUpper, label: 'Una letra mayúscula' },
-            { ok: passwordChecks.hasNumber, label: 'Un número' },
-            { ok: passwordChecks.hasSpecial, label: 'Un carácter especial' },
-          ].map((req) => (
-            <View key={req.label} style={dynamicStyles.requirementRow}>
-              <Ionicons
-                name={req.ok ? 'checkmark-circle' : 'ellipse-outline'}
-                size={16}
-                color={req.ok ? colors.success : colors.textMuted}
-              />
-              <Text style={[dynamicStyles.requirementText, { color: req.ok ? colors.success : colors.textMuted }]}>
-                {req.label}
-              </Text>
+          {/* Password requirements — card style matching accountInfo, con el logo a la derecha */}
+          <View style={dynamicStyles.requirementsCard}>
+            <Text style={dynamicStyles.requirementsCardTitle}>Tu contraseña debe tener</Text>
+            <View style={dynamicStyles.requirementsCardRow}>
+              <View style={dynamicStyles.requirementsList}>
+                {[
+                  { ok: passwordChecks.minLength, label: 'Mínimo 8 caracteres' },
+                  { ok: passwordChecks.hasUpper, label: 'Una letra mayúscula' },
+                  { ok: passwordChecks.hasNumber, label: 'Un número' },
+                  { ok: passwordChecks.hasSpecial, label: 'Un carácter especial' },
+                ].map((req) => (
+                  <View key={req.label} style={dynamicStyles.requirementRow}>
+                    <Ionicons
+                      name={req.ok ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={16}
+                      color={req.ok ? colors.success : colors.textMuted}
+                    />
+                    <Text style={[dynamicStyles.requirementText, { color: req.ok ? colors.success : colors.textMuted }]}>
+                      {req.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={[dynamicStyles.requirementsDivider, { backgroundColor: colors.border }]} />
+
+              <View style={dynamicStyles.requirementsLogoWrap}>
+                <View style={[dynamicStyles.requirementsLogoCircle, { backgroundColor: colors.primary + '15' }]}>
+                  <Image
+                    source={require('../../assets/logo.jpeg')}
+                    style={dynamicStyles.requirementsLogoImage}
+                  />
+                </View>
+              </View>
             </View>
-          ))}
+          </View>
           <View style={dynamicStyles.divider} />
 
           {/* Security tip */}
@@ -783,13 +897,8 @@ export default function ProfileScreen() {
             {/* Account Info */}
             <View style={dynamicStyles.accountInfo}>
               <View style={[dynamicStyles.accountInfoRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
-                <Ionicons name="mail-outline" size={16} color={colors.textMuted} />
-                <Text style={dynamicStyles.accountInfoLabel}>{t('email')}</Text>
-                <Text style={dynamicStyles.accountInfoValue}>{user?.email || '—'}</Text>
-              </View>
-              <View style={[dynamicStyles.accountInfoRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
                 <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
-                <Text style={dynamicStyles.accountInfoLabel}>Miembro desde</Text>
+                <Text style={dynamicStyles.accountInfoLabel}>Moto-Traker desde</Text>
                 <Text style={dynamicStyles.accountInfoValue}>
                   {(user as any)?.createdAt
                     ? new Date((user as any).createdAt).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -800,6 +909,11 @@ export default function ProfileScreen() {
                 <Ionicons name="bicycle-outline" size={16} color={colors.textMuted} />
                 <Text style={dynamicStyles.accountInfoLabel}>Motos registradas</Text>
                 <Text style={dynamicStyles.accountInfoValue}>{motorcyclesCount ?? '—'}</Text>
+              </View>
+              <View style={[dynamicStyles.accountInfoRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+                <Ionicons name="locate-outline" size={16} color={colors.textMuted} />
+                <Text style={dynamicStyles.accountInfoLabel}>GPS registrados</Text>
+                <Text style={dynamicStyles.accountInfoValue}>-</Text>
               </View>
               <View style={[dynamicStyles.accountInfoRow, { borderBottomWidth: 0 }]}>
                 <Ionicons name="shield-checkmark-outline" size={16} color={colors.textMuted} />
@@ -907,6 +1021,43 @@ export default function ProfileScreen() {
               </>
             )}
 
+          </View>
+        </View>
+      </Modal>
+
+      {/* App Tutorial Modal — onboarding de 4 pasos */}
+      <Modal visible={showTutorial} animationType="fade" transparent presentationStyle="overFullScreen">
+        <View style={dynamicStyles.deleteFlowOverlay}>
+          <View style={dynamicStyles.deleteFlowCard}>
+            <TouchableOpacity style={dynamicStyles.tutorialClose} activeOpacity={0.6} onPress={closeTutorial}>
+              <Ionicons name="close" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={[dynamicStyles.tutorialIconWrapper, { backgroundColor: tutorialSteps[tutorialStep].iconBg }]}>
+              <Ionicons name={tutorialSteps[tutorialStep].icon} size={32} color={tutorialSteps[tutorialStep].iconColor} />
+            </View>
+
+            <Text style={dynamicStyles.tutorialTitle}>{tutorialSteps[tutorialStep].title}</Text>
+            <Text style={dynamicStyles.tutorialText}>{tutorialSteps[tutorialStep].text}</Text>
+
+            <View style={dynamicStyles.tutorialDots}>
+              {tutorialSteps.map((_, i) => (
+                <View key={i} style={i === tutorialStep ? dynamicStyles.tutorialDotActive : dynamicStyles.tutorialDot} />
+              ))}
+            </View>
+
+            <View style={dynamicStyles.deleteFlowActions}>
+              <TouchableOpacity style={dynamicStyles.deleteFlowSecondaryBtn} activeOpacity={0.7} onPress={closeTutorial}>
+                <Text style={dynamicStyles.deleteFlowSecondaryBtnText}>
+                  {tutorialStep === tutorialSteps.length - 1 ? 'Cerrar' : 'Omitir'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={dynamicStyles.deleteFlowPrimaryBtn} activeOpacity={0.8} onPress={handleTutorialNext}>
+                <Text style={dynamicStyles.deleteFlowPrimaryBtnText}>
+                  {tutorialStep === tutorialSteps.length - 1 ? 'Finalizar' : 'Siguiente'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
