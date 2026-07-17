@@ -31,23 +31,26 @@ export function CustomAlert({ visible, title, message, buttons, icon, iconColor,
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: colors.surface }]}>
           {icon && (
             <View style={[styles.iconContainer, { backgroundColor: primary + '15' }]}>
               <Ionicons name={icon} size={32} color={primary} />
             </View>
           )}
-          <Text style={styles.title}>{title}</Text>
-          {message ? <Text style={styles.message}>{message}</Text> : null}
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+          {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
           <View style={[styles.buttonRow, buttons.length === 1 && { justifyContent: 'center' }]}>
             {buttons.map((btn, i) => (
               <TouchableOpacity
                 key={i}
                 style={[
                   styles.button,
-                  { backgroundColor: primary },
-                  btn.style === 'destructive' && styles.destructiveBtn,
-                  btn.style === 'cancel' && styles.cancelBtn,
+                  btn.style === 'cancel' 
+                    ? { backgroundColor: colors.surfaceSecondary || colors.inputBg }
+                    : btn.style === 'destructive' 
+                      ? styles.destructiveBtn
+                      : { backgroundColor: primary },
+                  btn.style === 'cancel' && { borderWidth: 1, borderColor: colors.border },
                   buttons.length === 1 && styles.singleBtn,
                 ]}
                 onPress={() => handlePress(btn)}
@@ -57,7 +60,7 @@ export function CustomAlert({ visible, title, message, buttons, icon, iconColor,
                   style={[
                     styles.buttonText,
                     btn.style === 'destructive' && styles.destructiveText,
-                    btn.style === 'cancel' && styles.cancelText,
+                    btn.style === 'cancel' && { color: colors.text },
                   ]}
                 >
                   {btn.text}
@@ -105,12 +108,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#1a1a1a',
   },
   message: {
     fontSize: 14,
     textAlign: 'center',
-    color: '#666',
     lineHeight: 20,
     marginBottom: 24,
   },
@@ -128,9 +129,6 @@ const styles = StyleSheet.create({
   singleBtn: {
     maxWidth: 200,
   },
-  cancelBtn: {
-    backgroundColor: '#F0F0F0',
-  },
   destructiveBtn: {
     backgroundColor: '#FF3B30',
   },
@@ -139,8 +137,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  cancelText: {
-    color: '#333',
+  destructiveText: {
+    color: '#fff',
   },
   destructiveText: {
     color: '#fff',

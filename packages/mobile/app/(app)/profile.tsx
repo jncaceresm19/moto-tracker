@@ -458,8 +458,9 @@ export default function ProfileScreen() {
     tutorialDots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 20 },
     tutorialDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
     tutorialDotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: colors.primary },
-    tutorialActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 },
-    tutorialCancelText: { color: colors.primary, fontSize: 16, fontWeight: '600', paddingVertical: 8 },
+    tutorialActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+    tutorialActionBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 10 },
+    tutorialActionBtnText: { fontSize: 16, fontWeight: '600' },
   });
 
   return (
@@ -1042,13 +1043,13 @@ export default function ProfileScreen() {
             </View>
 
             <View style={dynamicStyles.tutorialActions}>
-              <TouchableOpacity activeOpacity={0.7} onPress={closeTutorial}>
-                <Text style={dynamicStyles.tutorialCancelText}>
+              <TouchableOpacity style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }]} activeOpacity={0.7} onPress={closeTutorial}>
+                <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.text }]}>
                   {tutorialStep === tutorialSteps.length - 1 ? 'Cerrar' : 'Omitir'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={dynamicStyles.deleteFlowPrimaryBtn} activeOpacity={0.8} onPress={handleTutorialNext}>
-                <Text style={dynamicStyles.deleteFlowPrimaryBtnText}>
+              <TouchableOpacity style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} onPress={handleTutorialNext}>
+                <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.primaryText }]}>
                   {tutorialStep === tutorialSteps.length - 1 ? 'Finalizar' : 'Siguiente'}
                 </Text>
               </TouchableOpacity>
