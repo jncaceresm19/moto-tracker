@@ -979,11 +979,11 @@ export default function ProfileScreen() {
                 />
 
                 <View style={dynamicStyles.deleteFlowActions}>
-                  <TouchableOpacity style={dynamicStyles.deleteFlowSecondaryBtn} activeOpacity={0.7} onPress={resetDeleteFlow}>
-                    <Text style={dynamicStyles.deleteFlowSecondaryBtnText}>Cancelar</Text>
+                  <TouchableOpacity style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }]} activeOpacity={0.7} onPress={resetDeleteFlow}>
+                    <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.text }]}>Cancelar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={dynamicStyles.deleteFlowPrimaryBtn} activeOpacity={0.8} onPress={goToStep2}>
-                    <Text style={dynamicStyles.deleteFlowPrimaryBtnText}>Continuar</Text>
+                  <TouchableOpacity style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} onPress={goToStep2}>
+                    <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.primaryText }]}>Continuar</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -1007,11 +1007,11 @@ export default function ProfileScreen() {
                 </View>
 
                 <View style={dynamicStyles.deleteFlowActions}>
-                  <TouchableOpacity style={dynamicStyles.deleteFlowSecondaryBtn} activeOpacity={0.7} onPress={finishSurveyAndConfirm}>
-                    <Text style={dynamicStyles.deleteFlowSecondaryBtnText}>Omitir</Text>
+                  <TouchableOpacity style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }]} activeOpacity={0.7} onPress={finishSurveyAndConfirm}>
+                    <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.text }]}>Omitir</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={dynamicStyles.deleteFlowPrimaryBtn} activeOpacity={0.8} onPress={finishSurveyAndConfirm}>
-                    <Text style={dynamicStyles.deleteFlowPrimaryBtnText}>Continuar</Text>
+                  <TouchableOpacity style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8} onPress={finishSurveyAndConfirm}>
+                    <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.primaryText }]}>Continuar</Text>
                   </TouchableOpacity>
                 </View>
               </>
