@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useAuth } from '../../src/auth-context';
@@ -48,6 +49,8 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState('');
   const [rut, setRut] = useState('');
   const [phone, setPhone] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Step 2 fields
   const [password, setPassword] = useState('');
@@ -106,6 +109,21 @@ export default function RegisterScreen() {
       newErrors.phone = 'El teléfono debe tener 8 dígitos';
     }
 
+    if (!birthDate.trim()) {
+      newErrors.birthDate = 'La fecha de nacimiento es obligatoria';
+    } else {
+      const birth = new Date(birthDate);
+      const today = new Date();
+      let age = today.getFullYear() - birth.getFullYear();
+      const monthDiff = today.getMonth() - birth.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        newErrors.birthDate = 'Debes ser mayor de 18 años para registrarte';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -141,7 +159,7 @@ export default function RegisterScreen() {
 
     setLoading(true);
     try {
-      await signUp(email, password, name, phone ? `+569${phone}` : undefined, rut);
+      await signUp(email, password, name, phone ? `+569${phone}` : undefined, rut, birthDate);
       setOtpStep('choose');
     } catch (err) {
       showAlert(t('error'), err instanceof Error ? err.message : t('registrationFailed'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
@@ -419,6 +437,40 @@ export default function RegisterScreen() {
               <Text style={dynamicStyles.errorText}>{errors.phone}</Text>
             ) : (
               <View style={{ marginBottom: 12 }} />
+            )}
+          </View>
+
+          {/* Birth Date */}
+          <View style={dynamicStyles.inputWrapper}>
+            <TouchableOpacity
+              style={[dynamicStyles.input, errors.birthDate && dynamicStyles.inputError, { justifyContent: 'center' }]}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={{ color: birthDate ? colors.text : colors.textMuted, fontSize: 16 }}>
+                {birthDate ? new Date(birthDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Fecha de nacimiento'}
+              </Text>
+            </TouchableOpacity>
+            {errors.birthDate ? (
+              <Text style={dynamicStyles.errorText}>{errors.birthDate}</Text>
+            ) : (
+              <View style={{ marginBottom: 12 }} />
+            )}
+            {showDatePicker && (
+              <DateTimePicker
+                value={birthDate ? new Date(birthDate) : new Date(2000, 0, 1)}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (selectedDate && event.type !== 'dismissed') {
+                    const isoDate = selectedDate.toISOString().split('T')[0];
+                    setBirthDate(isoDate);
+                    if (errors.birthDate) setErrors(prev => ({ ...prev, birthDate: '' }));
+                  }
+                }}
+                maximumDate={new Date()}
+                minimumDate={new Date(1920, 0, 1)}
+              />
             )}
           </View>
 

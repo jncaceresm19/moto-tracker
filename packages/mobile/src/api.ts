@@ -57,8 +57,8 @@ export async function api<T = unknown>(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // If 401, try refresh token
-  if (res.status === 401) {
+  // If 401, try refresh token (skip for auth endpoints — they return 401 for bad credentials)
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
     const refreshToken = await AsyncStorage.getItem('refreshToken');
     if (!refreshToken) {
       // No refresh token stored → user logged in with old code, force re-login
@@ -97,7 +97,9 @@ export async function api<T = unknown>(
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data.error?.message || 'Request failed');
+    const details = data.error?.details;
+    const msg = data.error?.message || 'Request failed';
+    throw new Error(details ? `${msg}: ${JSON.stringify(details)}` : msg);
   }
 
   return data.data ?? data;
@@ -105,7 +107,7 @@ export async function api<T = unknown>(
 
 // Auth
 export async function login(email: string, password: string) {
-  const data = await api<{ user: { id: string; email: string }; accessToken: string; refreshToken: string }>(
+  const data = await api<{ user: { id: string; email: string; name?: string; phone?: string; avatarUrl?: string; role?: string; createdAt?: string }; accessToken: string; refreshToken: string }>(
     '/api/auth/login',
     { method: 'POST', body: { email, password } }
   );
@@ -114,14 +116,30 @@ export async function login(email: string, password: string) {
   return data;
 }
 
-export async function register(email: string, password: string, name: string, phone?: string, rut?: string) {
-  const data = await api<{ user: { id: string; email: string }; accessToken: string; refreshToken: string }>(
+export async function register(email: string, password: string, name: string, phone?: string, rut?: string, birthDate?: string) {
+  // Step 1: Save pending user + send OTP (no tokens yet)
+  await api<{ message: string }>(
     '/api/auth/register',
-    { method: 'POST', body: { email, password, name, phone, rut } }
+    { method: 'POST', body: { email, password, name, phone, rut, birthDate } }
+  );
+}
+
+export async function verifyRegistration(email: string, code: string) {
+  // Step 2: Verify OTP + create user + get tokens
+  const data = await api<{ user: { id: string; email: string }; accessToken: string; refreshToken: string }>(
+    '/api/auth/register/verify',
+    { method: 'POST', body: { email, code } }
   );
   await AsyncStorage.setItem('accessToken', data.accessToken);
   await AsyncStorage.setItem('refreshToken', data.refreshToken);
   return data;
+}
+
+export async function resendRegistrationOtp(email: string, tipo: 'email' | 'phone' = 'email') {
+  return api<{ message: string }>('/api/auth/register/resend', {
+    method: 'POST',
+    body: { email, tipo },
+  });
 }
 
 export async function logout() {
@@ -139,6 +157,21 @@ export async function changePassword(currentPassword: string, newPassword: strin
 export async function deleteAccount() {
   await api<{ message: string }>('/api/profile', { method: 'DELETE' });
   await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+}
+
+// Forgot Password
+export async function forgotPassword(email: string) {
+  return api<{ message: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: { email },
+  });
+}
+
+export async function resetPassword(email: string, code: string, newPassword: string) {
+  return api<{ message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: { email, code, newPassword },
+  });
 }
 
 // Motorcycles
@@ -306,6 +339,7 @@ export interface FuelRecord {
   pricePerLiter: number;
   totalCost: number;
   location?: string;
+  octane?: string;
   recordedAt: string;
   notes?: string;
   createdAt: string;
@@ -317,7 +351,7 @@ export async function listFuelRecords(motorcycleId: string): Promise<FuelRecord[
 
 export async function createFuelRecord(
   motorcycleId: string,
-  data: { stationName?: string; liters: number; pricePerLiter: number; location?: string; recordedAt: string; notes?: string }
+  data: { stationName?: string; liters: number; pricePerLiter: number; location?: string; octane?: string; recordedAt: string; notes?: string }
 ): Promise<FuelRecord> {
   return api<FuelRecord>(`/api/motorcycles/${motorcycleId}/fuel`, { method: 'POST', body: data });
 }
@@ -325,7 +359,7 @@ export async function createFuelRecord(
 export async function updateFuelRecord(
   motorcycleId: string,
   entryId: string,
-  data: { stationName?: string | null; liters?: number; pricePerLiter?: number; location?: string | null; recordedAt?: string; notes?: string | null }
+  data: { stationName?: string | null; liters?: number; pricePerLiter?: number; location?: string | null; octane?: string | null; recordedAt?: string; notes?: string | null }
 ): Promise<FuelRecord> {
   return api<FuelRecord>(`/api/motorcycles/${motorcycleId}/fuel/${entryId}`, { method: 'PUT', body: data });
 }

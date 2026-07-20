@@ -40,6 +40,8 @@ export default function HomeScreen() {
   const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; userAvatar?: string; text: string; timeAgo: string }[]>>({});
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
+  const [nearbySearched, setNearbySearched] = useState(false);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
   const [activeMoto, setActiveMoto] = useState<ActiveMoto | null>(null);
   const [showActiveMotoModal, setShowActiveMotoModal] = useState(false);
   const [activationAddress, setActivationAddress] = useState<string | null>(null);
@@ -263,7 +265,7 @@ export default function HomeScreen() {
     loadGasStations();
     loadMotorcycles();
     loadTheftAlerts();
-    loadNearbyPlaces();
+    // loadNearbyPlaces() — now triggered by user via "Buscar" button
     loadActiveMoto();
     loadUnreadCount();
     loadRainAlert();
@@ -535,6 +537,9 @@ export default function HomeScreen() {
                 status={theftAlerts[0].status as 'active' | 'recovered' | 'closed'}
                 recoveredAt={theftAlerts[0].recoveredAt}
                 alertOwnerId={theftAlerts[0].userId}
+                ownerName={theftAlerts[0].ownerName}
+                ownerAvatarUrl={theftAlerts[0].ownerAvatarUrl}
+                ownerVerified={theftAlerts[0].ownerVerified}
                 responses={theftComments[theftAlerts[0].id] || []}
                 onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp', user?.id)}
                 onInstagram={() => handleInstagramShare(theftAlerts[0])}
@@ -574,6 +579,9 @@ export default function HomeScreen() {
                       status={alert.status as 'active' | 'recovered' | 'closed'}
                       recoveredAt={alert.recoveredAt}
                       alertOwnerId={alert.userId}
+                      ownerName={alert.ownerName}
+                      ownerAvatarUrl={alert.ownerAvatarUrl}
+                      ownerVerified={alert.ownerVerified}
                       responses={theftComments[alert.id] || []}
                       onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp', user?.id)}
                       onInstagram={() => handleInstagramShare(alert)}
@@ -646,7 +654,44 @@ export default function HomeScreen() {
         {/* Section: Servicios cercanos */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('nearbyServices')}</Text>
-          {nearbyPlaces.length > 0 ? (
+          {!nearbySearched ? (
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={styles.emptyCardIcon}>🔧</Text>
+              <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyServicesEmpty')}</Text>
+              <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
+                Encuentra talleres, vulcanizaciones y servicios cercanos
+              </Text>
+              <TouchableOpacity
+                style={[styles.searchButton, { backgroundColor: colors.primary }]}
+                onPress={async () => {
+                  setNearbyLoading(true);
+                  setNearbySearched(true);
+                  try {
+                    await loadNearbyPlaces();
+                  } finally {
+                    setNearbyLoading(false);
+                  }
+                }}
+                disabled={nearbyLoading}
+              >
+                {nearbyLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Ionicons name="search" size={18} color="#fff" />
+                )}
+                <Text style={styles.searchButtonText}>
+                  {nearbyLoading ? 'Buscando...' : 'Buscar'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : nearbyLoading ? (
+            <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.emptyCardText, { color: colors.inkFaint, marginTop: 12 }]}>
+                Buscando servicios cercanos...
+              </Text>
+            </View>
+          ) : nearbyPlaces.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offersScroll}>
               {nearbyPlaces.map((place) => (
                 <PlaceCard key={place.id} place={place} />
@@ -654,11 +699,26 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <View style={[styles.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={styles.emptyCardIcon}>🔧</Text>
-              <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>{t('nearbyServicesEmpty')}</Text>
+              <Text style={styles.emptyCardIcon}>🔍</Text>
+              <Text style={[styles.emptyCardTitle, { color: colors.ink }]}>No se encontraron servicios</Text>
               <Text style={[styles.emptyCardText, { color: colors.inkFaint }]}>
-                {t('loadingPlaces')}
+                Intenta buscar nuevamente
               </Text>
+              <TouchableOpacity
+                style={[styles.searchButton, { backgroundColor: colors.primary, marginTop: 12 }]}
+                onPress={async () => {
+                  setNearbyLoading(true);
+                  try {
+                    await loadNearbyPlaces();
+                  } finally {
+                    setNearbyLoading(false);
+                  }
+                }}
+                disabled={nearbyLoading}
+              >
+                <Ionicons name="refresh" size={18} color="#fff" />
+                <Text style={styles.searchButtonText}>Reintentar</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -875,4 +935,19 @@ const styles = StyleSheet.create({
   recoverActions: { flexDirection: 'row', gap: 10, width: '100%' },
   recoverBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   recoverBtnText: { fontSize: 15, fontWeight: '600' },
+  searchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 10,
+    marginTop: 16,
+  },
+  searchButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

@@ -181,18 +181,11 @@ export default function MyPublicationsScreen() {
     </View>
   );
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]} edges={['bottom']}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </SafeAreaView>
-    );
-  }
 
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
-      {/* Custom header */}
+      {/* Header siempre visible */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/(app)/profile')} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
@@ -201,22 +194,28 @@ export default function MyPublicationsScreen() {
         <View style={styles.headerBtn} />
       </View>
 
-      <FlatList
-        data={publications}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.list, publications.length === 0 && styles.listEmpty]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={48} color={colors.inkFaint} />
-            <Text style={[styles.emptyTitle, { color: colors.ink }]}>Sin publicaciones</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.inkFaint }]}>
-              Las alertas de robo que crees aparecerán aquí
-            </Text>
-          </View>
-        }
-      />
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={publications}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={[styles.list, publications.length === 0 && styles.listEmpty]}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="document-text-outline" size={48} color={colors.inkFaint} />
+              <Text style={[styles.emptyTitle, { color: colors.ink }]}>Sin publicaciones</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.inkFaint }]}>
+                Las alertas de robo que crees aparecerán aquí
+              </Text>
+            </View>
+          }
+        />
+      )}
       <Modal visible={recoverModalVisible} transparent animationType="fade" onRequestClose={() => setRecoverModalVisible(false)}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

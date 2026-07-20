@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { File } from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
@@ -86,7 +86,13 @@ export default function MotorcycleListScreen() {
       if (result.assets[0].base64) {
         uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
       } else {
-        const b64 = await new File(result.assets[0].uri).base64();
+        // File.base64() from the "new" expo-file-system module was added incrementally
+        // across v19 patch releases and can be missing depending on installed version.
+        // The legacy readAsStringAsync API is stable across versions, so we use it here
+        // as a safe fallback for the rare case ImagePicker doesn't return base64 directly.
+        const b64 = await FileSystemLegacy.readAsStringAsync(result.assets[0].uri, {
+          encoding: 'base64',
+        });
         uri = `data:image/jpeg;base64,${b64}`;
       }
       setImageUri(uri);
@@ -227,6 +233,21 @@ export default function MotorcycleListScreen() {
     errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
     saveBtn: { backgroundColor: colors.success, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
     saveBtnText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
+    // --- Safety / implements info banner (shown above the first listed motorcycle) ---
+    // Mismo estilo que las cards de "Requisitos" en documentos.tsx (brandBlue + opacidad)
+    safetyCard: {
+      marginHorizontal: 16,
+      marginTop: 12,
+      backgroundColor: colors.brandBlueBg,
+      borderColor: colors.brandBlue,
+      borderWidth: 1,
+      borderRadius: 10,
+      padding: 14,
+    },
+    safetyHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+    safetyTitle: { fontSize: 13, fontWeight: '600', color: colors.text + '99' },
+    safetyItem: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
+    safetyItemText: { fontSize: 11.5, flex: 1, lineHeight: 15, color: colors.text + '99' },
   });
 
   if (loading) {
@@ -237,6 +258,31 @@ export default function MotorcycleListScreen() {
     const { letters, numbers } = getDisplayPlateParts(raw);
     return numbers ? `${letters}-${numbers}` : letters;
   };
+
+  const SafetyInfoBanner = () => (
+    <View style={dynamicStyles.safetyCard}>
+      <View style={dynamicStyles.safetyHeader}>
+        <Ionicons name="shield-checkmark-outline" size={18} color={colors.brandBlue + '99'} style={{ marginRight: 8 }} />
+        <Text style={dynamicStyles.safetyTitle}>Seguridad / Implementos</Text>
+      </View>
+      <View>
+        <View style={dynamicStyles.safetyItem}>
+          <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+          <Text style={dynamicStyles.safetyItemText}>
+            <Text style={{ fontWeight: '600' }}>Casco: </Text>
+            cambio cada 5 años o por impacto
+          </Text>
+        </View>
+        <View style={dynamicStyles.safetyItem}>
+          <Ionicons name="checkmark-circle" size={16} color={colors.brandBlue + '99'} />
+          <Text style={dynamicStyles.safetyItemText}>
+            <Text style={{ fontWeight: '600' }}>Batería del rastreador GPS: </Text>
+            revisión cada 6 meses (si tienes activa esta opción).
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
 
   return (
     <View style={dynamicStyles.container}>
@@ -250,6 +296,7 @@ export default function MotorcycleListScreen() {
         <FlatList
           data={motorcycles}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={SafetyInfoBanner}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
           renderItem={({ item }) => (
             <TouchableOpacity

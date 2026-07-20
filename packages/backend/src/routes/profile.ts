@@ -94,6 +94,8 @@ router.get('/', authenticate, async (req: Request, res: Response) => {
         name: user.name,
         phone: user.phone,
         avatarUrl: user.avatarUrl,
+        birthDate: user.birthDate,
+        role: user.role,
         createdAt: new Date(user.createdAt),
         updatedAt: new Date(user.updatedAt),
       },

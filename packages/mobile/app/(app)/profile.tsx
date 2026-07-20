@@ -44,6 +44,9 @@ export default function ProfileScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [motorcyclesCount, setMotorcyclesCount] = useState<number | null>(null);
   const [motorcyclesVerifiedCount, setMotorcyclesVerifiedCount] = useState<number | null>(null);
+  const [showAdminCodeModal, setShowAdminCodeModal] = useState(false);
+  const [adminCode, setAdminCode] = useState('');
+  const [adminCodeError, setAdminCodeError] = useState('');
 
   // --- Delete account flow (Paso 1: motivo, Paso 2: rating, Paso 3: confirmación) ---
   const [showDeleteFlow, setShowDeleteFlow] = useState(false);
@@ -362,6 +365,33 @@ export default function ProfileScreen() {
     setDeleteRating(0);
   };
 
+  const openAdminCodeModal = () => {
+    setAdminCode('');
+    setAdminCodeError('');
+    setShowAdminCodeModal(true);
+  };
+
+  const handleAdminCodeSubmit = () => {
+    if (!adminCode.trim()) {
+      setAdminCodeError('Ingresa el código de acceso');
+      return;
+    }
+
+    // TODO: validar el código contra el backend cuando esté implementado.
+    // Por ahora solo se exige que el campo no esté vacío.
+
+    setShowAdminCodeModal(false);
+    setAdminCode('');
+    setAdminCodeError('');
+    router.push('/profile/admin');
+  };
+
+  const closeAdminCodeModal = () => {
+    setShowAdminCodeModal(false);
+    setAdminCode('');
+    setAdminCodeError('');
+  };
+
   const userInitial = user?.email?.charAt(0).toUpperCase() || '?';
 
   const dynamicStyles = StyleSheet.create({
@@ -474,7 +504,14 @@ export default function ProfileScreen() {
             <Text style={dynamicStyles.avatarText}>{userInitial}</Text>
           </View>
         )}
-        <Text style={dynamicStyles.name}>{user?.name || user?.email?.split('@')[0] || 'User'}</Text>
+        <View style={styles.nameRow}>
+          <Text style={dynamicStyles.name}>{user?.name || user?.email?.split('@')[0] || 'Usuario'}</Text>
+          {motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark" size={12} color="#fff" />
+            </View>
+          )}
+        </View>
 
         {/* Plan actual — card informativa */}
         <View style={dynamicStyles.planBadge}>
@@ -528,9 +565,9 @@ export default function ProfileScreen() {
             <Ionicons name="shield-checkmark-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('motoTrakerAccount')}</Text>
           </View>
-          <View style={[dynamicStyles.badge, { backgroundColor: colors.success }]}>
+          <View style={[dynamicStyles.badge, { backgroundColor: motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? '#1DA1F2' : colors.success }]}>
             <Text style={dynamicStyles.badgeText}>
-              {motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? 'Verificado' : t('connected')}
+              {motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? 'Moto-Traker Verificado' : t('connected')}
             </Text>
           </View>
         </View>
@@ -663,7 +700,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={() => router.push('/profile/admin')}>
+        <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={openAdminCodeModal}>
           <View style={styles.rowLeft}>
             <Ionicons name="people-outline" size={20} color={colors.text} />
             <Text style={dynamicStyles.rowText}>{t('admin')}</Text>
@@ -1074,6 +1111,48 @@ export default function ProfileScreen() {
         iconColor={alertIconColor}
         onClose={() => setAlertVisible(false)}
       />
+
+      {/* Admin Access Code Modal */}
+      <Modal visible={showAdminCodeModal} animationType="fade" transparent presentationStyle="overFullScreen">
+        <View style={dynamicStyles.deleteFlowOverlay}>
+          <View style={dynamicStyles.deleteFlowCard}>
+            <View style={[dynamicStyles.tutorialIconWrapper, { backgroundColor: mode === 'dark' ? 'rgba(10,132,255,0.15)' : '#EAF2FE' }]}>
+              <Ionicons name="lock-closed-outline" size={28} color={colors.primary} />
+            </View>
+
+            <Text style={dynamicStyles.deleteFlowTitle}>Acceso administrador</Text>
+            <Text style={dynamicStyles.deleteFlowSubtitle}>Ingresa el código de acceso para continuar.</Text>
+
+            <TextInput
+              style={dynamicStyles.input}
+              placeholder="Código de acceso"
+              placeholderTextColor={colors.textMuted}
+              value={adminCode}
+              onChangeText={(v) => { setAdminCode(v); setAdminCodeError(''); }}
+              secureTextEntry
+              autoCapitalize="none"
+            />
+            {adminCodeError ? <Text style={dynamicStyles.errorText}>{adminCodeError}</Text> : null}
+
+            <View style={dynamicStyles.deleteFlowActions}>
+              <TouchableOpacity
+                style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.surfaceSecondary, borderWidth: 1, borderColor: colors.border }]}
+                activeOpacity={0.7}
+                onPress={closeAdminCodeModal}
+              >
+                <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.text }]}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[dynamicStyles.tutorialActionBtn, { backgroundColor: colors.primary }]}
+                activeOpacity={0.8}
+                onPress={handleAdminCodeSubmit}
+              >
+                <Text style={[dynamicStyles.tutorialActionBtnText, { color: colors.primaryText }]}>Ingresar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1146,6 +1225,20 @@ const styles = StyleSheet.create({
   },
   rowRight: {
     flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  verifiedBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#1DA1F2',
+    justifyContent: 'center',
     alignItems: 'center',
   },
 });

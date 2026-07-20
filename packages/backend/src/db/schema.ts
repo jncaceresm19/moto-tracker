@@ -7,6 +7,7 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   name: text('name').notNull(),
   phone: text('phone'),
+  birthDate: text('birth_date'),
   googleId: text('google_id').unique(),
   rut: text('rut').unique(),
   verificadoClaveunica: integer('verificado_claveunica', { mode: 'boolean' }).default(false),
@@ -256,6 +257,7 @@ export const pendingUsers = sqliteTable('pending_users', {
   name: text('name').notNull(),
   phone: text('phone'),
   rut: text('rut').notNull(),
+  birthDate: text('birth_date'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
 });

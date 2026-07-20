@@ -207,7 +207,7 @@ export default function ManualPublicationScreen() {
             <Text style={[styles.headerTitle, { color: colors.ink }]}>
               {t('manualPublicationTitle')}
             </Text>
-            <Text style={[styles.headerSubtitle, { color: colors.inkSoft }]}>
+            <Text style={[styles.headerSubtitle, { color: colors.textMuted }]}>
               {t('manualPublicationSubtitle')}
             </Text>
           </View>
@@ -260,7 +260,7 @@ export default function ManualPublicationScreen() {
                           <Text style={[styles.pickerOptionTitle, { color: colors.ink }]}>
                             {moto.brand} {moto.model}
                           </Text>
-                          <Text style={[styles.pickerOptionSubtitle, { color: colors.inkSoft }]}>
+                          <Text style={[styles.pickerOptionSubtitle, { color: colors.textMuted }]}>
                             {formatPlate(moto.licensePlate)} · {moto.year}
                           </Text>
                         </View>

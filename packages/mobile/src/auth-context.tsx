@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as apiLogin, register as apiRegister, logout as apiLogout, getProfile } from './api';
+import { login as apiLogin, register as apiRegister, verifyRegistration, logout as apiLogout, getProfile } from './api';
 
 interface User {
   id: string;
@@ -9,6 +9,8 @@ interface User {
   phone?: string;
   avatarUrl?: string;
   rut?: string;
+  role?: string;
+  birthDate?: string;
   verificadoClaveunica?: boolean;
   identidadVerificada?: boolean;
   createdAt?: string;
@@ -19,7 +21,8 @@ interface AuthContextType {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithToken: (accessToken: string, refreshToken: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string, phone?: string, rut?: string) => Promise<void>;
+  signUp: (email: string, password: string, name: string, phone?: string, rut?: string, birthDate?: string) => Promise<void>;
+  completeRegistration: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -48,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const profile = await getProfile();
-      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, email: profile.email, createdAt: (profile as any)?.createdAt } : prev);
+      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, email: profile.email, role: (profile as any)?.role, birthDate: (profile as any)?.birthDate, createdAt: (profile as any)?.createdAt } : prev);
     } catch (e: any) {
       if (e?.message === 'SESSION_EXPIRED') {
         await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
@@ -68,7 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Fetch full profile in background
           try {
             const profile = await getProfile();
-              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, createdAt: (profile as any)?.createdAt });
+              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, role: (profile as any)?.role, birthDate: (profile as any)?.birthDate, createdAt: (profile as any)?.createdAt });
           } catch (e: any) {
             if (e?.message === 'SESSION_EXPIRED') {
               await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
@@ -90,14 +93,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch full profile
     try {
       const profile = await getProfile();
-      setUser({ id: data.user.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl });
+      setUser({ ...data.user, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl, role: (profile as any).role, birthDate: (profile as any).birthDate, createdAt: (profile as any).createdAt });
     } catch {
-      // Keep login data
+      // Keep login data (includes createdAt from login response)
     }
   };
 
-  const signUp = async (email: string, password: string, name: string, phone?: string, rut?: string) => {
-    const data = await apiRegister(email, password, name, phone, rut);
+  const signUp = async (email: string, password: string, name: string, phone?: string, rut?: string, birthDate?: string) => {
+    // Step 1: Save pending user + send OTP (no tokens, no user created yet)
+    await apiRegister(email, password, name, phone, rut, birthDate);
+  };
+
+  const completeRegistration = async (email: string, code: string) => {
+    // Step 2: Verify OTP + create user + get tokens
+    const data = await verifyRegistration(email, code);
     setUser(data.user);
   };
 
@@ -105,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem('accessToken', accessToken);
     await AsyncStorage.setItem('refreshToken', refreshToken);
     const profile = await getProfile();
-    setUser({ id: profile.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl });
+    setUser({ id: profile.id, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl, role: (profile as any).role, birthDate: (profile as any).birthDate, createdAt: (profile as any).createdAt });
   };
 
   const signOut = async () => {
@@ -114,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, signIn, signInWithToken, signUp, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, isLoading, signIn, signInWithToken, signUp, completeRegistration, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

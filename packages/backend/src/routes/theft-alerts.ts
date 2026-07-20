@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { eq, and, desc, count, or, gte } from 'drizzle-orm';
+import { eq, and, desc, count, or, gte, sql } from 'drizzle-orm';
 import { db } from '../db';
 import { theftAlerts, theftAlertResponses, motorcycles, users } from '../db/schema';
 import { authenticate } from '../middleware/auth';
@@ -154,6 +154,9 @@ router.get('/', async (req: Request, res: Response) => {
         recoveredAt: theftAlerts.recoveredAt,
         responseCount: count(theftAlertResponses.id),
         ownerPhone: users.phone,
+        ownerName: users.name,
+        ownerAvatarUrl: users.avatarUrl,
+        ownerVerified: sql<boolean>`COALESCE((SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM ${motorcycles} WHERE ${motorcycles.userId} = ${theftAlerts.userId} AND ${motorcycles.verificada} = 1), 0)`,
       })
       .from(theftAlerts)
       .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))

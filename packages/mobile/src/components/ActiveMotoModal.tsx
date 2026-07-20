@@ -1,9 +1,11 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../theme-context';
 import { useLanguage } from '../language-context';
-import { Motorcycle } from '../api';
+import { Motorcycle, updateMotorcycle } from '../api';
 import { ActiveMoto, formatActivationTime } from '../services/activeMoto';
 import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
 
@@ -30,15 +32,79 @@ export function ActiveMotoModal({
 }: ActiveMotoModalProps) {
   const { colors } = useTheme();
   const { t } = useLanguage();
+  const [selectedMoto, setSelectedMoto] = useState<Motorcycle | null>(null);
+  const [showPhotoStep, setShowPhotoStep] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const activeMotorcycle = activeMoto
     ? motorcycles.find(m => m.id === activeMoto.motorcycleId)
     : null;
 
-
   const formatPlate = (raw: string) => {
     const { letters, numbers } = getDisplayPlateParts(raw);
     return numbers ? `${letters}-${numbers}` : letters;
+  };
+
+  const handleSelectMoto = (moto: Motorcycle) => {
+    setSelectedMoto(moto);
+    setPhotoUri(null);
+    setShowPhotoStep(true);
+  };
+
+  const handlePickPhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true });
+
+    if (!result.canceled && result.assets[0]) {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      setPhotoUri(manipulated.uri);
+    }
+  };
+
+  const handleActivateWithPhoto = async () => {
+    if (!selectedMoto) return;
+    setSaving(true);
+    try {
+      if (photoUri) {
+        await updateMotorcycle(selectedMoto.id, { imageUrl: photoUri });
+      }
+      onActivate(selectedMoto.id);
+      setShowPhotoStep(false);
+      setSelectedMoto(null);
+      setPhotoUri(null);
+      onClose();
+    } catch (e) {
+      console.log('[ACTIVATE] Error saving photo:', e);
+      onActivate(selectedMoto.id);
+      setShowPhotoStep(false);
+      setSelectedMoto(null);
+      setPhotoUri(null);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSkipPhoto = () => {
+    if (!selectedMoto) return;
+    onActivate(selectedMoto.id);
+    setShowPhotoStep(false);
+    setSelectedMoto(null);
+    setPhotoUri(null);
+    onClose();
+  };
+
+  const handleBackToSelector = () => {
+    setShowPhotoStep(false);
+    setSelectedMoto(null);
+    setPhotoUri(null);
   };
 
   return (
@@ -60,10 +126,17 @@ export function ActiveMotoModal({
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.ink }]}>
-              {activeMoto ? t('activeMoto') : t('selectMoto')}
-            </Text>
-            <TouchableOpacity onPress={onClose}>
+            <View style={styles.headerTextGroup}>
+              <Text style={[styles.title, { color: colors.ink }]}>
+                {activeMoto ? t('activeMoto') : showPhotoStep ? 'Foto de la moto' : t('selectMoto')}
+              </Text>
+              {showPhotoStep && selectedMoto && (
+                <Text style={[styles.headerSubtitle, { color: colors.inkFaint }]}>
+                  {selectedMoto.brand} {selectedMoto.model} · {formatPlate(selectedMoto.licensePlate)}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={showPhotoStep ? handleBackToSelector : onClose}>
               <Ionicons name="close" size={24} color={colors.inkFaint} />
             </TouchableOpacity>
           </View>
@@ -92,7 +165,6 @@ export function ActiveMotoModal({
                 )}
               </View>
 
-              {/* Action buttons */}
               <TouchableOpacity
                 style={[styles.deactivateBtn, { borderColor: colors.border }]}
                 onPress={() => { onDeactivate(); onClose(); }}
@@ -109,6 +181,60 @@ export function ActiveMotoModal({
                 <Text style={styles.theftText}>{t('reportTheft')}</Text>
               </TouchableOpacity>
             </View>
+          ) : showPhotoStep && selectedMoto ? (
+            // Photo step view
+            <View style={styles.photoStepView}>
+              {photoUri ? (
+                <View style={styles.photoPreview}>
+                  <Image source={{ uri: photoUri }} style={styles.photoPreviewImage} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={[styles.removePhotoBtn, { backgroundColor: colors.danger }]}
+                    onPress={() => setPhotoUri(null)}
+                  >
+                    <Ionicons name="close" size={16} color="#fff" />
+                    <Text style={styles.removePhotoText}>Eliminar</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.photoCaptureZone, { borderColor: colors.border, backgroundColor: colors.surface2 || colors.surface }]}
+                  onPress={handlePickPhoto}
+                >
+                  <View style={[styles.photoCaptureIcon, { backgroundColor: colors.primary + '15' }]}>
+                    <Ionicons name="camera" size={26} color={colors.primary} />
+                  </View>
+                  <Text style={[styles.photoCaptureTitle, { color: colors.ink }]}>Tomar foto</Text>
+                  <Text style={[styles.photoCaptureHint, { color: colors.inkFaint }]}>
+                    Se mostrará en la alerta de robo si reportas un siniestro.
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={[styles.activateBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
+                onPress={handleActivateWithPhoto}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                    <Text style={styles.activateBtnText}>
+                      {photoUri ? 'Activar con foto' : 'Activar sin foto'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.skipPhotoBtn}
+                onPress={handleSkipPhoto}
+                disabled={saving}
+              >
+                <Text style={[styles.skipPhotoText, { color: colors.inkFaint }]}>Saltar y activar</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             // Motorcycle selector view
             <ScrollView style={styles.selectorView}>
@@ -123,7 +249,7 @@ export function ActiveMotoModal({
                   <TouchableOpacity
                     key={moto.id}
                     style={[styles.motoOption, { borderColor: colors.border }]}
-                    onPress={() => { onActivate(moto.id); onClose(); }}
+                    onPress={() => handleSelectMoto(moto)}
                   >
                     <View style={styles.motoOptionContent}>
                       <Text style={[styles.motoOptionName, { color: colors.ink }]}>
@@ -162,12 +288,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 16,
+  },
+  headerTextGroup: {
+    flex: 1,
+    marginRight: 12,
   },
   title: {
     fontSize: 17,
     fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
   activeView: {
     gap: 12,
@@ -264,5 +398,75 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'monospace',
     letterSpacing: 1,
+  },
+  photoStepView: {
+    gap: 12,
+  },
+  photoCaptureZone: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+  },
+  photoCaptureIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoCaptureTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  photoCaptureHint: {
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  photoPreview: {
+    alignItems: 'center',
+    gap: 10,
+  },
+  photoPreviewImage: {
+    width: '100%',
+    height: 160,
+    borderRadius: 12,
+  },
+  removePhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  removePhotoText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  activateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: 12,
+  },
+  activateBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  skipPhotoBtn: {
+    alignItems: 'center',
+    padding: 8,
+  },
+  skipPhotoText: {
+    fontSize: 13,
   },
 });

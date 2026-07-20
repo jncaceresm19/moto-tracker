@@ -18,6 +18,9 @@ export interface TheftAlert {
   recoveredAt?: Date; // when owner marked as found (card stays green until end of day)
   responseCount?: number;
   ownerPhone?: string; // owner's phone for WhatsApp contact
+  ownerName?: string;
+  ownerAvatarUrl?: string;
+  ownerVerified?: boolean;
 }
 
 export interface TheftAlertResponse {
