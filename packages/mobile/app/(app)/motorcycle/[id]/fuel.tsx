@@ -628,7 +628,7 @@ export default function FuelScreen() {
               </View>
 
               {/* Info card explaining how it works */}
-              <View style={[styles.consumptionInfoCard, { backgroundColor: colors.brandBlueBg }]}>
+              <View style={[styles.consumptionInfoCard, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue }]}>
                 <View style={styles.infoRow}>
                   <Ionicons name="information-circle-outline" size={16} color={colors.brandBlue} style={{ marginRight: 6 }} />
                   <Text style={[styles.infoTitle, { color: colors.brandBlue }]}>¿Cómo se calcula?</Text>
@@ -1095,6 +1095,7 @@ const styles = StyleSheet.create({
   consumptionInfoCard: {
     padding: 14,
     borderRadius: 16,
+    borderWidth: 1,
     marginTop: 8,
     marginBottom: 20,
   },
