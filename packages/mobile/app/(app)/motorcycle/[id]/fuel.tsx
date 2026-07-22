@@ -243,6 +243,23 @@ export default function FuelScreen() {
       });
   }, [records]);
 
+  // --- Current Year Data (calendar year, resets Jan 1) ---
+  const currentYear = new Date().getFullYear();
+  const MONTH_LABELS = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+  const currentYearMonthly = useMemo(() => {
+    const byMonth = new Array(12).fill(0);
+    for (const r of records) {
+      const d = new Date(r.recordedAt);
+      if (d.getFullYear() === currentYear) {
+        byMonth[d.getMonth()] += r.totalCost;
+      }
+    }
+    return byMonth; // [eneTotal, febTotal, ...]
+  }, [records, currentYear]);
+
+  const currentYearTotal = useMemo(() => currentYearMonthly.reduce((s, v) => s + v, 0), [currentYearMonthly]);
+
   // --- Sections ---
   const sections: FuelSection[] = [
     {
@@ -272,7 +289,7 @@ export default function FuelScreen() {
     {
       id: 'graphics',
       title: 'Gráficos',
-      subtitle: `${consumptionData.entries.length} datos de consumo · ${monthlyExpenses.length} meses`,
+      subtitle: currentYearTotal > 0 ? `$${currentYearTotal.toLocaleString('es-CL')} en ${currentYear}` : 'Sin datos este año',
       icon: 'bar-chart-outline',
       iconBg: '#F3E8FF',
       iconColor: '#6B21A8',
@@ -563,6 +580,17 @@ export default function FuelScreen() {
     const { entries, avg } = consumptionData;
     const hasKmData = records.some((r) => r.kilometersAtFill != null);
 
+    if (records.length === 0) {
+      return (
+        <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="speedometer-outline" size={56} color={colors.textMuted} style={{ marginBottom: 12 }} />
+          <Text style={[styles.empty, { color: colors.textMuted }]}>Sin datos de consumo</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>Registra cargas de combustible con kilometraje para ver tu consumo promedio.</Text>
+          <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+        </View>
+      );
+    }
+
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
@@ -650,16 +678,30 @@ export default function FuelScreen() {
     const { entries, avg, maxConsumption } = consumptionData;
     const maxExpense = monthlyExpenses.length > 0 ? Math.max(...monthlyExpenses.map(([, v]) => v)) : 0;
 
+    if (records.length === 0) {
+      return (
+        <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="bar-chart-outline" size={56} color={colors.textMuted} style={{ marginBottom: 12 }} />
+          <Text style={[styles.empty, { color: colors.textMuted }]}>Sin datos para gráficos</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>Registra cargas de combustible para ver tendencias de consumo y gastos.</Text>
+          <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+        </View>
+      );
+    }
+
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Consumption trend */}
           <Text style={[styles.sectionLabel, { color: colors.text }]}>Tendencia de Consumo</Text>
           <Text style={[styles.chartSub, { color: colors.textMuted }]}>km/L por carga (últimas 10)</Text>
           {entries.length === 0 ? (
-            <Text style={[styles.emptySub, { color: colors.textMuted, marginTop: 12 }]}>
-              Registra al menos 2 cargas con kilometraje para ver tendencias.
-            </Text>
+            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border, padding: 20, alignItems: 'center' }]}>
+              <Ionicons name="speedometer-outline" size={32} color={colors.textMuted} />
+              <Text style={[styles.emptySub, { color: colors.textMuted, marginTop: 8, textAlign: 'center' }]}>
+                Registra al menos 2 cargas con kilometraje para ver tendencias.
+              </Text>
+            </View>
           ) : (
             <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {[...entries].reverse().slice(0, 10).map((entry, i) => {
@@ -685,31 +727,42 @@ export default function FuelScreen() {
             </View>
           )}
 
-          {/* Monthly expenses */}
-          <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 24 }]}>Gastos por Mes</Text>
-          {monthlyExpenses.length === 0 ? (
-            <Text style={[styles.emptySub, { color: colors.textMuted, marginTop: 12 }]}>
-              No hay registros de combustible para mostrar.
-            </Text>
-          ) : (
-            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {monthlyExpenses.slice(-12).map(([month, total], i) => {
-                const pct = maxExpense > 0 ? (total / maxExpense) * 100 : 0;
+          {/* Current year - 12 month comparison grid */}
+          <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 28 }]}>Comparativa {currentYear}</Text>
+          <Text style={[styles.chartSub, { color: colors.textMuted }]}>Gasto por mes en el año calendario</Text>
+          <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.yearGrid}>
+              {MONTH_LABELS.map((label, i) => {
+                const total = currentYearMonthly[i];
+                const pct = currentYearTotal > 0 ? (total / currentYearTotal) * 100 : 0;
                 return (
-                  <View key={i} style={[styles.chartRow, { borderBottomColor: colors.border + '30' }]}>
-                    <Text style={[styles.chartLabel, { color: colors.textMuted }]}>{month}</Text>
-                    <View style={styles.chartBarTrack}>
-                      <View style={[styles.chartBarFill, {
-                        width: `${pct}%`,
-                        backgroundColor: '#FF9500',
-                      }]} />
+                  <View key={i} style={styles.yearGridItem}>
+                    <Text style={[styles.yearGridMonth, { color: colors.textMuted }]}>{label}</Text>
+                    <View style={[styles.yearGridTrack, { backgroundColor: colors.border + '40' }]}>
+                      <View style={[styles.yearGridFill, { height: `${Math.max(pct, 2)}%`, backgroundColor: total > 0 ? '#FF9500' : colors.border + '20' }]} />
                     </View>
-                    <Text style={[styles.chartValue, { color: colors.text }]}>${total.toLocaleString('es-CL')}</Text>
+                    <Text style={[styles.yearGridValue, { color: total > 0 ? colors.text : colors.textMuted }]}>
+                      {total > 0 ? `$${(total / 1000).toFixed(1)}k` : '-'}
+                    </Text>
                   </View>
                 );
               })}
             </View>
-          )}
+          </View>
+
+          {/* Annual total */}
+          <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 28 }]}>Gasto Anual {currentYear}</Text>
+          <View style={[styles.avgCard, { backgroundColor: '#FFF6D9', borderColor: '#C79000' }]}>
+            <Ionicons name="wallet" size={28} color="#8A6D00" />
+            <Text style={[styles.avgValue, { fontSize: 40, color: '#6B5400' }]}>${currentYearTotal.toLocaleString('es-CL')}</Text>
+            <Text style={[styles.avgUnit, { color: '#8A7000' }]}>gastado en {currentYear}</Text>
+            <View style={[styles.infoRow, { marginTop: 10, gap: 4 }]}>
+              <Ionicons name="refresh-outline" size={14} color="#C79000" />
+              <Text style={[styles.avgSub, { color: '#C79000', marginTop: 0 }]}>
+                Se reinicia el 31 de diciembre
+              </Text>
+            </View>
+          </View>
         </ScrollView>
 
         <CustomAlert
@@ -1096,4 +1149,34 @@ const styles = StyleSheet.create({
   chartValue: { fontSize: 12, fontWeight: '600', width: 60, textAlign: 'right' },
   chartAvg: { fontSize: 12, marginTop: 10, textAlign: 'center' },
   chartSub: { fontSize: 12, marginTop: -4, marginBottom: 8 },
+
+  // Year grid (12-month comparison)
+  yearGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingVertical: 12,
+    height: 160,
+  },
+  yearGridItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    height: '100%',
+  },
+  yearGridMonth: { fontSize: 10, marginBottom: 4 },
+  yearGridTrack: {
+    width: 12,
+    flex: 1,
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+    maxHeight: 100,
+  },
+  yearGridFill: {
+    width: '100%',
+    borderRadius: 6,
+    minHeight: 2,
+  },
+  yearGridValue: { fontSize: 9, marginTop: 3, fontWeight: '600' },
 });
