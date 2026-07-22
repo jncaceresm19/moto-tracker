@@ -302,7 +302,7 @@ export default function FuelScreen() {
     } else if (section.id === 'total') {
       showAlert('Total Gastado', totalSpent > 0
         ? `Has gastado un total de $${totalSpent.toLocaleString('es-CL')} en ${totalLiters.toFixed(1)} litros de combustible.`
-        : 'Aún no tienes registros de combustible.', [{ text: 'OK' }], 'wallet-outline', colors.primary);
+        : 'Aún no tienes registros de combustible.', [{ text: 'OK' }], 'wallet-outline', '#0F6E56');
     } else if (section.id === 'consumption') {
       setSelectedSection('consumption');
     } else if (section.id === 'graphics') {
@@ -613,49 +613,56 @@ export default function FuelScreen() {
           ) : (
             <>
               {/* Average consumption card */}
-              <View style={[styles.avgCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-                <Ionicons name="speedometer" size={32} color={colors.primary} />
-                <Text style={[styles.avgValue, { color: colors.primary }]}>{avg.toFixed(1)}</Text>
-                <Text style={[styles.avgUnit, { color: colors.primary }]}>km/L</Text>
-                <Text style={[styles.avgLabel, { color: colors.primary }]}>Consumo Promedio</Text>
-                <Text style={[styles.avgSub, { color: colors.primary + '99' }]}>
+              <View style={[styles.avgCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[styles.avgIconWrap, { backgroundColor: '#FAEEDA' }]}>
+                  <Ionicons name="speedometer-outline" size={24} color="#854F0B" />
+                </View>
+                <View style={styles.avgValueRow}>
+                  <Text style={[styles.avgValue, { color: colors.text }]}>{avg.toFixed(1)}</Text>
+                  <Text style={[styles.avgUnit, { color: colors.textMuted }]}>km/L</Text>
+                </View>
+                <Text style={[styles.avgLabel, { color: colors.text }]}>Consumo promedio</Text>
+                <Text style={[styles.avgSub, { color: colors.textMuted }]}>
                   Basado en {entries.length} tramo{entries.length !== 1 ? 's' : ''}
                 </Text>
               </View>
 
               {/* Info card explaining how it works */}
-              <View style={[styles.infoCard, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue, marginBottom: 20 }]}>
+              <View style={[styles.consumptionInfoCard, { backgroundColor: colors.brandBlueBg }]}>
                 <View style={styles.infoRow}>
-                  <Ionicons name="information-circle-outline" size={16} color={colors.brandBlue + '99'} style={{ marginRight: 6 }} />
-                  <Text style={[styles.infoTitle, { color: colors.brandBlue + '99' }]}>¿Cómo se calcula?</Text>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.brandBlue} style={{ marginRight: 6 }} />
+                  <Text style={[styles.infoTitle, { color: colors.brandBlue }]}>¿Cómo se calcula?</Text>
                 </View>
-                <Text style={[styles.infoText, { color: colors.brandBlue + '99', marginTop: 6 }]}>
+                <Text style={[styles.consumptionInfoText, { color: colors.brandBlue }]}>
                   Cada barra compara el kilometraje entre dos cargas consecutivas. Ej: si cargaste con 5.000 km y después con 5.200 km, y pusiste 5 litros, rindió 40 km/L en ese tramo. Solo aparecen tramos donde ambas cargas tienen kilometraje registrado.
                 </Text>
               </View>
 
               {/* Last consumptions */}
-              <Text style={[styles.sectionLabel, { color: colors.text }]}>Últimos consumos</Text>
-              {[...entries].reverse().slice(0, 10).map((entry, i) => {
-                const barWidth = avg > 0 ? (entry.kmPerLiter / (avg * 1.5)) * 100 : 0;
-                const date = new Date(entry.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
-                return (
-                  <View key={i} style={[styles.consumptionRow, { borderBottomColor: colors.border + '40' }]}>
-                    <View style={styles.consumptionLeft}>
-                      <Text style={[styles.consumptionDate, { color: colors.textMuted }]}>{date}</Text>
-                      <Text style={[styles.consumptionDetail, { color: colors.textMuted }]}>
-                        {entry.liters.toFixed(1)}L · {entry.kmDiff.toLocaleString('es-CL')} km
-                      </Text>
-                    </View>
-                    <View style={styles.consumptionRight}>
-                      <View style={[styles.consumptionBar, { backgroundColor: colors.border }]}>
-                        <View style={[styles.consumptionFill, { width: `${Math.min(barWidth, 100)}%`, backgroundColor: colors.primary }]} />
+              <Text style={[styles.sectionTitleDetail, { color: colors.textMuted }]}>Últimos consumos</Text>
+              <View style={[styles.consumptionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {[...entries].reverse().slice(0, 10).map((entry, i, arr) => {
+                  const barWidth = avg > 0 ? (entry.kmPerLiter / (avg * 1.5)) * 100 : 0;
+                  const date = new Date(entry.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+                  const isLast = i === arr.length - 1;
+                  return (
+                    <View key={i} style={[styles.consumptionRow, !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                      <View style={styles.consumptionLeft}>
+                        <Text style={[styles.consumptionDate, { color: colors.text }]}>{date}</Text>
+                        <Text style={[styles.consumptionDetail, { color: colors.textMuted }]}>
+                          {entry.liters.toFixed(1)} L · {entry.kmDiff.toLocaleString('es-CL')} km
+                        </Text>
+                      </View>
+                      <View style={styles.consumptionBar}>
+                        <View style={[styles.consumptionBarTrack, { backgroundColor: colors.border }]}>
+                          <View style={[styles.consumptionBarFill, { width: `${Math.min(barWidth, 100)}%`, backgroundColor: colors.primary }]} />
+                        </View>
                       </View>
                       <Text style={[styles.consumptionValue, { color: colors.text }]}>{entry.kmPerLiter.toFixed(1)}</Text>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </>
           )}
         </ScrollView>
@@ -693,8 +700,7 @@ export default function FuelScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
           {/* Consumption trend */}
-          <Text style={[styles.sectionLabel, { color: colors.text }]}>Tendencia de Consumo</Text>
-          <Text style={[styles.chartSub, { color: colors.textMuted }]}>km/L por carga (últimas 10)</Text>
+          <Text style={[styles.sectionTitleDetail, { color: colors.textMuted }]}>Tendencia de Consumo</Text>
           {entries.length === 0 ? (
             <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border, padding: 20, alignItems: 'center' }]}>
               <Ionicons name="speedometer-outline" size={32} color={colors.textMuted} />
@@ -703,14 +709,15 @@ export default function FuelScreen() {
               </Text>
             </View>
           ) : (
-            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {[...entries].reverse().slice(0, 10).map((entry, i) => {
+            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border, paddingHorizontal: 16 }]}>
+              {[...entries].reverse().slice(0, 10).map((entry, i, arr) => {
                 const pct = maxConsumption > 0 ? (entry.kmPerLiter / maxConsumption) * 100 : 0;
                 const date = new Date(entry.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
                 const isLow = entry.kmPerLiter < avg * 0.85;
+                const isLast = i === arr.length - 1;
                 return (
-                  <View key={i} style={[styles.chartRow, { borderBottomColor: colors.border + '30' }]}>
-                    <Text style={[styles.chartLabel, { color: colors.textMuted }]}>{date}</Text>
+                  <View key={i} style={[styles.chartRow, isLast && { borderBottomWidth: 0 }, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.chartLabel, { color: colors.text }]}>{date}</Text>
                     <View style={styles.chartBarTrack}>
                       <View style={[styles.chartBarFill, {
                         width: `${Math.min(pct, 100)}%`,
@@ -721,44 +728,53 @@ export default function FuelScreen() {
                   </View>
                 );
               })}
-              <Text style={[styles.chartAvg, { color: colors.textMuted }]}>
-                Promedio: {avg.toFixed(1)} km/L
-              </Text>
+              <View style={[styles.chartAvgRow, { borderTopColor: colors.border }]}>
+                <Text style={[styles.chartAvg, { color: colors.textSecondary }]}>
+                  Promedio: {avg.toFixed(1)} km/L
+                </Text>
+              </View>
             </View>
           )}
+          <Text style={[styles.chartSub, { color: colors.textMuted }]}>km/L por carga (últimas 10)</Text>
 
           {/* Current year - 12 month comparison grid */}
-          <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 28 }]}>Comparativa {currentYear}</Text>
-          <Text style={[styles.chartSub, { color: colors.textMuted }]}>Gasto por mes en el año calendario</Text>
+          <Text style={[styles.sectionTitleDetail, { color: colors.textMuted, marginTop: 28 }]}>Comparativa {currentYear}</Text>
           <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.yearGrid}>
               {MONTH_LABELS.map((label, i) => {
                 const total = currentYearMonthly[i];
                 const pct = currentYearTotal > 0 ? (total / currentYearTotal) * 100 : 0;
+                const isCurrentMonth = i === new Date().getMonth();
                 return (
                   <View key={i} style={styles.yearGridItem}>
-                    <Text style={[styles.yearGridMonth, { color: colors.textMuted }]}>{label}</Text>
-                    <View style={[styles.yearGridTrack, { backgroundColor: colors.border + '40' }]}>
-                      <View style={[styles.yearGridFill, { height: `${Math.max(pct, 2)}%`, backgroundColor: total > 0 ? '#FF9500' : colors.border + '20' }]} />
+                    {total > 0 && (
+                      <Text style={[styles.yearGridValue, { color: colors.text }]}>{`$${(total / 1000).toFixed(1)}k`}</Text>
+                    )}
+                    <View style={styles.yearGridTrack}>
+                      <View style={[styles.yearGridFill, {
+                        height: total > 0 ? `${Math.max(pct, 4)}%` : 2,
+                        backgroundColor: total > 0 ? colors.primary : colors.border,
+                      }]} />
                     </View>
-                    <Text style={[styles.yearGridValue, { color: total > 0 ? colors.text : colors.textMuted }]}>
-                      {total > 0 ? `$${(total / 1000).toFixed(1)}k` : '-'}
-                    </Text>
+                    <Text style={[styles.yearGridMonth, { color: isCurrentMonth ? colors.primary : colors.textMuted, fontWeight: isCurrentMonth ? '600' : '400' }]}>{label}</Text>
                   </View>
                 );
               })}
             </View>
           </View>
+          <Text style={[styles.chartSub, { color: colors.textMuted }]}>Gasto por mes en el año calendario</Text>
 
           {/* Annual total */}
-          <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 28 }]}>Gasto Anual {currentYear}</Text>
-          <View style={[styles.avgCard, { backgroundColor: '#FFF6D9', borderColor: '#C79000' }]}>
-            <Ionicons name="wallet" size={28} color="#8A6D00" />
-            <Text style={[styles.avgValue, { fontSize: 40, color: '#6B5400' }]}>${currentYearTotal.toLocaleString('es-CL')}</Text>
-            <Text style={[styles.avgUnit, { color: '#8A7000' }]}>gastado en {currentYear}</Text>
-            <View style={[styles.infoRow, { marginTop: 10, gap: 4 }]}>
-              <Ionicons name="refresh-outline" size={14} color="#C79000" />
-              <Text style={[styles.avgSub, { color: '#C79000', marginTop: 0 }]}>
+          <Text style={[styles.sectionTitleDetail, { color: colors.textMuted, marginTop: 28 }]}>Gasto Anual {currentYear}</Text>
+          <View style={[styles.avgCard, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 0 }]}>
+            <View style={[styles.avgIconWrap, { backgroundColor: '#E1F5EE' }]}>
+              <Ionicons name="wallet-outline" size={22} color="#0F6E56" />
+            </View>
+            <Text style={[styles.avgValue, { color: colors.text }]}>${currentYearTotal.toLocaleString('es-CL')}</Text>
+            <Text style={[styles.avgLabel, { color: colors.text }]}>gastado en {currentYear}</Text>
+            <View style={[styles.infoRow, { marginTop: 8, gap: 5 }]}>
+              <Ionicons name="refresh-outline" size={13} color={colors.textMuted} />
+              <Text style={[styles.avgSub, { color: colors.textMuted, marginTop: 0 }]}>
                 Se reinicia el 31 de diciembre
               </Text>
             </View>
@@ -874,6 +890,12 @@ const styles = StyleSheet.create({
   },
   sectionContent: { flex: 1 },
   sectionTitle: { fontSize: 15, fontWeight: '600' },
+  sectionTitleDetail: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
   sectionSubtitle: { fontSize: 12, marginTop: 2 },
 
   // Record Card
@@ -1069,6 +1091,15 @@ const styles = StyleSheet.create({
   infoTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   infoText: { fontSize: 13, lineHeight: 18 },
 
+  // Consumption view — info card (dedicated, does not affect other screens)
+  consumptionInfoCard: {
+    padding: 14,
+    borderRadius: 16,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  consumptionInfoText: { fontSize: 12, lineHeight: 18, marginTop: 8 },
+
   // Record kilometers
   recordKmRow: {
     flexDirection: 'row',
@@ -1083,43 +1114,55 @@ const styles = StyleSheet.create({
     padding: 24,
     borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 24,
+    marginBottom: 14,
   },
-  avgValue: { fontSize: 48, fontWeight: '800', marginTop: 8 },
-  avgUnit: { fontSize: 16, fontWeight: '600', marginTop: -4 },
-  avgLabel: { fontSize: 14, fontWeight: '600', marginTop: 8 },
-  avgSub: { fontSize: 12, marginTop: 4 },
+  avgIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  avgValueRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  avgValue: { fontSize: 42, fontWeight: '500' },
+  avgUnit: { fontSize: 14 },
+  avgLabel: { fontSize: 13, fontWeight: '600', marginTop: 14 },
+  avgSub: { fontSize: 12, marginTop: 2 },
 
   // Section label
   sectionLabel: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
 
-  // Consumption list rows
+  // Consumption list card + rows
+  consumptionCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+  },
   consumptionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    gap: 14,
+    paddingVertical: 14,
   },
-  consumptionLeft: { flex: 1 },
-  consumptionDate: { fontSize: 12 },
-  consumptionDetail: { fontSize: 10, marginTop: 1 },
-  consumptionRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-  },
-  consumptionBar: {
-    flex: 1,
-    height: 8,
-    borderRadius: 4,
+  consumptionLeft: { minWidth: 64 },
+  consumptionDate: { fontSize: 13 },
+  consumptionDetail: { fontSize: 11, marginTop: 2 },
+  consumptionBar: { flex: 1 },
+  consumptionBarTrack: {
+    height: 6,
+    borderRadius: 3,
     overflow: 'hidden',
   },
-  consumptionFill: {
+  consumptionBarFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  consumptionValue: { fontSize: 14, fontWeight: '700', width: 50, textAlign: 'right' },
+  consumptionValue: { fontSize: 14, fontWeight: '500', minWidth: 40, textAlign: 'right' },
 
   // Chart card
   chartCard: {
@@ -1147,16 +1190,22 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   chartValue: { fontSize: 12, fontWeight: '600', width: 60, textAlign: 'right' },
-  chartAvg: { fontSize: 12, marginTop: 10, textAlign: 'center' },
-  chartSub: { fontSize: 12, marginTop: -4, marginBottom: 8 },
+  chartAvgRow: {
+    borderTopWidth: 1,
+    marginTop: 4,
+    paddingTop: 12,
+    alignItems: 'center',
+  },
+  chartAvg: { fontSize: 12, textAlign: 'center' },
+  chartSub: { fontSize: 12, marginTop: 6 },
 
   // Year grid (12-month comparison)
   yearGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    paddingVertical: 12,
-    height: 160,
+    paddingVertical: 8,
+    height: 150,
   },
   yearGridItem: {
     flex: 1,
@@ -1164,19 +1213,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     height: '100%',
   },
-  yearGridMonth: { fontSize: 10, marginBottom: 4 },
+  yearGridMonth: { fontSize: 9, marginTop: 5 },
   yearGridTrack: {
-    width: 12,
+    width: 8,
     flex: 1,
-    borderRadius: 6,
     justifyContent: 'flex-end',
-    overflow: 'hidden',
-    maxHeight: 100,
+    maxHeight: 90,
   },
   yearGridFill: {
     width: '100%',
-    borderRadius: 6,
+    borderRadius: 4,
     minHeight: 2,
   },
-  yearGridValue: { fontSize: 9, marginTop: 3, fontWeight: '600' },
+  yearGridValue: { fontSize: 9, marginBottom: 4, fontWeight: '500' },
 });
