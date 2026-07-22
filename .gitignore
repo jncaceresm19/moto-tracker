@@ -62,3 +62,8 @@ ios/*.xcworkspace/xcuserdata/
 # Database
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
+
+# OCR training data (large binaries)
+*.traineddata
