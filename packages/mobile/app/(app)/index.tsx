@@ -13,7 +13,7 @@ import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
 import { detectCountry } from '../../src/services/countryDetection';
-import { TheftAlert, getTheftAlerts, closeAlert, createTheftAlert } from '../../src/services/theftAlertService';
+import { TheftAlert, getTheftAlerts, getTheftAlertById, respondToAlert, closeAlert, createTheftAlert } from '../../src/services/theftAlertService';
 import { shareToSpecificPlatform } from '../../src/services/shareService';
 import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
 import { PlaceCard } from '../../src/components/PlaceCard';
@@ -37,7 +37,7 @@ export default function HomeScreen() {
   const [motorcycles, setMotorcycles] = useState<Motorcycle[]>([]);
   const [gasStations, setGasStations] = useState<GasStation[]>([]);
   const [theftAlerts, setTheftAlerts] = useState<TheftAlert[]>([]);
-  const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; userAvatar?: string; text: string; timeAgo: string }[]>>({});
+  const [theftComments, setTheftComments] = useState<Record<string, { id: string; userName: string; userAvatar?: string; userVerified?: boolean; text: string; timeAgo: string }[]>>({});
   const [lastGasUpdate, setLastGasUpdate] = useState<string | null>(null);
   const [nearbyPlaces, setNearbyPlaces] = useState<NearbyPlace[]>([]);
   const [nearbySearched, setNearbySearched] = useState(false);
@@ -45,6 +45,7 @@ export default function HomeScreen() {
   const [activeMoto, setActiveMoto] = useState<ActiveMoto | null>(null);
   const [showActiveMotoModal, setShowActiveMotoModal] = useState(false);
   const [activationAddress, setActivationAddress] = useState<string | null>(null);
+  const [activationPhotoUrl, setActivationPhotoUrl] = useState<string | null>(null);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -69,9 +70,9 @@ export default function HomeScreen() {
   }, []);
 
   const checkBiometricPrompt = async () => {
+    if (!user) return;
     const hardware = await hasBiometricHardware();
-    const enrolled = await isBiometricEnrolled();
-    const prompted = await hasBeenPrompted();
+    const prompted = await hasBeenPrompted(user.id);
     setBiometricAvailable(hardware);
 
     // Only show prompt if device has hardware AND user hasn't been prompted before
@@ -81,18 +82,19 @@ export default function HomeScreen() {
   };
 
   const handleBiometricResponse = async (enable: boolean) => {
+    if (!user) return;
     if (enable) {
       // Check if device has enrolled biometrics before enabling
       const enrolled = await isBiometricEnrolled();
       if (!enrolled) {
         // Can't enable yet - just mark as prompted
-        await markAsPrompted();
+        await markAsPrompted(user.id);
         setBiometricPromptVisible(false);
         return;
       }
-      await enableBiometric();
+      await enableBiometric(user.id);
     }
-    await markAsPrompted();
+    await markAsPrompted(user.id);
     setBiometricPromptVisible(false);
   };
 
@@ -164,6 +166,31 @@ export default function HomeScreen() {
     try {
       const alerts = await getTheftAlerts();
       setTheftAlerts(alerts);
+
+      // Load comments for each alert in parallel
+      const commentEntries = await Promise.all(
+        alerts.map(async (alert) => {
+          try {
+            const detail = await getTheftAlertById(alert.id);
+            return [alert.id, detail.responses.map(r => ({
+              id: r.id,
+              userName: r.userName,
+              userAvatar: r.userAvatarUrl,
+              userVerified: r.userVerified,
+              text: r.text,
+              timeAgo: formatTimeAgo(r.createdAt),
+            }))] as const;
+          } catch {
+            return [alert.id, []] as const;
+          }
+        })
+      );
+
+      const commentsMap: Record<string, typeof theftComments[string]> = {};
+      for (const [id, comments] of commentEntries) {
+        commentsMap[id] = comments;
+      }
+      setTheftComments(commentsMap);
     } catch (e: any) {
       console.log('[THEFT] Error loading alerts:', e?.message || 'Unknown');
     }
@@ -259,6 +286,60 @@ export default function HomeScreen() {
     setRainAlert(null);
   };
 
+  const navigateToPostDetail = (alert: TheftAlert) => {
+    router.push({
+      pathname: '/(app)/post-detail',
+      params: {
+        alertId: alert.id,
+        title: `${alert.brand} ${alert.model} · Patente: ${formatPlate(alert.licensePlate)}`,
+        metadata: alert.lastLocationName || 'Ubicación desconocida',
+        timeAgo: formatTimeAgo(alert.createdAt),
+        photoUrl: alert.photoUrl || '',
+        notes: alert.notes || '',
+        status: alert.status,
+        ownerName: alert.ownerName || '',
+        ownerAvatarUrl: alert.ownerAvatarUrl || '',
+        ownerVerified: String(alert.ownerVerified || false),
+      },
+    });
+  };
+
+  const handleComment = async (alertId: string, text: string) => {
+    // Optimistic add
+    const optimisticComment = {
+      id: `comment-${Date.now()}`,
+      userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
+      userAvatar: user?.avatarUrl,
+      userVerified: false,
+      text,
+      timeAgo: 'ahora mismo',
+    };
+    setTheftComments(prev => ({
+      ...prev,
+      [alertId]: [...(prev[alertId] || []), optimisticComment],
+    }));
+
+    // Persist to backend
+    try {
+      await respondToAlert(alertId, text);
+      // Reload comments from server to get real ID and verified status
+      const detail = await getTheftAlertById(alertId);
+      setTheftComments(prev => ({
+        ...prev,
+        [alertId]: detail.responses.map(r => ({
+          id: r.id,
+          userName: r.userName,
+          userAvatar: r.userAvatarUrl,
+          userVerified: r.userVerified,
+          text: r.text,
+          timeAgo: formatTimeAgo(r.createdAt),
+        })),
+      }));
+    } catch (e: any) {
+      console.log('[THEFT] Error saving comment:', e?.message || 'Unknown');
+    }
+  };
+
   useEffect(() => {
     console.log('[NEARBY] useEffect fired');
     // Load cached gas stations immediately on mount (no await - runs in background)
@@ -332,8 +413,11 @@ export default function HomeScreen() {
     }
   };
 
-  const handleActivateMoto = async (motorcycleId: string) => {
+  const handleActivateMoto = async (motorcycleId: string, photoUrl?: string) => {
     try {
+      // Store activation photo (used only if user reports theft)
+      setActivationPhotoUrl(photoUrl || null);
+
       // OPTIMISTIC UPDATE - show active state IMMEDIATELY
       const optimisticActive: ActiveMoto = {
         id: `temp-${Date.now()}`,
@@ -381,6 +465,7 @@ export default function HomeScreen() {
       // OPTIMISTIC UPDATE - clear state immediately
       setActiveMoto(null);
       setActivationAddress(null);
+      setActivationPhotoUrl(null);
 
       // Sync with server in background (don't await)
       deactivateMoto().catch(e => {
@@ -398,12 +483,13 @@ export default function HomeScreen() {
     if (!moto) return;
 
     try {
-      // Create theft alert with activation location
+      // Create theft alert with activation location and optional photo
       await createTheftAlert({
         motorcycleId: moto.id,
         lastLatitude: activeMoto.activationLat || 0,
         lastLongitude: activeMoto.activationLon || 0,
         lastLocationName: activationAddress || `Estacionada en ${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`,
+        photoUrl: activationPhotoUrl || undefined,
       });
 
       // Deactivate after reporting
@@ -540,24 +626,13 @@ export default function HomeScreen() {
                 ownerName={theftAlerts[0].ownerName}
                 ownerAvatarUrl={theftAlerts[0].ownerAvatarUrl}
                 ownerVerified={theftAlerts[0].ownerVerified}
+                ownerCreatedAt={theftAlerts[0].ownerCreatedAt}
                 responses={theftComments[theftAlerts[0].id] || []}
                 onWhatsApp={() => shareToSpecificPlatform(theftAlerts[0], 'whatsapp', user?.id)}
                 onInstagram={() => handleInstagramShare(theftAlerts[0])}
                 onMarkAsFound={() => handleMarkAsFound(theftAlerts[0].id)}
-                onComment={(text) => {
-                  const alertId = theftAlerts[0].id;
-                  const newComment = {
-                    id: `comment-${Date.now()}`,
-                    userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
-                    userAvatar: user?.avatarUrl,
-                    text,
-                    timeAgo: 'ahora mismo',
-                  };
-                  setTheftComments(prev => ({
-                    ...prev,
-                    [alertId]: [...(prev[alertId] || []), newComment],
-                  }));
-                }}
+                onPress={() => navigateToPostDetail(theftAlerts[0])}
+                onComment={(text) => handleComment(theftAlerts[0].id, text)}
               />
             ) : (
               <ScrollView
@@ -582,23 +657,13 @@ export default function HomeScreen() {
                       ownerName={alert.ownerName}
                       ownerAvatarUrl={alert.ownerAvatarUrl}
                       ownerVerified={alert.ownerVerified}
+                      ownerCreatedAt={alert.ownerCreatedAt}
                       responses={theftComments[alert.id] || []}
                       onWhatsApp={() => shareToSpecificPlatform(alert, 'whatsapp', user?.id)}
                       onInstagram={() => handleInstagramShare(alert)}
                       onMarkAsFound={() => handleMarkAsFound(alert.id)}
-                      onComment={(text) => {
-                        const newComment = {
-                          id: `comment-${Date.now()}`,
-                          userName: user?.name || user?.email?.split('@')[0] || 'Usuario',
-                          userAvatar: user?.avatarUrl,
-                          text,
-                          timeAgo: 'ahora mismo',
-                        };
-                        setTheftComments(prev => ({
-                          ...prev,
-                          [alert.id]: [...(prev[alert.id] || []), newComment],
-                        }));
-                      }}
+                      onPress={() => navigateToPostDetail(alert)}
+                      onComment={(text) => handleComment(alert.id, text)}
                     />
                   </View>
                 ))}
@@ -910,7 +975,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
   modalMessage: { fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 24 },
   modalButtons: { width: '100%', gap: 12 },
-  modalBtn: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  modalBtn: { paddingVertical: 14, borderRadius: 30, alignItems: 'center' },
   modalBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   recoverOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 24 },
   recoverCard: { width: '100%', maxWidth: 340, borderRadius: 16, padding: 20, alignItems: 'center' },
@@ -942,7 +1007,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 10,
+    borderRadius: 30,
     marginTop: 16,
   },
   searchButtonText: {

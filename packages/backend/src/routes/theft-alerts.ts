@@ -21,6 +21,7 @@ const createTheftAlertSchema = z.object({
   lastLongitude: z.number().min(-180).max(180).optional(),
   lastLocationName: z.string().max(200).optional(),
   notes: z.string().max(500).optional(),
+  photoUrl: z.string().max(2000000).optional(),
 });
 
 const respondSchema = z.object({
@@ -40,7 +41,7 @@ const alertIdParam = z.object({
 router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { motorcycleId, lastLatitude, lastLongitude, lastLocationName, notes } = req.body;
+    const { motorcycleId, lastLatitude, lastLongitude, lastLocationName, notes, photoUrl } = req.body;
 
     // For manual publications without GPS, use null coordinates
     const latitude = lastLatitude ?? null;
@@ -88,7 +89,7 @@ router.post('/', validateBody(createTheftAlertSchema), async (req: Request, res:
       brand: motorcycle.brand,
       model: motorcycle.model,
       licensePlate: motorcycle.licensePlate,
-      photoUrl: motorcycle.imageUrl,
+      photoUrl: photoUrl || motorcycle.imageUrl,
       lastLatitude: latitude,
       lastLongitude: longitude,
       lastLocationName: lastLocationName ?? null,
@@ -157,6 +158,7 @@ router.get('/', async (req: Request, res: Response) => {
         ownerName: users.name,
         ownerAvatarUrl: users.avatarUrl,
         ownerVerified: sql<boolean>`COALESCE((SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END FROM ${motorcycles} WHERE ${motorcycles.userId} = ${theftAlerts.userId} AND ${motorcycles.verificada} = 1), 0)`,
+        ownerCreatedAt: users.createdAt,
       })
       .from(theftAlerts)
       .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))
@@ -208,9 +210,11 @@ router.get('/my', async (req: Request, res: Response) => {
         createdAt: theftAlerts.createdAt,
         closedAt: theftAlerts.closedAt,
         responseCount: count(theftAlertResponses.id),
+        ownerCreatedAt: users.createdAt,
       })
       .from(theftAlerts)
       .leftJoin(theftAlertResponses, eq(theftAlerts.id, theftAlertResponses.theftAlertId))
+      .leftJoin(users, eq(theftAlerts.userId, users.id))
       .where(eq(theftAlerts.userId, userId))
       .groupBy(theftAlerts.id)
       .orderBy(desc(theftAlerts.createdAt));
@@ -247,12 +251,14 @@ router.get('/:id', validateParams(alertIdParam), async (req: Request, res: Respo
       return;
     }
 
-    // Get responses with user names
+    // Get responses with user names and verification status
     const responses = await db
       .select({
         id: theftAlertResponses.id,
         userId: theftAlertResponses.userId,
         userName: users.name,
+        userAvatarUrl: users.avatarUrl,
+        userVerified: users.identidadVerificada,
         text: theftAlertResponses.text,
         createdAt: theftAlertResponses.createdAt,
       })

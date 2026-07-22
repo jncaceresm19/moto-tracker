@@ -35,9 +35,9 @@ type MockUser = {
 };
 
 const MOCK_USERS: MockUser[] = [
-  { id: '1', name: 'Marcela González', email: 'marcela.g@correo.com', initials: 'MG', plan: 'Copiloto', origin: 'google', role: 'usuario' },
-  { id: '2', name: 'Roberto Torres', email: 'rtorres@correo.com', initials: 'RT', plan: 'Garage', origin: 'manual', role: 'usuario' },
-  { id: '3', name: 'Carla Fuentes', email: 'carla.f@correo.com', initials: 'CF', plan: 'Garage', origin: 'admin', role: 'admin' },
+  { id: '1', name: 'Jon Caceres', email: 'jon.caceresm501@gmail.com', initials: 'JC', plan: 'Garage', origin: 'admin', role: 'admin' },
+  { id: '2', name: 'Marcela González', email: 'marcela.g@correo.com', initials: 'MG', plan: 'Copiloto', origin: 'google', role: 'usuario' },
+  { id: '3', name: 'Roberto Torres', email: 'rtorres@correo.com', initials: 'RT', plan: 'Garage', origin: 'manual', role: 'usuario' },
 ];
 
 const PLAN_OPTIONS = ['Piloto', 'Vigía', 'Copiloto', 'Comandante', 'Garage'];
@@ -92,7 +92,11 @@ export default function AdminScreen() {
       flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
       marginTop: 24, marginBottom: 8, marginHorizontal: 16,
     },
-    sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase' },
+    sectionTitle: {
+      fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', marginTop: 24,
+      marginBottom: 14,
+      marginHorizontal: 16,
+    },
     historyBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 4,
       paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8,
@@ -100,7 +104,13 @@ export default function AdminScreen() {
     },
     historyBtnText: { fontSize: 12, color: colors.primary, fontWeight: '500' },
 
-    metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 12, gap: 12 },
+    metricsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 12,
+      gap: 12,
+      marginTop: 4,
+    },
     metricCard: {
       flexBasis: '46%', flexGrow: 1, backgroundColor: colors.surfaceSecondary,
       borderRadius: 10, padding: 14,
@@ -110,8 +120,13 @@ export default function AdminScreen() {
     metricSuffix: { fontSize: 13, fontWeight: '400', color: colors.textMuted },
 
     card: {
-      backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-      borderRadius: 12, padding: 16, marginHorizontal: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 16,
+      marginHorizontal: 16,
+      marginTop: 4,
     },
     cardTitle: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 12 },
 
@@ -285,8 +300,8 @@ export default function AdminScreen() {
   }
 
   return (
-    <ScrollView style={dynamicStyles.container}>
-      {/* Header */}
+    <View style={dynamicStyles.container}>
+      {/* Header fijo — no se desplaza con el contenido */}
       <View style={dynamicStyles.header}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/(app)/profile')} style={dynamicStyles.headerBtn}>
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
@@ -295,164 +310,166 @@ export default function AdminScreen() {
         <View style={dynamicStyles.headerBtn} />
       </View>
 
-      {/* Métricas */}
-      <View style={dynamicStyles.sectionRow}>
-        <Text style={dynamicStyles.sectionTitle}>Estadísticas</Text>
-        <TouchableOpacity style={dynamicStyles.historyBtn} onPress={() => setShowHistory(true)}>
-          <Ionicons name="time-outline" size={14} color={colors.primary} />
-          <Text style={dynamicStyles.historyBtnText}>Historial</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={dynamicStyles.metricsGrid}>
-        {METRICS.map((m) => (
-          <View key={m.label} style={dynamicStyles.metricCard}>
-            <Text style={dynamicStyles.metricLabel}>{m.label}</Text>
-            <Text style={dynamicStyles.metricValue}>
-              {m.value}
-              {m.suffix ? <Text style={dynamicStyles.metricSuffix}>{m.suffix}</Text> : null}
-            </Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Motivos de eliminación */}
-      <Text style={dynamicStyles.sectionTitle}>Motivos de eliminación de cuenta</Text>
-      <View style={dynamicStyles.card}>
-        {DELETE_REASONS.map((r) => (
-          <View key={r.label} style={dynamicStyles.reasonRow}>
-            <Text style={dynamicStyles.reasonLabel}>{r.label}</Text>
-            <View style={dynamicStyles.reasonTrack}>
-              <View style={[dynamicStyles.reasonFill, { width: `${r.pct}%` }]} />
-            </View>
-            <Text style={dynamicStyles.reasonPct}>{r.pct}%</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Buscar usuarios */}
-      <Text style={dynamicStyles.sectionTitle}>Buscar usuarios</Text>
-      <View style={dynamicStyles.card}>
-        <View style={dynamicStyles.searchRow}>
-          <TextInput
-            style={dynamicStyles.searchInput}
-            placeholder="Nombre, correo o ID de usuario"
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity style={dynamicStyles.searchBtn}>
-            <Ionicons name="search" size={16} color={colors.primaryText} />
+      <ScrollView style={{ flex: 1 }}>
+        {/* Métricas */}
+        <View style={dynamicStyles.sectionRow}>
+          <Text style={dynamicStyles.sectionTitle}>Estadísticas</Text>
+          <TouchableOpacity style={dynamicStyles.historyBtn} onPress={() => setShowHistory(true)}>
+            <Ionicons name="time-outline" size={14} color={colors.primary} />
+            <Text style={dynamicStyles.historyBtnText}>Historial</Text>
           </TouchableOpacity>
         </View>
-
-        {filteredUsers.map((u) => {
-          const selected = u.id === selectedUserId;
-          return (
-            <TouchableOpacity
-              key={u.id}
-              style={[dynamicStyles.userRow, selected && dynamicStyles.userRowSelected]}
-              activeOpacity={0.6}
-              onPress={() => setSelectedUserId(u.id)}
-            >
-              <View style={dynamicStyles.userLeft}>
-                <View style={[dynamicStyles.avatar, { backgroundColor: colors.surfaceSecondary }]}>
-                  <Text style={[dynamicStyles.avatarText, { color: colors.text }]}>{u.initials}</Text>
-                </View>
-                <View style={{ flexShrink: 1 }}>
-                  <Text style={dynamicStyles.userName}>{u.name}</Text>
-                  <Text style={dynamicStyles.userEmail} numberOfLines={1}>{u.email}</Text>
-                </View>
-              </View>
-
-              <View style={dynamicStyles.originCell}>
-                <Ionicons name={originIcon[u.origin]} size={13} color={colors.textSecondary} />
-                <Text style={dynamicStyles.originText}>{originLabel[u.origin]}</Text>
-              </View>
-
-              <TouchableOpacity style={dynamicStyles.actionBtn} onPress={() => setSelectedUserId(u.id)}>
-                <Text style={dynamicStyles.actionBtnText}>{u.origin === 'google' ? 'Ver' : 'Gestionar'}</Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Gestionar usuario */}
-      {selectedUser && (
-        <>
-          <Text style={dynamicStyles.sectionTitle}>Gestionar usuario</Text>
-          <View style={dynamicStyles.card}>
-            <View style={dynamicStyles.manageHeader}>
-              <Text style={dynamicStyles.manageName}>{selectedUser.name}</Text>
-              <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceSecondary }]}>
-                <Text style={[dynamicStyles.badgeText, { color: colors.text }]}>
-                  {originLabel[selectedUser.origin]}
-                </Text>
-              </View>
+        <View style={dynamicStyles.metricsGrid}>
+          {METRICS.map((m) => (
+            <View key={m.label} style={dynamicStyles.metricCard}>
+              <Text style={dynamicStyles.metricLabel}>{m.label}</Text>
+              <Text style={dynamicStyles.metricValue}>
+                {m.value}
+                {m.suffix ? <Text style={dynamicStyles.metricSuffix}>{m.suffix}</Text> : null}
+              </Text>
             </View>
-            <Text style={dynamicStyles.manageEmail}>{selectedUser.email}</Text>
+          ))}
+        </View>
 
-            {!isManual ? (
-              <>
-                <View style={dynamicStyles.infoBox}>
-                  <Text style={dynamicStyles.infoLabel}>Plan actual</Text>
-                  <Text style={dynamicStyles.infoValue}>{selectedUser.plan}</Text>
+        {/* Motivos de eliminación */}
+        <Text style={dynamicStyles.sectionTitle}>Motivos de eliminación de cuenta</Text>
+        <View style={dynamicStyles.card}>
+          {DELETE_REASONS.map((r) => (
+            <View key={r.label} style={dynamicStyles.reasonRow}>
+              <Text style={dynamicStyles.reasonLabel}>{r.label}</Text>
+              <View style={dynamicStyles.reasonTrack}>
+                <View style={[dynamicStyles.reasonFill, { width: `${r.pct}%` }]} />
+              </View>
+              <Text style={dynamicStyles.reasonPct}>{r.pct}%</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Buscar usuarios */}
+        <Text style={dynamicStyles.sectionTitle}>Buscar usuarios</Text>
+        <View style={dynamicStyles.card}>
+          <View style={dynamicStyles.searchRow}>
+            <TextInput
+              style={dynamicStyles.searchInput}
+              placeholder="Nombre, correo o ID de usuario"
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity style={dynamicStyles.searchBtn}>
+              <Ionicons name="search" size={16} color={colors.primaryText} />
+            </TouchableOpacity>
+          </View>
+
+          {filteredUsers.map((u) => {
+            const selected = u.id === selectedUserId;
+            return (
+              <TouchableOpacity
+                key={u.id}
+                style={[dynamicStyles.userRow, selected && dynamicStyles.userRowSelected]}
+                activeOpacity={0.6}
+                onPress={() => setSelectedUserId(u.id)}
+              >
+                <View style={dynamicStyles.userLeft}>
+                  <View style={[dynamicStyles.avatar, { backgroundColor: colors.surfaceSecondary }]}>
+                    <Text style={[dynamicStyles.avatarText, { color: colors.text }]}>{u.initials}</Text>
+                  </View>
+                  <View style={{ flexShrink: 1 }}>
+                    <Text style={dynamicStyles.userName}>{u.name}</Text>
+                    <Text style={dynamicStyles.userEmail} numberOfLines={1}>{u.email}</Text>
+                  </View>
                 </View>
-                <View style={dynamicStyles.readonlyNote}>
-                  <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
-                  <Text style={dynamicStyles.readonlyNoteText}>
-                    {selectedUser.origin === 'google'
-                      ? 'Plan gestionado por Google Play. Solo lectura desde este panel: no se puede modificar ni revocar manualmente.'
-                      : 'Acceso otorgado como administrador. La gestión de este tipo de acceso se realiza desde otro usuario con permisos.'}
+
+                <View style={dynamicStyles.originCell}>
+                  <Ionicons name={originIcon[u.origin]} size={13} color={colors.textSecondary} />
+                  <Text style={dynamicStyles.originText}>{originLabel[u.origin]}</Text>
+                </View>
+
+                <TouchableOpacity style={dynamicStyles.actionBtn} onPress={() => setSelectedUserId(u.id)}>
+                  <Text style={dynamicStyles.actionBtnText}>{'Ver'}</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Gestionar usuario */}
+        {selectedUser && (
+          <>
+            <Text style={dynamicStyles.sectionTitle}>Gestionar usuario</Text>
+            <View style={dynamicStyles.card}>
+              <View style={dynamicStyles.manageHeader}>
+                <Text style={dynamicStyles.manageName}>{selectedUser.name}</Text>
+                <View style={[dynamicStyles.badge, { backgroundColor: colors.surfaceSecondary }]}>
+                  <Text style={[dynamicStyles.badgeText, { color: colors.text }]}>
+                    {originLabel[selectedUser.origin]}
                   </Text>
                 </View>
-              </>
-            ) : (
-              <>
-                {/* Selector de plan: todos los planes disponibles como chips seleccionables */}
-                <Text style={dynamicStyles.fieldLabel}>Cambiar plan</Text>
-                <View style={dynamicStyles.planChipsRow}>
-                  {PLAN_OPTIONS.map((plan) => {
-                    const active = plan === manualPlan;
-                    return (
-                      <TouchableOpacity
-                        key={plan}
-                        style={[dynamicStyles.planChip, active && dynamicStyles.planChipActive]}
-                        activeOpacity={0.7}
-                        onPress={() => setManualPlan(plan)}
-                      >
-                        <Text style={[dynamicStyles.planChipText, active && dynamicStyles.planChipTextActive]}>
-                          {plan}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+              </View>
+              <Text style={dynamicStyles.manageEmail}>{selectedUser.email}</Text>
 
-                <View style={dynamicStyles.fieldBlock}>
-                  <Text style={dynamicStyles.fieldLabel}>Motivo</Text>
-                  <TextInput
-                    style={dynamicStyles.input}
-                    placeholder="Compensación por incidente"
-                    placeholderTextColor={colors.textMuted}
-                  />
-                </View>
+              {!isManual ? (
+                <>
+                  <View style={dynamicStyles.infoBox}>
+                    <Text style={dynamicStyles.infoLabel}>Plan actual</Text>
+                    <Text style={dynamicStyles.infoValue}>{selectedUser.plan}</Text>
+                  </View>
+                  <View style={dynamicStyles.readonlyNote}>
+                    <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
+                    <Text style={dynamicStyles.readonlyNoteText}>
+                      {selectedUser.origin === 'google'
+                        ? 'Plan gestionado por Google Play. Solo lectura desde este panel: no se puede modificar ni revocar manualmente.'
+                        : 'Acceso otorgado como administrador. La gestión de este tipo de acceso se realiza desde otro usuario con permisos.'}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  {/* Selector de plan: todos los planes disponibles como chips seleccionables */}
+                  <Text style={dynamicStyles.fieldLabel}>Cambiar plan</Text>
+                  <View style={dynamicStyles.planChipsRow}>
+                    {PLAN_OPTIONS.map((plan) => {
+                      const active = plan === manualPlan;
+                      return (
+                        <TouchableOpacity
+                          key={plan}
+                          style={[dynamicStyles.planChip, active && dynamicStyles.planChipActive]}
+                          activeOpacity={0.7}
+                          onPress={() => setManualPlan(plan)}
+                        >
+                          <Text style={[dynamicStyles.planChipText, active && dynamicStyles.planChipTextActive]}>
+                            {plan}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
 
-                <View style={dynamicStyles.actionsRow}>
-                  <TouchableOpacity style={dynamicStyles.revokeBtn}>
-                    <Text style={dynamicStyles.revokeBtnText}>Revocar plan manual</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={dynamicStyles.saveBtn}>
-                    <Text style={dynamicStyles.saveBtnText}>Guardar cambios</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </>
-      )}
+                  <View style={dynamicStyles.fieldBlock}>
+                    <Text style={dynamicStyles.fieldLabel}>Motivo</Text>
+                    <TextInput
+                      style={dynamicStyles.input}
+                      placeholder="Compensación por incidente"
+                      placeholderTextColor={colors.textMuted}
+                    />
+                  </View>
 
-      <View style={{ height: 32 }} />
+                  <View style={dynamicStyles.actionsRow}>
+                    <TouchableOpacity style={dynamicStyles.revokeBtn}>
+                      <Text style={dynamicStyles.revokeBtnText}>Revocar plan manual</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={dynamicStyles.saveBtn}>
+                      <Text style={dynamicStyles.saveBtnText}>Guardar cambios</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </>
+        )}
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
 
       {/* Modal historial de cambios */}
       <Modal visible={showHistory} animationType="slide" presentationStyle="pageSheet">
@@ -482,6 +499,6 @@ export default function AdminScreen() {
           </ScrollView>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }

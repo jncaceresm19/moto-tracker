@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, 
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
 import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
@@ -10,6 +11,9 @@ import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { VerificationModal } from '../../src/components/VerificationModal';
+import { ImageCropModal } from '../../src/components/ImageCropModal';
+import { OcrReviewModal, buildOcrFields } from '../../src/components/OcrReviewModal';
+import { extractDocumentData } from '../../src/services/ocrService';
 import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
 
 export default function MotorcycleListScreen() {
@@ -20,7 +24,7 @@ export default function MotorcycleListScreen() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '', color: '' });
+  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', color: '', engineNumber: '', chassisNumber: '', serialNumber: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -32,6 +36,16 @@ export default function MotorcycleListScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [verifyingMotorcycle, setVerifyingMotorcycle] = useState<Motorcycle | null>(null);
+
+  // Padrón scan flow
+  const [padronScanPhase, setPadronScanPhase] = useState<'idle' | 'front' | 'back'>('idle');
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState('');
+  const [showOcrReview, setShowOcrReview] = useState(false);
+  const [ocrFields, setOcrFields] = useState<{ key: string; label: string; value: string; editable?: boolean }[]>([]);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState('');
+  const [ocrConfidence, setOcrConfidence] = useState<number | undefined>(undefined);
 
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -99,6 +113,130 @@ export default function MotorcycleListScreen() {
     }
   };
 
+  // ── Padrón scan flow ────────────────────────────────────────────────────
+  const processPadronOcr = async (base64: string, side: 'front' | 'back') => {
+    const dataUri = `data:image/jpeg;base64,${base64}`;
+    setShowCropModal(false);
+    setOcrLoading(true);
+    setOcrError('');
+    setShowOcrReview(true);
+    try {
+      const result = await extractDocumentData(dataUri, 'padron');
+      if (result.error) {
+        setOcrError(result.error);
+        return;
+      }
+      setOcrConfidence(result.confidence);
+      const filtered: Record<string, string | undefined> = {
+        issueDate: result.issueDate, patente: result.patente, rut: result.rut,
+        brand: result.brand, model: result.model, year: result.year,
+        engineNumber: result.engineNumber, chassisNumber: result.chassisNumber,
+        serialNumber: result.serialNumber, color: result.color,
+      };
+
+      if (side === 'back') {
+        // Back: only show patente, rut
+        filtered.brand = undefined;
+        filtered.model = undefined;
+        filtered.year = undefined;
+        filtered.engineNumber = undefined;
+        filtered.chassisNumber = undefined;
+        filtered.serialNumber = undefined;
+        filtered.color = undefined;
+      } else {
+        // Front: only show vehicle fields, not patente/rut
+        filtered.patente = undefined;
+        filtered.rut = undefined;
+      }
+
+      // Check if any meaningful field was actually extracted
+      const hasData = side === 'back'
+        ? !!(filtered.patente || filtered.rut)
+        : !!(filtered.issueDate || filtered.year || filtered.brand || filtered.model ||
+          filtered.engineNumber || filtered.chassisNumber || filtered.serialNumber || filtered.color);
+
+      if (!hasData) {
+        setOcrError('No se pudieron extraer datos.\nReintentá con mejor iluminación o completá los campos manualmente.');
+        return;
+      }
+
+      setOcrFields(buildOcrFields('padron', filtered));
+    } catch (e: any) {
+      setOcrError(e?.message || 'Error al procesar OCR');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // Show/hide create modal around scan flow to avoid modal stacking issues
+  const closeCreateForScan = () => { setShowCreate(false); };
+  const reopenCreateAfterScan = () => { setShowCreate(true); };
+
+  const handlePadronOcrSave = () => {
+    // Extract values from ocrFields and auto-fill the form
+    const ocrData: Record<string, string> = {};
+    for (const field of ocrFields) {
+      ocrData[field.key] = field.value;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      ...(ocrData.year ? { year: ocrData.year } : {}),
+      ...(ocrData.brand ? { brand: ocrData.brand } : {}),
+      ...(ocrData.model ? { model: ocrData.model } : {}),
+      ...(ocrData.engineNumber ? { engineNumber: ocrData.engineNumber } : {}),
+      ...(ocrData.chassisNumber ? { chassisNumber: ocrData.chassisNumber } : {}),
+      ...(ocrData.serialNumber ? { serialNumber: ocrData.serialNumber } : {}),
+      ...(ocrData.color ? { color: ocrData.color } : {}),
+      ...(ocrData.patente ? { licensePlate: ocrData.patente } : {}),
+    }));
+
+    setShowOcrReview(false);
+
+    if (padronScanPhase === 'front') {
+      // After front scan, automatically start back scan
+      setPadronScanPhase('back');
+      // Small delay before opening camera for back
+      setTimeout(() => handlePadronScan(), 600);
+    } else {
+      setPadronScanPhase('idle');
+      reopenCreateAfterScan();
+    }
+  };
+
+  const handlePadronScan = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showAlert(t('permissionNeeded'), t('permissionCamera'), [{ text: 'OK' }], 'lock-closed', '#FF9500');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false });
+    if (result.canceled || !result.assets[0]) { reopenCreateAfterScan(); return; }
+
+    const manipulated = await ImageManipulator.manipulateAsync(
+      result.assets[0].uri,
+      [{ resize: { width: 2400 } }],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+
+    if (!manipulated.base64) { reopenCreateAfterScan(); return; }
+
+    setCropImageUri(manipulated.uri);
+    setShowCropModal(true);
+  };
+
+  const handlePadronCropConfirm = async (base64: string) => {
+    if (padronScanPhase === 'idle') return;
+    await processPadronOcr(base64, padronScanPhase);
+  };
+
+  const handlePadronRetry = () => {
+    setShowOcrReview(false);
+    setTimeout(() => { handlePadronScan(); }, 300);
+  };
+  // ──────────────────────────────────────────────────────────────────────────
+
   const showImageOptions = () => {
     setShowPhotoModal(true);
   };
@@ -109,6 +247,8 @@ export default function MotorcycleListScreen() {
     if (!form.model) newErrors.model = t('required');
     if (!form.year) newErrors.year = t('required');
     if (!form.licensePlate) newErrors.licensePlate = t('required');
+    if (!form.engineNumber) newErrors.engineNumber = t('required');
+    if (!form.chassisNumber) newErrors.chassisNumber = t('required');
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
     setErrors({});
     setSaving(true);
@@ -119,13 +259,15 @@ export default function MotorcycleListScreen() {
         year: Number(form.year),
         licensePlate: form.licensePlate,
         currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
-        gpsTracker: form.gpsTracker || undefined,
         color: form.color || undefined,
+        engineNumber: form.engineNumber || undefined,
+        chassisNumber: form.chassisNumber || undefined,
+        serialNumber: form.serialNumber || undefined,
         imageUrl: imageUri || undefined,
       });
       setMotorcycles((prev) => [created, ...prev]);
       setShowCreate(false);
-      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '', color: '' });
+      setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', color: '', engineNumber: '', chassisNumber: '', serialNumber: '' });
       setImageUri(null);
       showAlert(t('success'), t('motorcycleUpdated'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
     } catch {
@@ -197,7 +339,22 @@ export default function MotorcycleListScreen() {
     modal: { flex: 1, padding: 20, backgroundColor: colors.background },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
-    cancel: { color: colors.primary, fontSize: 16 },
+    cancel: { color: colors.textSecondary, fontSize: 16, marginBottom: 15 },
+    modalTopRow: {
+      flexDirection: 'row',
+      marginBottom: 4,
+    },
+    modalLogoContainer: {
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.textMuted,
+      marginTop: -60,
+      marginBottom: 30,
+    },
     photoBtn: {
       width: '100%',
       height: 90,
@@ -210,8 +367,8 @@ export default function MotorcycleListScreen() {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      borderWidth: 2,
-      borderColor: colors.border,
+      borderWidth: 1,
+      borderColor: colors.primary,
       borderStyle: 'dashed',
       borderRadius: 10,
       gap: 10,
@@ -231,7 +388,7 @@ export default function MotorcycleListScreen() {
       color: colors.text,
     },
     errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
-    saveBtn: { backgroundColor: colors.success, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+    saveBtn: { backgroundColor: colors.success, borderRadius: 30, padding: 14, alignItems: 'center', marginTop: 8 },
     saveBtnText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
     // --- Safety / implements info banner (shown above the first listed motorcycle) ---
     // Mismo estilo que las cards de "Requisitos" en documentos.tsx (brandBlue + opacidad)
@@ -248,6 +405,71 @@ export default function MotorcycleListScreen() {
     safetyTitle: { fontSize: 13, fontWeight: '600', color: colors.text + '99' },
     safetyItem: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
     safetyItemText: { fontSize: 11.5, flex: 1, lineHeight: 15, color: colors.text + '99' },
+
+    // ── Nuevos estilos: layout tipo mockup (secciones agrupadas) ──────────
+
+    sectionLabel: { fontSize: 13, fontWeight: '600', color: colors.textMuted, textTransform: 'uppercase', marginTop: 8, marginBottom: 8, marginHorizontal: 3 },
+    sectionCard: {
+      backgroundColor: colors.surfaceSecondary,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 4,
+      marginBottom: 20,
+    },
+    groupedInput: {
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: colors.text,
+      marginBottom: 0,
+    },
+    divider: {
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    groupedError: {
+      color: colors.danger,
+      fontSize: 11,
+      paddingHorizontal: 12,
+      paddingBottom: 6,
+      marginTop: -4,
+    },
+    scanBtn: {
+      width: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      padding: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 6,
+    },
+    scanBtnText: { color: '#fff', fontSize: 15, fontWeight: '500' },
+    scanHint: {
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    photoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderStyle: 'dashed',
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 24,
+      overflow: 'hidden',
+    },
+    photoRowThumb: { width: 40, height: 40, borderRadius: 6, color: colors.primary },
+    photoRowText: { fontSize: 13, color: colors.primary, textAlign: 'center', },
   });
 
   if (loading) {
@@ -338,16 +560,17 @@ export default function MotorcycleListScreen() {
         />
       )}
 
-      <TouchableOpacity style={dynamicStyles.fab} activeOpacity={0.8} onPress={() => { setErrors({}); setImageUri(null); setShowCreate(true); }}>
+      <TouchableOpacity style={dynamicStyles.fab} activeOpacity={0.8} onPress={() => { setErrors({}); setImageUri(null); setPadronScanPhase('idle'); setShowCropModal(false); setShowOcrReview(false); setShowCreate(true); }}>
         <Text style={dynamicStyles.fabText}>+</Text>
       </TouchableOpacity>
 
       <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={dynamicStyles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-            <View style={dynamicStyles.modalHeader}>
-              <Text style={dynamicStyles.modalTitle}>{t('addMotorcycle')}</Text>
-              <TouchableOpacity onPress={() => setShowCreate(false)}><Text style={dynamicStyles.cancel}>X</Text></TouchableOpacity>
+            <View style={dynamicStyles.modalTopRow}>
+              <TouchableOpacity onPress={() => setShowCreate(false)} style={{ marginLeft: 'auto' }}>
+                <Text style={dynamicStyles.cancel}>{t('cancel')}</Text>
+              </TouchableOpacity>
             </View>
 
             <ScrollView
@@ -355,34 +578,78 @@ export default function MotorcycleListScreen() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 24 }}
             >
-              <TouchableOpacity style={dynamicStyles.photoBtn} onPress={showImageOptions}>
+              <View style={dynamicStyles.modalLogoContainer}>
+                <Image
+                  source={require('../../assets/nombre.jpeg')}
+                  style={styles.modalLogo}
+                  resizeMode="contain"
+                />
+                <Text style={dynamicStyles.modalSubtitle}>{t('addMotorcycle')}</Text>
+              </View>
+
+              {/* Escanear padrón — CTA principal */}
+              <TouchableOpacity
+                style={dynamicStyles.scanBtn}
+                activeOpacity={0.8}
+                onPress={() => { setPadronScanPhase('front'); closeCreateForScan(); handlePadronScan(); }}
+              >
+                <Ionicons name="scan-outline" size={18} color="#fff" />
+                <Text style={dynamicStyles.scanBtnText}>Escanear padrón</Text>
+              </TouchableOpacity>
+              <Text style={dynamicStyles.scanHint}>Completa año, marca, modelo y N° automáticamente</Text>
+
+              {/* Foto — secundaria */}
+              <TouchableOpacity activeOpacity={0.7} style={dynamicStyles.photoRow} onPress={showImageOptions}>
                 {imageUri ? (
-                  <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
+                  <>
+                    <Image source={{ uri: imageUri }} style={dynamicStyles.photoRowThumb} resizeMode="cover" />
+                    <Text style={dynamicStyles.photoRowText}>Cambiar foto del vehículo</Text>
+                  </>
                 ) : (
-                  <View style={dynamicStyles.photoPlaceholder}>
-                    <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                    <Text style={dynamicStyles.photoPlaceholderText}>{t('tapToAddMotoPhoto')}</Text>
-                  </View>
+                  <>
+                    <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                    <Text style={dynamicStyles.photoRowText}>{t('tapToAddMotoPhoto')}</Text>
+                  </>
                 )}
               </TouchableOpacity>
 
-              <TextInput style={dynamicStyles.input} placeholder={t('brand') + ' *'} placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
-              {errors.brand ? <Text style={dynamicStyles.errorText}>{errors.brand}</Text> : null}
-              <TextInput style={dynamicStyles.input} placeholder={t('model') + ' *'} placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
-              {errors.model ? <Text style={dynamicStyles.errorText}>{errors.model}</Text> : null}
-              <TextInput style={dynamicStyles.input} placeholder={t('year') + ' *'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
-              {errors.year ? <Text style={dynamicStyles.errorText}>{errors.year}</Text> : null}
-              <TextInput style={dynamicStyles.input} placeholder={t('licensePlate') + ' *'} placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
-              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: -6, marginBottom: 10 }}>Ingresar patente del permiso de circulación o padrón</Text>
-              {errors.licensePlate ? <Text style={dynamicStyles.errorText}>{errors.licensePlate}</Text> : null}
-              <TextInput style={dynamicStyles.input} placeholder={t('currentKilometers')} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
-              <TextInput style={dynamicStyles.input} placeholder="Color" placeholderTextColor={colors.textMuted} value={form.color} onChangeText={(v) => setForm((p) => ({ ...p, color: v }))} />
-              <View style={{ marginTop: 10, marginBottom: 6 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{t('gpsQuestion')}</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
+              {/* Sección: Identificación */}
+              <Text style={dynamicStyles.sectionLabel}>Identificación</Text>
+              <View style={dynamicStyles.sectionCard}>
+                <TextInput style={dynamicStyles.groupedInput} placeholder={t('year') + ' *'} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.year} onChangeText={(v) => { setForm((p) => ({ ...p, year: v })); setErrors((p) => ({ ...p, year: '' })); }} />
+                {errors.year ? <Text style={dynamicStyles.groupedError}>{errors.year}</Text> : null}
+                <View style={dynamicStyles.divider} />
+                <TextInput style={dynamicStyles.groupedInput} placeholder={t('brand') + ' *'} placeholderTextColor={colors.textMuted} value={form.brand} onChangeText={(v) => { setForm((p) => ({ ...p, brand: v })); setErrors((p) => ({ ...p, brand: '' })); }} />
+                {errors.brand ? <Text style={dynamicStyles.groupedError}>{errors.brand}</Text> : null}
+                <View style={dynamicStyles.divider} />
+                <TextInput style={dynamicStyles.groupedInput} placeholder={t('model') + ' *'} placeholderTextColor={colors.textMuted} value={form.model} onChangeText={(v) => { setForm((p) => ({ ...p, model: v })); setErrors((p) => ({ ...p, model: '' })); }} />
+                {errors.model ? <Text style={dynamicStyles.groupedError}>{errors.model}</Text> : null}
               </View>
-              <TextInput style={dynamicStyles.input} placeholder={t('gpsIdPlaceholder')} placeholderTextColor={colors.textMuted} value={form.gpsTracker} onChangeText={(v) => setForm((p) => ({ ...p, gpsTracker: v }))} />
-              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 4, marginBottom: 4 }}>{t('gpsQuestionHint2')}</Text>
+
+              {/* Sección: Números de identificación */}
+              <Text style={dynamicStyles.sectionLabel}>Números de identificación</Text>
+              <View style={dynamicStyles.sectionCard}>
+                <TextInput style={dynamicStyles.groupedInput} placeholder="N° Motor *" placeholderTextColor={colors.textMuted} value={form.engineNumber} onChangeText={(v) => { setForm((p) => ({ ...p, engineNumber: v })); setErrors((p) => ({ ...p, engineNumber: '' })); }} />
+                {errors.engineNumber ? <Text style={dynamicStyles.groupedError}>{errors.engineNumber}</Text> : null}
+                <View style={dynamicStyles.divider} />
+                <TextInput style={dynamicStyles.groupedInput} placeholder="N° Chasis *" placeholderTextColor={colors.textMuted} value={form.chassisNumber} onChangeText={(v) => { setForm((p) => ({ ...p, chassisNumber: v })); setErrors((p) => ({ ...p, chassisNumber: '' })); }} />
+                {errors.chassisNumber ? <Text style={dynamicStyles.groupedError}>{errors.chassisNumber}</Text> : null}
+                <View style={dynamicStyles.divider} />
+                <TextInput style={dynamicStyles.groupedInput} placeholder="N° Serie" placeholderTextColor={colors.textMuted} value={form.serialNumber} onChangeText={(v) => setForm((p) => ({ ...p, serialNumber: v }))} />
+              </View>
+
+              {/* Sección: Otros datos */}
+              <Text style={dynamicStyles.sectionLabel}>Otros datos</Text>
+              <View style={dynamicStyles.sectionCard}>
+                <TextInput style={dynamicStyles.groupedInput} placeholder={t('licensePlate') + ' *'} placeholderTextColor={colors.textMuted} value={form.licensePlate} onChangeText={(v) => { setForm((p) => ({ ...p, licensePlate: v })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
+                <Text style={{ fontSize: 11, color: colors.textMuted, paddingHorizontal: 12, marginTop: -4, marginBottom: 6 }}>Ingresar patente del permiso de circulación o padrón</Text>
+                {errors.licensePlate ? <Text style={dynamicStyles.groupedError}>{errors.licensePlate}</Text> : null}
+                <View style={dynamicStyles.divider} />
+                <TextInput style={dynamicStyles.groupedInput} placeholder={t('currentKilometers')} placeholderTextColor={colors.textMuted} keyboardType="numeric" value={form.currentKilometers} onChangeText={(v) => setForm((p) => ({ ...p, currentKilometers: v }))} />
+                <View style={dynamicStyles.divider} />
+                <TextInput style={dynamicStyles.groupedInput} placeholder="Color" placeholderTextColor={colors.textMuted} value={form.color} onChangeText={(v) => setForm((p) => ({ ...p, color: v }))} />
+              </View>
+
               <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleCreate} disabled={saving}>
                 {saving ? <ActivityIndicator color={colors.successText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
               </TouchableOpacity>
@@ -410,6 +677,29 @@ export default function MotorcycleListScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Padrón scan modals */}
+      <ImageCropModal
+        visible={showCropModal}
+        imageUri={cropImageUri}
+        onConfirm={handlePadronCropConfirm}
+        onCancel={() => { setShowCropModal(false); reopenCreateAfterScan(); if (padronScanPhase === 'back') { setPadronScanPhase('idle'); } }}
+      />
+
+      <OcrReviewModal
+        visible={showOcrReview}
+        documentType="padron"
+        loading={ocrLoading}
+        fields={ocrFields}
+        error={ocrError}
+        confidence={ocrConfidence}
+        onFieldChange={(key, value) => {
+          setOcrFields((prev) => prev.map((f) => (f.key === key ? { ...f, value } : f)));
+        }}
+        onSave={handlePadronOcrSave}
+        onCancel={() => { setShowOcrReview(false); setPadronScanPhase('idle'); reopenCreateAfterScan(); }}
+        onRetry={handlePadronRetry}
+      />
 
       <CustomAlert
         visible={alertVisible}
@@ -529,5 +819,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalLogo: {
+    width: 300,
+    height: 150,
+    marginTop: -30,
   },
 });

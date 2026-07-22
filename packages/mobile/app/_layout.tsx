@@ -76,7 +76,7 @@ function RootLayoutInner() {
         console.log('[AUTH] App returned to foreground, elapsed:', Math.round(elapsed / 1000), 's');
 
         if (user && elapsed >= LOCK_THRESHOLD_MS) {
-          const enabled = await isBiometricEnabled();
+          const enabled = await isBiometricEnabled(user.id);
           if (enabled) {
             setBiometricNeeded(true);
           }
@@ -154,13 +154,14 @@ function RootLayoutInner() {
   };
 
   const checkBiometricFlow = async () => {
+    if (!user) return;
     try {
-      const hasPreference = await hasBiometricPreference();
+      const hasPreference = await hasBiometricPreference(user.id);
       console.log('[AUTH] Has preference:', hasPreference);
 
       if (hasPreference) {
         // User already answered before → use their preference
-        const enabled = await isBiometricEnabled();
+        const enabled = await isBiometricEnabled(user.id);
         console.log('[AUTH] Biometric enabled:', enabled);
         biometricChecked.current = true;
         setInitialCheckDone(true);
@@ -200,9 +201,10 @@ function RootLayoutInner() {
 
   const handleEnableBiometric = async () => {
     setShowBiometricPrompt(false);
+    if (!user) return;
     const authenticated = await authenticateWithBiometrics();
     if (authenticated) {
-      await enableBiometric();
+      await enableBiometric(user.id);
       setBiometricNeeded(true);
     } else {
       router.replace('/(app)');
@@ -211,7 +213,8 @@ function RootLayoutInner() {
 
   const handleSkipBiometric = async () => {
     setShowBiometricPrompt(false);
-    await disableBiometric();
+    if (!user) return;
+    await disableBiometric(user.id);
     router.replace('/(app)');
   };
 

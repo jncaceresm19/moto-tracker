@@ -1,8 +1,16 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BIOMETRIC_ENABLED_KEY = '@biometric_enabled';
-const BIOMETRIC_PROMPTED_KEY = '@biometric_prompted';
+const BIOMETRIC_ENABLED_PREFIX = '@biometric_enabled_';
+const BIOMETRIC_PROMPTED_PREFIX = '@biometric_prompted_';
+
+function biometricEnabledKey(userId: string): string {
+  return `${BIOMETRIC_ENABLED_PREFIX}${userId}`;
+}
+
+function biometricPromptedKey(userId: string): string {
+  return `${BIOMETRIC_PROMPTED_PREFIX}${userId}`;
+}
 
 // Check if device has biometric hardware
 export async function hasBiometricHardware(): Promise<boolean> {
@@ -34,9 +42,9 @@ export async function isBiometricAvailable(): Promise<boolean> {
 }
 
 // Check if user has been prompted for biometrics
-export async function hasBeenPrompted(): Promise<boolean> {
+export async function hasBeenPrompted(userId: string): Promise<boolean> {
   try {
-    const prompted = await AsyncStorage.getItem(BIOMETRIC_PROMPTED_KEY);
+    const prompted = await AsyncStorage.getItem(biometricPromptedKey(userId));
     return prompted === 'true';
   } catch {
     return false;
@@ -44,14 +52,14 @@ export async function hasBeenPrompted(): Promise<boolean> {
 }
 
 // Mark as prompted
-export async function markAsPrompted(): Promise<void> {
-  await AsyncStorage.setItem(BIOMETRIC_PROMPTED_KEY, 'true');
+export async function markAsPrompted(userId: string): Promise<void> {
+  await AsyncStorage.setItem(biometricPromptedKey(userId), 'true');
 }
 
 // Check if user has answered the biometric prompt (has a stored preference)
-export async function hasBiometricPreference(): Promise<boolean> {
+export async function hasBiometricPreference(userId: string): Promise<boolean> {
   try {
-    const pref = await AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY);
+    const pref = await AsyncStorage.getItem(biometricEnabledKey(userId));
     return pref !== null; // null means never asked
   } catch {
     return false;
@@ -59,9 +67,9 @@ export async function hasBiometricPreference(): Promise<boolean> {
 }
 
 // Check if user enabled biometrics
-export async function isBiometricEnabled(): Promise<boolean> {
+export async function isBiometricEnabled(userId: string): Promise<boolean> {
   try {
-    const enabled = await AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY);
+    const enabled = await AsyncStorage.getItem(biometricEnabledKey(userId));
     return enabled === 'true';
   } catch {
     return false;
@@ -69,19 +77,18 @@ export async function isBiometricEnabled(): Promise<boolean> {
 }
 
 // Enable biometrics
-export async function enableBiometric(): Promise<void> {
-  await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+export async function enableBiometric(userId: string): Promise<void> {
+  await AsyncStorage.setItem(biometricEnabledKey(userId), 'true');
 }
 
 // Disable biometrics
-export async function disableBiometric(): Promise<void> {
-  await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'false');
+export async function disableBiometric(userId: string): Promise<void> {
+  await AsyncStorage.setItem(biometricEnabledKey(userId), 'false');
 }
 
 // Reset biometric preference (for debugging/testing)
-export async function resetBiometricPreference(): Promise<void> {
-  await AsyncStorage.removeItem(BIOMETRIC_ENABLED_KEY);
-  // DO NOT remove BIOMETRIC_PROMPTED_KEY - user already answered the modal
+export async function resetBiometricPreference(userId: string): Promise<void> {
+  await AsyncStorage.removeItem(biometricEnabledKey(userId));
 }
 
 // Authenticate with biometrics

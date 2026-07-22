@@ -15,12 +15,13 @@ export interface TheftAlert {
   status: 'active' | 'closed' | 'recovered';
   createdAt: Date;
   closedAt?: Date;
-  recoveredAt?: Date; // when owner marked as found (card stays green until end of day)
+  recoveredAt?: Date;
   responseCount?: number;
-  ownerPhone?: string; // owner's phone for WhatsApp contact
+  ownerPhone?: string;
   ownerName?: string;
   ownerAvatarUrl?: string;
   ownerVerified?: boolean;
+  ownerCreatedAt?: Date;
 }
 
 export interface TheftAlertResponse {
@@ -28,6 +29,8 @@ export interface TheftAlertResponse {
   theftAlertId: string;
   userId: string;
   userName: string;
+  userAvatarUrl?: string;
+  userVerified?: boolean;
   text: string;
   createdAt: Date;
 }
@@ -42,6 +45,7 @@ export async function createTheftAlert(data: {
   lastLatitude: number;
   lastLongitude: number;
   lastLocationName?: string;
+  photoUrl?: string;
 }): Promise<TheftAlert> {
   return api<TheftAlert>('/api/theft-alerts', {
     method: 'POST',

@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 30,
     marginTop: 8,
   },
   submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },

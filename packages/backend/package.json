@@ -28,6 +28,11 @@
     "express": "^5.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^9.0.3",
+    "pdf-parse": "^2.4.5",
+    "sharp": "^0.35.3",
+    "tesseract.js": "^7.0.0",
+    "twilio": "^6.0.2",
     "zod": "^3.25.0"
   },
   "devDependencies": {
@@ -37,7 +42,9 @@
     "@types/express": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.3",
+    "@types/nodemailer": "^8.0.1",
     "@types/supertest": "^7.2.0",
+    "@types/twilio": "^3.19.2",
     "@typescript-eslint/eslint-plugin": "^8.32.0",
     "@typescript-eslint/parser": "^8.32.0",
     "@vitest/coverage-v8": "^3.2.1",

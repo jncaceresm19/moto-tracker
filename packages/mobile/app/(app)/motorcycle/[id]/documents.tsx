@@ -5,12 +5,36 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { File, Paths } from 'expo-file-system';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
 import { useTheme } from '../../../../src/theme-context';
+import { useAuth } from '../../../../src/auth-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
+import { extractDocumentData, extractPdfData, OcrResult } from '../../../../src/services/ocrService';
+import { OcrReviewModal, buildOcrFields, OcrField } from '../../../../src/components/OcrReviewModal';
+import { ImageCropModal } from '../../../../src/components/ImageCropModal';
+
+// Parse date as LOCAL (avoids UTC midnight shifting the day back)
+// Handles both "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss.sssZ"
+function parseLocalDate(dateStr: string): Date {
+  const datePart = dateStr.split('T')[0]; // "2026-04-02" or "2026-04-02T00:00:00.000Z" → "2026-04-02"
+  const [y, m, d] = datePart.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function formatDateEs(dateStr: string): string {
+  if (!dateStr) return '';
+  try {
+    const d = parseLocalDate(dateStr);
+    return d.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+}
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'padron', 'drivers_license', 'fines'];
 
@@ -41,6 +65,9 @@ const FIXED_TITLE_TYPES: Record<string, string> = {
   drivers_license: 'driversLicense',
 };
 
+// Types that support OCR scanning
+const OCR_TYPES = ['circulation_permit', 'technical_review', 'drivers_license', 'padron', 'insurance'];
+
 // Types that allow multiple documents
 const MULTI_DOC_TYPES = ['fines'];
 
@@ -50,6 +77,7 @@ export default function DocumentsScreen() {
   const router = useRouter();
   const { t } = useLanguage();
   const { colors } = useTheme();
+  const { user } = useAuth();
 
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,6 +105,23 @@ export default function DocumentsScreen() {
   const [showTechReviewInstructivo, setShowTechReviewInstructivo] = useState(false);
   const [showLicenseInstructivo, setShowLicenseInstructivo] = useState(false);
   const [showPadronDuplicado, setShowPadronDuplicado] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'photo' | 'file'>('photo');
+  const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; mimeType: string } | null>(null);
+  // OCR state
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [showOcrReview, setShowOcrReview] = useState(false);
+  const [ocrFields, setOcrFields] = useState<OcrField[]>([]);
+  const [ocrError, setOcrError] = useState<string | undefined>();
+  const [ocrConfidence, setOcrConfidence] = useState<number | undefined>();
+  const [ocrDocumentType, setOcrDocumentType] = useState('');
+  const [ocrRawResult, setOcrRawResult] = useState<Record<string, string | undefined>>({});
+  const [ocrComuna, setOcrComuna] = useState<string | undefined>();
+  const [ocrPhotoUri, setOcrPhotoUri] = useState<string | null>(null);
+  // Crop modal state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState('');
+  const [pendingOcrSide, setPendingOcrSide] = useState<'front' | 'back'>('front');
+  const [cropMode, setCropMode] = useState<'ocr' | 'photo'>('ocr');
 
   useEffect(() => {
     navigation.setOptions({
@@ -84,7 +129,9 @@ export default function DocumentsScreen() {
       headerLeft: () => (
         <TouchableOpacity
           onPress={() => {
-            if (selectedType) {
+            if (viewing) {
+              setViewing(null);
+            } else if (selectedType) {
               setSelectedType(null);
               setViewing(null);
             } else {
@@ -97,7 +144,7 @@ export default function DocumentsScreen() {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, id, router, selectedType, t, colors]);
+  }, [navigation, id, router, selectedType, viewing, t, colors]);
 
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = colors.primary) => {
     setAlertTitle(title);
@@ -138,6 +185,9 @@ export default function DocumentsScreen() {
   const resetForm = (type: string = 'other') => {
     const titleKey = FIXED_TITLE_TYPES[type];
     setForm({ type, title: titleKey ? t(titleKey) : '', fileUrl: '', fileUrlBack: '', issueDate: '', expiryDate: '' });
+    setUploadMode('photo');
+    setPickedFile(null);
+    setOcrPhotoUri(null);
   };
 
   const openCreate = () => { resetForm(selectedType || 'other'); setErrors({}); setShowCreate(true); };
@@ -168,30 +218,53 @@ export default function DocumentsScreen() {
     }
 
     const result = fromCamera
-      ? await ImagePicker.launchCameraAsync({ quality: 0.8, allowsEditing: true })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.8, allowsEditing: true });
+      ? await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 1.0, allowsEditing: false });
 
     if (!result.canceled && result.assets[0]) {
       const manipulated = await ImageManipulator.manipulateAsync(
         result.assets[0].uri,
-        [{ resize: { width: 1200 } }],
-        { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+        [{ resize: { width: 2400 } }],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
-      if (manipulated.base64) {
-        const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
-        if (photoSide === 'back') {
-          setForm((p) => ({ ...p, fileUrlBack: dataUri }));
-        } else {
-          setForm((p) => ({ ...p, fileUrl: dataUri }));
-          setErrors((p) => ({ ...p, fileUrl: '' }));
-        }
-      }
+      if (!manipulated.base64) return;
+      // Show crop modal for all photo types
+      setPendingOcrSide(photoSide);
+      setCropImageUri(manipulated.uri);
+      setCropMode('photo');
+      setShowCropModal(true);
     }
   };
 
   const showImageOptions = (side: 'front' | 'back' = 'front') => {
     setPhotoSide(side);
     setShowPhotoModal(true);
+  };
+
+  const pickFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const file = result.assets[0];
+      setPickedFile({ uri: file.uri, name: file.name, mimeType: file.mimeType || 'application/pdf' });
+      const response = await fetch(file.uri);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        setForm((p) => ({ ...p, fileUrl: base64 }));
+        setErrors((p) => ({ ...p, fileUrl: '' }));
+
+        // Auto-OCR for PDFs on OCR-supported types
+        const docType = selectedType || form.type;
+        if (file.mimeType === 'application/pdf' && OCR_TYPES.includes(docType)) {
+          await handlePdfOcr(base64, docType);
+        }
+      };
+      reader.readAsDataURL(blob);
+    }
   };
 
   const handleCreate = async () => {
@@ -226,6 +299,229 @@ export default function DocumentsScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── OCR Handlers ──────────────────────────────────────────────────────────
+  // Process OCR with a base64 image
+  const processOcr = async (dataUri: string, docType: string, ocrSide: 'front' | 'back') => {
+    setOcrDocumentType(docType);
+    setOcrLoading(true);
+    setOcrError(undefined);
+    setShowOcrReview(true);
+    setOcrPhotoUri(dataUri);
+
+    try {
+      const ocrResult = await extractDocumentData(dataUri, docType);
+
+      if (ocrResult.error) {
+        setOcrError(ocrResult.error);
+        setOcrConfidence((ocrResult as any).confidence);
+      } else {
+        setOcrConfidence((ocrResult as any).confidence);
+        const rawResult: Record<string, string | undefined> = {};
+        let fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
+
+        // Drivers license: expiry = issueDate + 6 years, day = user's birth day
+        if (docType === 'drivers_license' && (ocrResult as any).issueDate && user?.birthDate) {
+          const birthDay = parseLocalDate(user.birthDate).getDate();
+          const issue = parseLocalDate((ocrResult as any).issueDate);
+          const expiry = new Date(issue.getFullYear() + 6, issue.getMonth(), birthDay);
+          const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
+          (ocrResult as any).expiryDate = iso;
+          fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
+        }
+
+        fields.forEach(f => { rawResult[f.key] = f.value; });
+        setOcrRawResult(rawResult);
+        setOcrFields(fields);
+      }
+    } catch (err) {
+      console.error('[OCR] Scan error:', err);
+      setOcrError('Error al conectar con el servicio de OCR. Intenta de nuevo.');
+      setOcrConfidence(0);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  // Handle crop confirm: run OCR or just store the image
+  const handleCropConfirm = async (base64: string) => {
+    setShowCropModal(false);
+    const dataUri = `data:image/jpeg;base64,${base64}`;
+
+    if (cropMode === 'ocr') {
+      const docType = selectedType || form.type;
+      await processOcr(dataUri, docType, pendingOcrSide);
+    } else {
+      // Just store the image (non-OCR flow)
+      if (pendingOcrSide === 'back') {
+        setForm((p) => ({ ...p, fileUrlBack: dataUri }));
+      } else {
+        setForm((p) => ({ ...p, fileUrl: dataUri }));
+        setErrors((p) => ({ ...p, fileUrl: '' }));
+      }
+    }
+  };
+
+  // Open camera for OCR scan
+  const handleScanDocument = async () => {
+    setShowPhotoModal(false);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showAlert(t('permissionNeeded'), t('permissionMessage'), [{ text: 'OK' }], 'lock-closed', colors.accent);
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false });
+    if (result.canceled || !result.assets[0]) return;
+
+    const manipulated = await ImageManipulator.manipulateAsync(
+      result.assets[0].uri,
+      [{ resize: { width: 2400 } }],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+
+    if (!manipulated.base64) return;
+
+    const docType = selectedType || form.type;
+    const isPadron = docType === 'padron';
+
+    // For padron: OCR runs on the BACK photo (where issue date is)
+    // For all other 2-photo docs: OCR runs only on the FRONT
+    const runOcr = isPadron ? photoSide === 'back' : photoSide === 'front';
+
+    // Use photoSide (the actual side tapped) — NOT a calculated ocrSide
+    setPendingOcrSide(photoSide);
+    setCropImageUri(manipulated.uri);
+    setCropMode(runOcr ? 'ocr' : 'photo');
+    setShowCropModal(true);
+  };
+
+  // Auto-scan: open camera directly, then crop → OCR
+  const handleAutoScan = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showAlert(t('permissionNeeded'), t('permissionMessage'), [{ text: 'OK' }], 'lock-closed', colors.accent);
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false });
+    if (result.canceled || !result.assets[0]) return;
+
+    const manipulated = await ImageManipulator.manipulateAsync(
+      result.assets[0].uri,
+      [{ resize: { width: 2400 } }],
+      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
+
+    if (!manipulated.base64) return;
+
+    const docType = selectedType || form.type;
+    const isPadron = docType === 'padron';
+
+    // Auto-scan from front placeholder:
+    // For padron: save front photo only (no OCR — issue date is on back)
+    // For others: run OCR on front
+    setPendingOcrSide('front');
+    setCropImageUri(manipulated.uri);
+    setCropMode(isPadron ? 'photo' : 'ocr');
+    setShowCropModal(true);
+  };
+
+  // PDF OCR: extract text from PDF and run through parser
+  const handlePdfOcr = async (pdfBase64: string, docType: string) => {
+    setOcrDocumentType(docType);
+    setOcrLoading(true);
+    setOcrError(undefined);
+    setShowOcrReview(true);
+
+    try {
+      const ocrResult = await extractPdfData(pdfBase64, docType);
+
+      if (ocrResult.error) {
+        setOcrError(ocrResult.error);
+        setOcrConfidence((ocrResult as any).confidence);
+      } else {
+        setOcrConfidence((ocrResult as any).confidence);
+        const rawResult: Record<string, string | undefined> = {};
+        let fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
+
+        if (docType === 'drivers_license' && (ocrResult as any).issueDate && user?.birthDate) {
+          const birthDay = parseLocalDate(user.birthDate).getDate();
+          const issue = parseLocalDate((ocrResult as any).issueDate);
+          const expiry = new Date(issue.getFullYear() + 6, issue.getMonth(), birthDay);
+          const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
+          (ocrResult as any).expiryDate = iso;
+          fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
+        }
+
+        fields.forEach(f => { rawResult[f.key] = f.value; });
+        setOcrRawResult(rawResult);
+        setOcrFields(fields);
+      }
+    } catch (err) {
+      console.error('[OCR] PDF error:', err);
+      setOcrError('Error al procesar el PDF. Intenta de nuevo.');
+      setOcrConfidence(0);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleOcrFieldChange = (key: string, value: string) => {
+    setOcrFields(prev => prev.map(f => f.key === key ? { ...f, value } : f));
+    setOcrRawResult(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleOcrSave = async () => {
+    setShowOcrReview(false);
+    const docType = ocrDocumentType;
+
+    // Store comuna for Google Maps actions
+    if (ocrRawResult.comuna) setOcrComuna(ocrRawResult.comuna);
+
+    // Set form directly — do NOT call openCreate() (it resets everything)
+    // OCR photo goes to the correct side depending on document type
+    const isBackOcr = docType === 'padron';
+    const titleKey = FIXED_TITLE_TYPES[docType];
+    setForm((prev) => ({
+      type: docType,
+      title: titleKey ? t(titleKey) : '',
+      fileUrl: isBackOcr ? prev.fileUrl : (ocrPhotoUri || prev.fileUrl),
+      fileUrlBack: isBackOcr ? (ocrPhotoUri || prev.fileUrlBack) : prev.fileUrlBack,
+      issueDate: ocrRawResult.issueDate || '',
+      expiryDate: ocrRawResult.expiryDate || '',
+    }));
+    setErrors({});
+    setShowCreate(true);
+  };
+
+  const handleOcrRetry = () => {
+    setOcrError(undefined);
+    setOcrFields([]);
+    setShowOcrReview(false);
+    handleScanDocument();
+  };
+
+  // ── Google Maps Actions ───────────────────────────────────────────────────
+  const handlePayPermit = (comuna?: string) => {
+    if (!comuna) {
+      showAlert('Sin comuna', 'Escanea el permiso de circulación para detectar la comuna.', [{ text: 'OK' }], 'alert-circle', colors.accent);
+      return;
+    }
+    const url = `https://www.google.com/maps/search/?api=1&query=municipalidad+de+${encodeURIComponent(comuna)}+Chile`;
+    Linking.openURL(url);
+  };
+
+  const handleFindTechPlants = () => {
+    const url = `https://www.google.com/maps/search/?api=1&query=plantas+de+revisión+técnica+cercanas`;
+    Linking.openURL(url);
+  };
+
+  const handleGoToMunicipality = (comuna?: string) => {
+    const query = comuna ? `municipalidad+de+${encodeURIComponent(comuna)}+Chile` : 'municipalidad+cercana';
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+    Linking.openURL(url);
   };
 
   const handleUpdate = async () => {
@@ -281,8 +577,8 @@ export default function DocumentsScreen() {
 
   const generatePDF = async (doc: Document) => {
     if (!doc.fileUrl) return null;
-    const issuedStr = doc.issueDate ? new Date(doc.issueDate).toLocaleDateString() : '—';
-    const expiresStr = doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString() : '—';
+    const issuedStr = doc.issueDate ? parseLocalDate(doc.issueDate).toLocaleDateString() : '—';
+    const expiresStr = doc.expiryDate ? parseLocalDate(doc.expiryDate).toLocaleDateString() : '—';
     const backSection = doc.fileUrlBack
       ? `<div style="page-break-before: always; text-align: center; padding-top: 20px;">
            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Reverso</div>
@@ -327,6 +623,29 @@ export default function DocumentsScreen() {
     }
   };
 
+  const openPDF = async (dataUri: string) => {
+    try {
+      const base64 = dataUri.replace(/^data:application\/pdf;base64,/, '');
+      const fileName = 'doc_' + Date.now() + '.pdf';
+      const file = new File(Paths.cache, fileName);
+      file.create();
+      file.write(base64, { encoding: 'base64' });
+      // Print API can render PDFs - opens native print/share dialog with preview
+      await Print.printAsync({ uri: file.uri });
+    } catch (e: any) {
+      // Fallback: Sharing (gives "Open with" options)
+      try {
+        const base64_2 = dataUri.replace(/^data:application\/pdf;base64,/, '');
+        const file2 = new File(Paths.cache, 'doc_fb_' + Date.now() + '.pdf');
+        file2.create();
+        file2.write(base64_2, { encoding: 'base64' });
+        await Sharing.shareAsync(file2.uri, { mimeType: 'application/pdf' });
+      } catch (e2: any) {
+        showAlert(t('error'), 'No se pudo abrir el PDF: ' + (e2?.message || String(e2)), [{ text: 'OK' }], 'close-circle', colors.danger);
+      }
+    }
+  };
+
   const handleBulkSaveAsPDF = async () => {
     const photos = filteredDocs.filter((d) => d.fileUrl);
     if (photos.length === 0) {
@@ -335,8 +654,8 @@ export default function DocumentsScreen() {
     }
 
     const pages = photos.map((doc) => {
-      const issuedStr = doc.issueDate ? new Date(doc.issueDate).toLocaleDateString() : '—';
-      const expiresStr = doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString() : '—';
+      const issuedStr = doc.issueDate ? parseLocalDate(doc.issueDate).toLocaleDateString() : '—';
+      const expiresStr = doc.expiryDate ? parseLocalDate(doc.expiryDate).toLocaleDateString() : '—';
       return `
         <div style="page-break-after: always; padding: 20px; text-align: center;">
           <div style="font-size: 18px; font-weight: bold; margin-bottom: 4px;">${doc.title}</div>
@@ -533,7 +852,13 @@ export default function DocumentsScreen() {
           <ScrollView contentContainerStyle={styles.detailContent} scrollEnabled={doc.type !== 'circulation_permit'}>
             {/* Photo with status badge overlay */}
             <View>
-              {((doc.type === 'drivers_license' || doc.type === 'technical_review') && doc.fileUrlBack) ? (
+              {doc.fileUrl?.startsWith('data:application/pdf') ? (
+                <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, marginTop: 16 }]} activeOpacity={0.9} onPress={() => openPDF(doc.fileUrl!)}>
+                  <Ionicons name="document-text" size={48} color={colors.primary} />
+                  <Text style={[styles.pdfName, { color: colors.text, marginTop: 8 }]}>{doc.title}</Text>
+                  <Text style={[styles.pdfHint, { color: colors.textMuted }]}>Toca para abrir el PDF</Text>
+                </TouchableOpacity>
+              ) : ((doc.type === 'drivers_license' || doc.type === 'technical_review' || doc.type === 'padron') && doc.fileUrlBack) ? (
                 <View style={{ gap: 10 }}>
                   <View>
                     <Text style={[styles.pdfHint, { color: colors.textMuted }]}>{doc.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
@@ -584,7 +909,7 @@ export default function DocumentsScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 0 }}>
                     <Ionicons name="calendar-outline" size={16} color={colors.success} />
                     <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                      {t('issued')}: {new Date(doc.issueDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {t('issued')}: {formatDateEs(doc.issueDate)}
                     </Text>
                   </View>
                 )}
@@ -592,7 +917,7 @@ export default function DocumentsScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                     <Ionicons name="calendar-outline" size={16} color={colors.danger} />
                     <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                      {t('expires')}: {new Date(doc.expiryDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      {t('expires')}: {formatDateEs(doc.expiryDate)}
                     </Text>
                   </View>
                 )}
@@ -654,7 +979,8 @@ export default function DocumentsScreen() {
                 <TouchableOpacity
                   style={[styles.submitBtn, { backgroundColor: isCirculationPermitOpen() ? colors.success : colors.textMuted + '40', marginTop: 12 }]}
                   activeOpacity={isCirculationPermitOpen() ? 0.8 : 1}
-                  disabled={!isCirculationPermitOpen()}>
+                  disabled={!isCirculationPermitOpen()}
+                  onPress={() => handlePayPermit(ocrComuna)}>
                   <Ionicons name="wallet-outline" size={20} color={isCirculationPermitOpen() ? '#fff' : colors.textMuted} />
                   <Text style={[styles.submitBtnText, { color: isCirculationPermitOpen() ? '#fff' : colors.textMuted }]}>Paga tu permiso</Text>
                 </TouchableOpacity>
@@ -796,8 +1122,9 @@ export default function DocumentsScreen() {
                 </TouchableOpacity>
                 <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
                 <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}>
-                  <Ionicons name="calendar-outline" size={20} color="#fff" />
+                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
+                  onPress={() => handleGoToMunicipality(ocrComuna)}>
+                  <Ionicons name="map-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
                 </TouchableOpacity>
               </>
@@ -841,10 +1168,6 @@ export default function DocumentsScreen() {
                       <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
                       <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>Moto nueva: exenta los primeros 36-48 meses desde inscripción</Text>
                     </View>
-                    <View style={styles.infoCardItem}>
-                      <Ionicons name="time-outline" size={16} color={colors.brandBlue + '99'} />
-                      <Text style={[styles.infoCardText, { color: colors.text + '99' }]}>5-9 años: cada 2 años · 10+ años: cada año</Text>
-                    </View>
                   </View>
                   <View style={[styles.infoCardDivider, { backgroundColor: colors.brandBlue, opacity: 0.25, marginTop: 10 }]} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -863,9 +1186,10 @@ export default function DocumentsScreen() {
                 <Text style={[styles.payHint, { color: colors.textMuted }]}>Procura cumplir con todos estos requisitos previo a tu cita</Text>
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}>
-                  <Ionicons name="calendar-outline" size={20} color="#fff" />
-                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
+                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
+                  onPress={handleFindTechPlants}>
+                  <Ionicons name="map-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Buscar plantas de revisión</Text>
                 </TouchableOpacity>
                 <Text style={[styles.payHint, { color: colors.textMuted }]}>El valor de la revisión técnica puede variar según la Planta de Revisión Técnica (PRT). Consulta el precio vigente al momento de reservar tu hora.</Text>
               </>
@@ -916,66 +1240,151 @@ export default function DocumentsScreen() {
         <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
-                <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+              <View style={styles.modalTopRow}>
+                <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
+                </TouchableOpacity>
               </View>
-              {(form.type === 'drivers_license' || form.type === 'technical_review') ? (
-                <View style={{ gap: 10, marginBottom: 12 }}>
-                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
+
+              <View style={[styles.modalLogoContainer, { borderBottomColor: colors.border }]}>
+                <Image
+                  source={require('../../../../assets/nombre.jpeg')}
+                  style={styles.modalLogo}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>{modalTitle}</Text>
+              </View>
+              {/* Upload mode toggle — segmented pill control */}
+              <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceSecondary }]}>
+                <TouchableOpacity
+                  style={[styles.segmentedOption, uploadMode === 'photo' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
+                  onPress={() => { setUploadMode('photo'); setPickedFile(null); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+                >
+                  <Ionicons name="camera-outline" size={16} color={uploadMode === 'photo' ? colors.primary : colors.textMuted} />
+                  <Text style={[styles.segmentedOptionText, { color: uploadMode === 'photo' ? colors.primary : colors.textMuted }]}>Foto</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segmentedOption, uploadMode === 'file' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
+                  onPress={() => { setUploadMode('file'); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+                >
+                  <Ionicons name="document-outline" size={16} color={uploadMode === 'file' ? colors.primary : colors.textMuted} />
+                  <Text style={[styles.segmentedOptionText, { color: uploadMode === 'file' ? colors.primary : colors.textMuted }]}>Subir archivo</Text>
+                </TouchableOpacity>
+              </View>
+              {uploadMode === 'photo' && (
+                (form.type === 'drivers_license' || form.type === 'technical_review' || form.type === 'padron') ? (
+                  <View style={{ gap: 10, marginBottom: 12 }}>
+                    <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                      {form.fileUrl ? (
+                        <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                          <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                            <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                          </View>
+                          <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>{form.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
+                          <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>Toca para capturar</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('back')}>
+                      {form.fileUrlBack ? (
+                        <Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />
+                      ) : (
+                        <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                          <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                            <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                          </View>
+                          <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>{form.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text>
+                          <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>Toca para capturar</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
                     {form.fileUrl ? (
                       <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                     ) : (
-                      <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
-                        <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                        <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
+                      <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                        <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                          <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>{t('tapToAddPhoto')}</Text>
+                        <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>Toca para capturar</Text>
                       </View>
                     )}
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('back')}>
-                    {form.fileUrlBack ? (
-                      <Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />
-                    ) : (
-                      <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
-                        <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                        <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text>
+                )
+              )}
+              {/* File picker */}
+              {uploadMode === 'file' && (
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary, marginBottom: 12 }]} onPress={pickFile}>
+                  {pickedFile ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
+                      <Ionicons name="document-text" size={28} color={colors.primary} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{pickedFile.name}</Text>
+                        <Text style={{ fontSize: 12, color: colors.textMuted }}>{pickedFile.mimeType === 'application/pdf' ? 'PDF' : 'Imagen'}</Text>
                       </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
-                  {form.fileUrl ? (
-                    <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                    </View>
                   ) : (
-                    <View style={[styles.photoPlaceholder, { borderColor: colors.border }]}>
-                      <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                      <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('tapToAddPhoto')}</Text>
+                    <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                      <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                        <Ionicons name="document-outline" size={20} color={colors.primary} />
+                      </View>
+                      <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>Toca para seleccionar archivo</Text>
+                      <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>PDF o imagen</Text>
                     </View>
                   )}
                 </TouchableOpacity>
               )}
               {errors.fileUrl ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.fileUrl}</Text> : null}
-              {isTitleEditable ? (
-                <TextInput style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]} placeholder={t('title')} placeholderTextColor={colors.textMuted} value={form.title} onChangeText={(text) => setForm((p) => ({ ...p, title: text }))} />
-              ) : (
-                <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}><Text style={{ fontSize: 15, color: colors.text }}>{form.title}</Text></View>
-              )}
-              <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowIssueDatePicker(true)}>
-                <Text style={{ fontSize: 15, color: form.issueDate ? colors.text : colors.textMuted }}>{form.issueDate || t('issueDate')}</Text>
-              </TouchableOpacity>
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{isTitleEditable ? t('title') : 'Tipo de documento'}</Text>
+                {isTitleEditable ? (
+                  <View style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]}>
+                    <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                    <TextInput style={[styles.fieldInput, { color: colors.text }]} placeholder={t('title')} placeholderTextColor={colors.textMuted} value={form.title} onChangeText={(text) => setForm((p) => ({ ...p, title: text }))} />
+                  </View>
+                ) : (
+                  <View style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                    <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                    <Text style={{ fontSize: 14, color: colors.text }}>{form.title}</Text>
+                  </View>
+                )}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('issueDate')}</Text>
+                  <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowIssueDatePicker(true)}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                    <Text style={[styles.fieldInputText, { color: form.issueDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.issueDate ? formatDateEs(form.issueDate) : 'Selecciona'}</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('expiryDate')}</Text>
+                  <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                    <Text style={[styles.fieldInputText, { color: form.expiryDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.expiryDate ? formatDateEs(form.expiryDate) : 'Selecciona'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
               {showIssueDatePicker && (
                 <DateTimePicker value={form.issueDate ? new Date(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, issueDate: iso })); if (form.expiryDate && new Date(form.expiryDate) >= date) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
               )}
-              <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
-                <Text style={{ fontSize: 15, color: form.expiryDate ? colors.text : colors.textMuted }}>{form.expiryDate || t('expiryDate')}</Text>
-              </TouchableOpacity>
-              {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.expiryDate}</Text> : null}
               {showExpiryDatePicker && (
                 <DateTimePicker value={form.expiryDate ? new Date(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, expiryDate: iso })); if (form.issueDate && date < new Date(form.issueDate)) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
               )}
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
-                {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>}
+                {saving ? <ActivityIndicator color={colors.primaryText} /> : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="save-outline" size={18} color={colors.primaryText} />
+                    <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
               {showPhotoModal && (
                 <View style={styles.photoOverlay}>
@@ -983,8 +1392,8 @@ export default function DocumentsScreen() {
                   <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
                     <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
                     <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
-                    <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}><Ionicons name="camera" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('takePhoto')}</Text></TouchableOpacity>
                     <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}><Ionicons name="images" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('chooseFromGallery')}</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.success }]} onPress={handleScanDocument}><Ionicons name="scan-outline" size={20} color="#fff" /><Text style={[styles.photoOverlayBtnText, { color: '#fff' }]}>Escanear documento</Text></TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -993,6 +1402,26 @@ export default function DocumentsScreen() {
         </Modal>
 
         <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+
+        <OcrReviewModal
+          visible={showOcrReview}
+          documentType={ocrDocumentType}
+          loading={ocrLoading}
+          fields={ocrFields}
+          error={ocrError}
+          confidence={ocrConfidence}
+          onFieldChange={handleOcrFieldChange}
+          onSave={handleOcrSave}
+          onCancel={() => setShowOcrReview(false)}
+          onRetry={handleOcrRetry}
+        />
+
+        <ImageCropModal
+          visible={showCropModal}
+          imageUri={cropImageUri}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setShowCropModal(false)}
+        />
 
         {/* Modal: Instructivo Revisión Técnica */}
         <Modal visible={showTechReviewInstructivo} transparent animationType="fade">
@@ -1140,147 +1569,159 @@ export default function DocumentsScreen() {
     );
   }
 
-  // --- Multi-doc types: list view with cards + modal detail ---
+  // --- Multi-doc types: list view with cards + inline detail ---
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <FlatList
-        data={filteredDocs}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={filteredDocs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        ListHeaderComponent={
-          <View style={[styles.infoBanner, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue, marginHorizontal: 16, marginTop: 12 }]}>
-            <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue} />
-            <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('finesDisclaimer')}</Text>
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>📄</Text>
-            <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noDocuments')}</Text>
-            <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noDocumentsSub')}</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} activeOpacity={0.8} onPress={() => setViewing(item)}>
-            <View style={styles.cardRow}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[styles.cardStatus, item.status === 'expired' && { color: colors.danger }, item.status === 'expiring' && { color: colors.accent }, item.status === 'valid' && { color: colors.success }]}>
-                {item.status === 'expired' ? t('expired') : item.status === 'expiring' ? t('expiring') : t('valid')}
-              </Text>
-            </View>
-            {item.issueDate && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <Ionicons name="calendar-outline" size={13} color={colors.success} />
-                <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                  {t('issued')}: {new Date(item.issueDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </Text>
-              </View>
-            )}
-            {item.expiryDate && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                <Ionicons name="calendar-outline" size={13} color={colors.danger} />
-                <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                  {t('expires')}: {new Date(item.expiryDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
-      />
-
-      {filteredDocs.some((d) => d.fileUrl) && (
-        <TouchableOpacity style={[styles.bulkFab, { backgroundColor: colors.success }]} onPress={handleBulkSaveAsPDF}>
-          <Ionicons name="download-outline" size={24} color={colors.successText} />
-        </TouchableOpacity>
-      )}
-      {selectedType === 'fines' && (
-        <TouchableOpacity
-          style={[styles.bulkFab, { backgroundColor: colors.primary, bottom: 148 }]}
-          onPress={() => Linking.openURL('https://www.registrocivil.cl/consultas/multas')}>
-          <Ionicons name="search-outline" size={22} color={colors.primaryText} />
-        </TouchableOpacity>
-      )}
-
-      <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
-        <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
-      </TouchableOpacity>
-
-      {/* Detail Modal (multi-doc types) */}
-      <Modal visible={viewing !== null} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.detailContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.detailHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setViewing(null)}>
-              <Text style={{ color: colors.primary, fontSize: 16 }}>{t('done')}</Text>
-            </TouchableOpacity>
-            <View style={styles.detailActions}>
-              <TouchableOpacity onPress={() => viewing && openEdit(viewing)} style={styles.editBtn}>
-                <Ionicons name="pencil" size={20} color={colors.primary} />
+      {viewing ? (
+        <ScrollView contentContainerStyle={styles.detailContent}>
+          {/* Photo with status badge overlay — same as single-doc detail */}
+          <View>
+            {viewing.fileUrl?.startsWith('data:application/pdf') ? (
+              <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, marginTop: 16 }]} activeOpacity={0.9} onPress={() => openPDF(viewing.fileUrl!)}>
+                <Ionicons name="document-text" size={48} color={colors.primary} />
+                <Text style={[styles.pdfName, { color: colors.text, marginTop: 8 }]}>{viewing.title}</Text>
+                <Text style={[styles.pdfHint, { color: colors.textMuted }]}>Toca para abrir el PDF</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => viewing && handleDelete(viewing)} style={styles.deleteBtn}>
-                <Ionicons name="trash" size={20} color={colors.danger} />
-              </TouchableOpacity>
-            </View>
-          </View>
-          {viewing && (
-            <ScrollView contentContainerStyle={styles.detailContent}>
-              <View style={styles.detailTitleRow}>
-                <Text style={[styles.detailTitle, { color: colors.text, flex: 1 }]}>{viewing.title}</Text>
-                <View style={[styles.detailStatusBadge, {
-                  backgroundColor: viewing.status === 'expired' ? colors.danger + '15' : viewing.status === 'expiring' ? colors.accent + '15' : colors.success + '15',
-                  borderColor: viewing.status === 'expired' ? colors.danger : viewing.status === 'expiring' ? colors.accent : colors.success,
+            ) : viewing.fileUrl ? (
+              <View>
+                <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} activeOpacity={0.9} onPress={() => { setViewingPhoto('front'); setShowPhotoViewer(true); }}>
+                  <Image source={{ uri: viewing.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
+                </TouchableOpacity>
+                <View style={[styles.statusBadgeOverlay, {
+                  backgroundColor: viewing.status === 'expired' ? colors.danger : viewing.status === 'expiring' ? colors.accent : colors.success,
                 }]}>
-                  <Text style={[styles.detailStatusText, {
-                    color: viewing.status === 'expired' ? colors.danger : viewing.status === 'expiring' ? colors.accent : colors.success,
-                  }]}>
+                  <Text style={styles.statusBadgeOverlayText}>
                     {viewing.status === 'expired' ? t('expired') : viewing.status === 'expiring' ? t('expiring') : t('valid')}
                   </Text>
                 </View>
               </View>
+            ) : (
+              <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
+                <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Edit + Delete — same layout as single-doc */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+            <View>
               {viewing.issueDate && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 0 }}>
                   <Ionicons name="calendar-outline" size={16} color={colors.success} />
-                  <Text style={[styles.detailDate, { color: colors.textSecondary }]}>
-                    {t('issued')}: {new Date(viewing.issueDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                    {t('issued')}: {formatDateEs(viewing.issueDate)}
                   </Text>
                 </View>
               )}
               {viewing.expiryDate && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
                   <Ionicons name="calendar-outline" size={16} color={colors.danger} />
-                  <Text style={[styles.detailDate, { color: colors.textSecondary }]}>
-                    {t('expires')}: {new Date(viewing.expiryDate).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                    {t('expires')}: {formatDateEs(viewing.expiryDate)}
                   </Text>
                 </View>
               )}
-              {viewing.type === 'drivers_license' && viewing.fileUrlBack ? (
-                <View style={{ gap: 10, marginTop: 20 }}>
-                  <View>
-                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{t('frontPhoto')}</Text>
-                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewingPhoto('front'); setShowPhotoViewer(true); }}>
-                      <Image source={{ uri: viewing.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                    </TouchableOpacity>
-                  </View>
-                  <View>
-                    <Text style={[styles.pdfHint, { color: colors.textMuted, marginBottom: 6 }]}>{t('backPhoto')}</Text>
-                    <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewingPhoto('back'); setShowPhotoViewer(true); }}>
-                      <Image source={{ uri: viewing.fileUrlBack }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : viewing.fileUrl ? (
-                <TouchableOpacity style={[styles.pdfThumbnail, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]} onPress={() => { setViewingPhoto('front'); setShowPhotoViewer(true); }}>
-                  <Image source={{ uri: viewing.fileUrl }} style={styles.pdfPreviewImage} resizeMode="contain" />
-                </TouchableOpacity>
-              ) : (
-                <View style={[styles.noPhoto, { backgroundColor: colors.surfaceSecondary }]}>
-                  <Text style={{ color: colors.textMuted }}>{t('noDocumentAttached')}</Text>
-                </View>
-              )}
-            </ScrollView>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity onPress={() => openEdit(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Ionicons name="pencil" size={18} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
+                <Ionicons name="trash" size={18} color={colors.danger} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Download + Share — same as single-doc */}
+          {viewing.fileUrl && (
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flex: 1 }]}
+                onPress={() => handleSaveAsPDF(viewing)}
+              >
+                <Ionicons name="download-outline" size={18} color={colors.text} />
+                <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('download')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flex: 1 }]}
+                onPress={() => handleShare(viewing)}
+              >
+                <Ionicons name="share-outline" size={18} color={colors.text} />
+                <Text style={[styles.actionBtnText, { color: colors.text }]}>↗ {t('share')}</Text>
+              </TouchableOpacity>
+            </View>
           )}
-        </View>
-      </Modal>
+        </ScrollView>
+      ) : (
+        <>
+          <FlatList
+            data={filteredDocs}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={filteredDocs.length === 0 ? { flexGrow: 1, justifyContent: 'center' } : undefined}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+            ListHeaderComponent={filteredDocs.length > 0 ? (
+              <View style={[styles.infoBanner, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue, marginHorizontal: 16, marginTop: 12 }]}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.brandBlue} />
+                <Text style={[styles.infoBannerText, { color: colors.text }]}>{t('finesDisclaimer')}</Text>
+              </View>
+            ) : null}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>📄</Text>
+                <Text style={[styles.empty, { color: colors.textMuted }]}>{t('noDocuments')}</Text>
+                <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t('noDocumentsSub')}</Text>
+              </View>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={[styles.card, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}
+                activeOpacity={0.8}
+                onPress={() => setViewing(item)}
+              >
+                <View style={styles.cardRow}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{item.title}</Text>
+                  <Text style={[styles.cardStatus, item.status === 'expired' && { color: colors.danger }, item.status === 'expiring' && { color: colors.accent }, item.status === 'valid' && { color: colors.success }]}>
+                    {item.status === 'expired' ? t('expired') : item.status === 'expiring' ? t('expiring') : t('valid')}
+                  </Text>
+                </View>
+                {item.issueDate && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <Ionicons name="calendar-outline" size={13} color={colors.success} />
+                    <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                      {t('issued')}: {formatDateEs(item.issueDate)}
+                    </Text>
+                  </View>
+                )}
+                {item.expiryDate && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <Ionicons name="calendar-outline" size={13} color={colors.danger} />
+                    <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
+                      {t('expires')}: {formatDateEs(item.expiryDate)}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
+          />
+
+          {filteredDocs.some((d) => d.fileUrl) && (
+            <TouchableOpacity style={[styles.bulkFab, { backgroundColor: colors.success }]} onPress={handleBulkSaveAsPDF}>
+              <Ionicons name="download-outline" size={24} color={colors.successText} />
+            </TouchableOpacity>
+          )}
+          {selectedType === 'fines' && (
+            <TouchableOpacity
+              style={[styles.bulkFab, { backgroundColor: colors.primary, bottom: 148 }]}
+              onPress={() => Linking.openURL('https://www.registrocivil.cl/consultas/multas')}>
+              <Ionicons name="search-outline" size={22} color={colors.primaryText} />
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={openCreate}>
+            <Text style={[styles.fabText, { color: colors.primaryText }]}>+</Text>
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* Photo Viewer */}
       <Modal visible={showPhotoViewer} animationType="fade" transparent>
@@ -1307,49 +1748,157 @@ export default function DocumentsScreen() {
         </View>
       </Modal>
 
-      {/* Create/Edit Modal */}
+
+
+      {/* Create/Edit Modal (multi-doc types: fines) */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
-              <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+            <View style={styles.modalTopRow}>
+              <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
+              </TouchableOpacity>
             </View>
-            {(form.type === 'drivers_license' || form.type === 'technical_review') ? (
-              <View style={{ gap: 10, marginBottom: 12 }}>
-                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
-                  {form.fileUrl ? (<Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text></View>)}
+
+            <View style={[styles.modalLogoContainer, { borderBottomColor: colors.border }]}>
+              <Image
+                source={require('../../../../assets/nombre.jpeg')}
+                style={styles.modalLogo}
+                resizeMode="contain"
+              />
+              <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>{modalTitle}</Text>
+            </View>
+            {/* Upload mode toggle — segmented pill control */}
+            <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceSecondary }]}>
+              <TouchableOpacity
+                style={[styles.segmentedOption, uploadMode === 'photo' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
+                onPress={() => { setUploadMode('photo'); setPickedFile(null); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+              >
+                <Ionicons name="camera-outline" size={16} color={uploadMode === 'photo' ? colors.primary : colors.textMuted} />
+                <Text style={[styles.segmentedOptionText, { color: uploadMode === 'photo' ? colors.primary : colors.textMuted }]}>Foto</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.segmentedOption, uploadMode === 'file' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
+                onPress={() => { setUploadMode('file'); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+              >
+                <Ionicons name="document-outline" size={16} color={uploadMode === 'file' ? colors.primary : colors.textMuted} />
+                <Text style={[styles.segmentedOptionText, { color: uploadMode === 'file' ? colors.primary : colors.textMuted }]}>Subir archivo</Text>
+              </TouchableOpacity>
+            </View>
+            {uploadMode === 'photo' && (
+              (form.type === 'drivers_license' || form.type === 'technical_review' || form.type === 'padron') ? (
+                <View style={{ gap: 10, marginBottom: 12 }}>
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                    {form.fileUrl ? (
+                      <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                        <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                          <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>{form.type === 'technical_review' ? 'Revisión Técnica' : t('frontPhoto')}</Text>
+                        <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>Toca para capturar</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('back')}>
+                    {form.fileUrlBack ? (
+                      <Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                        <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                          <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                        </View>
+                        <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>{form.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text>
+                        <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>Toca para capturar</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                  {form.fileUrl ? (
+                    <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                      <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                        <Ionicons name="camera-outline" size={20} color={colors.primary} />
+                      </View>
+                      <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>{t('tapToAddPhoto')}</Text>
+                      <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>Toca para capturar</Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('back')}>
-                  {form.fileUrlBack ? (<Image source={{ uri: form.fileUrlBack }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{form.type === 'technical_review' ? 'Emisión de Gases' : t('backPhoto')}</Text></View>)}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => showImageOptions('front')}>
-                {form.fileUrl ? (<Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />) : (<View style={[styles.photoPlaceholder, { borderColor: colors.border }]}><Text style={styles.photoPlaceholderIcon}>📷</Text><Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('tapToAddPhoto')}</Text></View>)}
+              )
+            )}
+            {/* File picker */}
+            {uploadMode === 'file' && (
+              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary, marginBottom: 12 }]} onPress={pickFile}>
+                {pickedFile ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
+                    <Ionicons name="document-text" size={28} color={colors.primary} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{pickedFile.name}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textMuted }}>{pickedFile.mimeType === 'application/pdf' ? 'PDF' : 'Imagen'}</Text>
+                    </View>
+                    <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                  </View>
+                ) : (
+                  <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
+                    <View style={[styles.photoPlaceholderIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                      <Ionicons name="document-outline" size={20} color={colors.primary} />
+                    </View>
+                    <Text style={[styles.photoPlaceholderTitle, { color: colors.text }]}>Toca para seleccionar archivo</Text>
+                    <Text style={[styles.photoPlaceholderSubtitle, { color: colors.textMuted }]}>PDF o imagen</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             )}
             {errors.fileUrl ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.fileUrl}</Text> : null}
-            {isTitleEditable ? (
-              <TextInput style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]} placeholder={t('title')} placeholderTextColor={colors.textMuted} value={form.title} onChangeText={(text) => setForm((p) => ({ ...p, title: text }))} />
-            ) : (
-              <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}><Text style={{ fontSize: 15, color: colors.text }}>{form.title}</Text></View>
-            )}
-            <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowIssueDatePicker(true)}>
-              <Text style={{ fontSize: 15, color: form.issueDate ? colors.text : colors.textMuted }}>{form.issueDate || t('issueDate')}</Text>
-            </TouchableOpacity>
+            <View style={{ marginBottom: 12 }}>
+              <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{isTitleEditable ? t('title') : 'Tipo de documento'}</Text>
+              {isTitleEditable ? (
+                <View style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                  <TextInput style={[styles.fieldInput, { color: colors.text }]} placeholder={t('title')} placeholderTextColor={colors.textMuted} value={form.title} onChangeText={(text) => setForm((p) => ({ ...p, title: text }))} />
+                </View>
+              ) : (
+                <View style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                  <Ionicons name="pricetag-outline" size={16} color={colors.textSecondary} />
+                  <Text style={{ fontSize: 14, color: colors.text }}>{form.title}</Text>
+                </View>
+              )}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('issueDate')}</Text>
+                <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowIssueDatePicker(true)}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                  <Text style={[styles.fieldInputText, { color: form.issueDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.issueDate ? formatDateEs(form.issueDate) : 'Selecciona'}</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('expiryDate')}</Text>
+                <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
+                  <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                  <Text style={[styles.fieldInputText, { color: form.expiryDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.expiryDate ? formatDateEs(form.expiryDate) : 'Selecciona'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
             {showIssueDatePicker && (
               <DateTimePicker value={form.issueDate ? new Date(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, issueDate: iso })); if (form.expiryDate && new Date(form.expiryDate) >= date) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
             )}
-            <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
-              <Text style={{ fontSize: 15, color: form.expiryDate ? colors.text : colors.textMuted }}>{form.expiryDate || t('expiryDate')}</Text>
-            </TouchableOpacity>
-            {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.expiryDate}</Text> : null}
             {showExpiryDatePicker && (
               <DateTimePicker value={form.expiryDate ? new Date(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, expiryDate: iso })); if (form.issueDate && date < new Date(form.issueDate)) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
             )}
             <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
-              {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>}
+              {saving ? <ActivityIndicator color={colors.primaryText} /> : (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="save-outline" size={18} color={colors.primaryText} />
+                  <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             {showPhotoModal && (
               <View style={styles.photoOverlay}>
@@ -1357,8 +1906,8 @@ export default function DocumentsScreen() {
                 <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
                   <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
                   <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
-                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}><Ionicons name="camera" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('takePhoto')}</Text></TouchableOpacity>
                   <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}><Ionicons name="images" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('chooseFromGallery')}</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.success }]} onPress={handleScanDocument}><Ionicons name="scan-outline" size={20} color="#fff" /><Text style={[styles.photoOverlayBtnText, { color: '#fff' }]}>Escanear documento</Text></TouchableOpacity>
                 </View>
               </View>
             )}
@@ -1366,7 +1915,27 @@ export default function DocumentsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      <ImageCropModal
+        visible={showCropModal}
+        imageUri={cropImageUri}
+        onConfirm={handleCropConfirm}
+        onCancel={() => setShowCropModal(false)}
+      />
+
       <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+
+      <OcrReviewModal
+        visible={showOcrReview}
+        documentType={ocrDocumentType}
+        loading={ocrLoading}
+        fields={ocrFields}
+        error={ocrError}
+        confidence={ocrConfidence}
+        onFieldChange={handleOcrFieldChange}
+        onSave={handleOcrSave}
+        onCancel={() => setShowOcrReview(false)}
+        onRetry={handleOcrRetry}
+      />
     </View>
   );
 }
@@ -1412,22 +1981,23 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center' },
   emptyIcon: { fontSize: 48, marginBottom: 8 },
   emptySub: { fontSize: 13, marginTop: 4 },
-  card: { padding: 14, marginHorizontal: 16, marginTop: 8, borderRadius: 8 },
+  card: {
+    padding: 14,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 10,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 10,
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+    borderLeftWidth: 4,
+  },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
+  cardTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginBottom: 5 },
   cardStatus: { fontSize: 12, fontWeight: '500' },
   cardDate: { fontSize: 11, marginTop: 2 },
-  // Detail Modal
-  detailContainer: { flex: 1 },
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
-  detailActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  editBtn: { padding: 8 },
-  deleteBtn: { padding: 8 },
+  // Detail content shared by single-doc and multi-doc inline detail
   detailContent: { paddingHorizontal: 20, paddingBottom: 20, paddingTop: 6 },
-  detailTitle: { fontSize: 22, fontWeight: 'bold', marginTop: 4 },
-  detailTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailStatusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
-  detailStatusText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
   statusBadgeOverlay: { position: 'absolute', top: 10, right: 10, paddingHorizontal: 12, paddingVertical: 5, borderRadius: 8 },
   statusBadgeOverlayText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   detailDate: { fontSize: 12, marginTop: 8 },
@@ -1481,29 +2051,101 @@ const styles = StyleSheet.create({
   photoViewerBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   // Create/Edit Modal
   modal: { flex: 1, padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: -15 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
+  // Upload mode segmented control (Foto / Subir archivo)
+  segmentedControl: {
+    flexDirection: 'row',
+    borderRadius: 10,
+    padding: 3,
+    marginBottom: 12,
+    marginTop: -30
+  },
+  segmentedOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 8,
+  },
+  segmentedOptionActive: {
+    borderWidth: 1.5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  segmentedOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   photoBtn: {
     width: '100%',
     height: 140,
     borderRadius: 10,
     overflow: 'hidden',
-    marginBottom: 12,
+    marginBottom: 5,
   },
   photoPreview: { width: '100%', height: '100%' },
   photoPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
+    borderWidth: 1,
     borderStyle: 'dashed',
     borderRadius: 10,
   },
+  photoPlaceholderIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  photoPlaceholderTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  photoPlaceholderSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+  },
   photoPlaceholderIcon: { fontSize: 32, marginBottom: 6 },
   photoPlaceholderText: { fontSize: 14 },
+  // Form fields with floating uppercase labels + inline icon
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 5,
+    marginTop: 8
+  },
+  fieldBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  fieldInput: {
+    flex: 1,
+    fontSize: 14,
+    padding: 0,
+  },
+  fieldInputText: {
+    fontSize: 13,
+    flex: 1,
+  },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10 },
   errorText: { fontSize: 12, marginBottom: 8, marginTop: -6 },
-  saveBtn: { borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtn: { borderRadius: 30, padding: 14, alignItems: 'center', marginTop: 25 },
   saveBtnText: { fontSize: 16, fontWeight: '600' },
   fab: {
     position: 'absolute',
@@ -1592,7 +2234,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 30,
   },
   submitBtnText: {
     fontSize: 16,
@@ -1607,11 +2249,11 @@ const styles = StyleSheet.create({
   },
 
   linkText: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
   },
   payHint: {
-    fontSize: 12,
+    fontSize: 10,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -1647,4 +2289,25 @@ const styles = StyleSheet.create({
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   headerSubtitle: { fontSize: 13, marginTop: 2 },
+  modalTopRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  modalLogoContainer: {
+    alignItems: 'center',
+    paddingBottom: 16,
+    marginBottom: 16,
+    borderBottomWidth: 1,
+  },
+  modalLogo: {
+    width: 300,
+    height: 150,
+    marginTop: -30
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: -60,
+    marginBottom: 30
+  },
 });

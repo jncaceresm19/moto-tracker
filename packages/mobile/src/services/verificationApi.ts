@@ -19,6 +19,7 @@ export interface VerifyResult {
   verificadaPor: string;
   rtVigente: boolean;
   encargoRobo: boolean;
+  ppuMatch?: boolean;
   warnings: string[];
 }
 
@@ -31,11 +32,14 @@ export async function verifyMotorcycle(
   padronUrl: string,
   carnetFrontUrl?: string,
   carnetBackUrl?: string,
-  selfieUrl?: string
+  selfieUrl?: string,
+  padronBackUrl?: string,
+  extractedPatente?: string,
+  extractedRut?: string
 ): Promise<{ data: VerifyResult }> {
   return api(`/api/motorcycles/${motorcycleId}/verify`, {
     method: 'POST',
-    body: { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl },
+    body: { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl, padronBackUrl, extractedPatente, extractedRut },
   });
 }
 

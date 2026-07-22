@@ -285,12 +285,14 @@ export default function MaintenanceScreen() {
   };
 
   const resetForm = (type: string = 'motor_oil') => {
-    setForm({ type, description: '', kilometersAtService: '', serviceDate: '', cost: '', notes: '' });
+    const today = new Date().toISOString().split('T')[0];
+    setForm({ type, description: '', kilometersAtService: '', serviceDate: today, cost: '', notes: '' });
     setImageUri(null);
   };
 
   const openCreate = () => {
-    setForm({ type: selectedType || 'motor_oil', description: '', kilometersAtService: String(motorcycleKm || ''), serviceDate: '', cost: '', notes: '' });
+    const today = new Date().toISOString().split('T')[0];
+    setForm({ type: selectedType || 'motor_oil', description: '', kilometersAtService: String(motorcycleKm || ''), serviceDate: today, cost: '', notes: '' });
     setImageUri(null);
     setErrors({});
     setShowCreate(true);
@@ -434,6 +436,23 @@ export default function MaintenanceScreen() {
         },
       },
     ], 'warning', colors.accent);
+  };
+
+  const handleRenew = async (record: MaintenanceRecord) => {
+    if (!id) return;
+    try {
+      const created = await createMaintenance(id, {
+        type: record.type,
+        description: record.description,
+        kilometersAtService: motorcycleKm,
+        serviceDate: new Date().toISOString(),
+        cost: undefined,
+      });
+      setRecords((prev) => [created, ...prev]);
+      showAlert(t('success'), 'Mantención renovada', [{ text: 'OK' }], 'checkmark-circle', colors.success);
+    } catch {
+      showAlert(t('error'), 'Error al renovar', [{ text: 'OK' }], 'close-circle', colors.danger);
+    }
   };
 
   const modalTitle = editing ? t('editRecord') : t('newRecord');
@@ -664,9 +683,6 @@ export default function MaintenanceScreen() {
             )}
           </View>
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity onPress={() => openEdit(rec)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-              <Ionicons name="pencil" size={18} color={colors.primary} />
-            </TouchableOpacity>
             <TouchableOpacity onPress={() => handleDelete(rec)} style={[styles.iconActionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
               <Ionicons name="trash" size={18} color={colors.danger} />
             </TouchableOpacity>
@@ -788,6 +804,17 @@ export default function MaintenanceScreen() {
                   {interval.notes}
                 </Text>
               )}
+
+              {isOverdue && (
+                <TouchableOpacity
+                  onPress={() => handleRenew(rec)}
+                  activeOpacity={0.7}
+                  style={[styles.renewBtn, { backgroundColor: colors.primary }]}
+                >
+                  <Ionicons name="refresh" size={18} color="#fff" style={{ marginRight: 6 }} />
+                  <Text style={styles.renewBtnText}>Renovar mantención</Text>
+                </TouchableOpacity>
+              )}
             </View>
           );
         })()}
@@ -797,22 +824,16 @@ export default function MaintenanceScreen() {
           <TouchableOpacity
             style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary }]}
             activeOpacity={0.7}
-            onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}
+            onPress={() => router.push(`/(app)/motorcycle/${id}/maintenance-history?type=${rec.type}`)}
           >
             <View style={[styles.sectionChip, { backgroundColor: '#FBEAF0' }]}>
               <Ionicons name="stats-chart-outline" size={18} color="#993556" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.sectionText, { color: colors.text }]}>{t('kilometerHistory')}</Text>
-              {kmEntries.length > 0 ? (
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Último: {kmEntries[0].readingKm.toLocaleString('es-CL')} km · {new Date(kmEntries[0].recordedAt).toLocaleDateString()}
-                </Text>
-              ) : (
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Sin registros
-                </Text>
-              )}
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                {filteredRecords.length} {filteredRecords.length === 1 ? 'registro' : 'registros'}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
@@ -846,7 +867,7 @@ export default function MaintenanceScreen() {
           {/* Historial de Kilómetros */}
           {kmEntries.length > 0 && (
             <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }} onPress={() => router.push(`/(app)/motorcycle/${id}/kilometers`)}>
+              <TouchableOpacity style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }} onPress={() => router.push(`/(app)/motorcycle/${id}/maintenance-history?type=${selectedType}`)}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kilometerHistory')}</Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
               </TouchableOpacity>
@@ -905,17 +926,24 @@ export default function MaintenanceScreen() {
           </TouchableOpacity>
         );
       })()}
-
-      {/* Create/Edit Modal */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <View style={[styles.modal, { backgroundColor: colors.background }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>{modalTitle}</Text>
-              <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+            <View style={styles.modalTopRow}>
+              <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
+              </TouchableOpacity>
             </View>
 
             <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 20 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <View style={styles.modalLogoContainer}>
+                <Image
+                  source={require('../../../../assets/nombre.jpeg')}
+                  style={styles.modalLogo}
+                  resizeMode="contain"
+                />
+                <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>{modalTitle}</Text>
+              </View>
               {/* Type indicator (read-only, set by category) */}
               <View style={[styles.input, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
                 <Text style={{ fontSize: 15, color: colors.text }}>{getLabel(form.type)}</Text>
@@ -927,6 +955,7 @@ export default function MaintenanceScreen() {
                   {MOTOR_OIL_OPTIONS.map((opt) => (
                     <TouchableOpacity
                       key={opt.key}
+                      activeOpacity={0.7}
                       style={[
                         styles.oilOption,
                         { borderColor: form.description === opt.label ? colors.primary : colors.inputBorder, backgroundColor: form.description === opt.label ? colors.surfaceSecondary : colors.surface },
@@ -946,6 +975,7 @@ export default function MaintenanceScreen() {
                   <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('description')} *</Text>
                   {BRAKE_OPTIONS.map((opt) => (
                     <TouchableOpacity
+                      activeOpacity={0.7}
                       key={opt.key}
                       style={[
                         styles.oilOption,
@@ -1010,7 +1040,7 @@ export default function MaintenanceScreen() {
               />
               {errors.kilometersAtService ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.kilometersAtService}</Text> : null}
 
-              <TouchableOpacity style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowDatePicker(true)}>
+              <TouchableOpacity activeOpacity={0.7} style={[styles.input, { borderColor: colors.inputBorder }]} onPress={() => setShowDatePicker(true)}>
                 <Text style={{ fontSize: 15, color: form.serviceDate ? colors.text : colors.textMuted }}>
                   {form.serviceDate || t('selectDate')}
                 </Text>
@@ -1043,7 +1073,7 @@ export default function MaintenanceScreen() {
               />
 
               {/* Photo picker */}
-              <TouchableOpacity style={[styles.photoBtn, { borderColor: colors.inputBorder }]} onPress={showImageOptions}>
+              <TouchableOpacity activeOpacity={0.7} style={[styles.photoBtn, { borderColor: colors.inputBorder }]} onPress={showImageOptions}>
                 {imageUri ? (
                   <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
                 ) : (
@@ -1054,7 +1084,7 @@ export default function MaintenanceScreen() {
                 )}
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
+              <TouchableOpacity activeOpacity={0.8} style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
                 {saving ? <ActivityIndicator color={colors.primaryText} /> : <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>{t('save')}</Text>}
               </TouchableOpacity>
             </ScrollView>
@@ -1080,11 +1110,11 @@ export default function MaintenanceScreen() {
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={[styles.photoModalTitle, { color: colors.text }]}>Foto del producto</Text>
-            <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(true); }}>
+            <TouchableOpacity activeOpacity={0.7} style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(true); }}>
               <Ionicons name="camera" size={20} color={colors.primaryText} />
               <Text style={[styles.photoModalBtnText, { color: colors.primaryText }]}>Tomar foto</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(false); }}>
+            <TouchableOpacity activeOpacity={0.7} style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(false); }}>
               <Ionicons name="images" size={20} color={colors.primaryText} />
               <Text style={[styles.photoModalBtnText, { color: colors.primaryText }]}>Elegir de galería</Text>
             </TouchableOpacity>
@@ -1319,6 +1349,25 @@ const styles = StyleSheet.create({
   modal: { flex: 1, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottomWidth: 1 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
+  modalTopRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  modalLogoContainer: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modalLogo: {
+    width: 300,
+    height: 150,
+    marginTop: -30,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: -60,
+    marginBottom: 30,
+  },
   input: { borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 10 },
   inputLabel: { fontSize: 14, marginBottom: 6 },
   oilOption: { borderWidth: 1.5, borderRadius: 8, padding: 12, marginBottom: 8 },
@@ -1340,7 +1389,7 @@ const styles = StyleSheet.create({
   reminderInfoText: { fontSize: 14, textAlign: 'center' },
   reminderInfoNote: { fontSize: 11, marginTop: 6, fontStyle: 'italic' },
   reminderActions: { flexDirection: 'row', gap: 10, width: '100%' },
-  reminderBtn: { flex: 1, padding: 14, borderRadius: 8, alignItems: 'center' },
+  reminderBtn: { flex: 1, padding: 14, borderRadius: 30, alignItems: 'center' },
 
   // Photo picker
   photoBtn: { borderWidth: 1, borderRadius: 8, padding: 10, marginBottom: 10, alignItems: 'center', overflow: 'hidden' },
@@ -1356,7 +1405,7 @@ const styles = StyleSheet.create({
   photoModalBtnText: { fontSize: 16, fontWeight: '600' },
 
   errorText: { fontSize: 12, marginBottom: 8, marginTop: -6 },
-  saveBtn: { borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtn: { borderRadius: 30, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { fontSize: 16, fontWeight: '600' },
   fab: {
     position: 'absolute',
@@ -1380,7 +1429,7 @@ const styles = StyleSheet.create({
   addTypeModal: { borderRadius: 14, padding: 20 },
   addTypeTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   addTypeActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
-  addTypeBtn: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  addTypeBtn: { flex: 1, padding: 12, borderRadius: 30, alignItems: 'center' },
   categoryChip: {
     width: 34,
     height: 34,
@@ -1459,4 +1508,17 @@ const styles = StyleSheet.create({
   headerInfo: { flex: 1 },
   headerTitle: { fontSize: 18, fontWeight: '700' },
   headerSubtitle: { fontSize: 13, marginTop: 2 },
+  renewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  renewBtnText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });

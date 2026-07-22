@@ -15,6 +15,8 @@ import notificationRoutes from './routes/notifications';
 import googleRoutes from './routes/google';
 import weatherRoutes from './routes/weather';
 import otpRoutes from './routes/otp';
+import gpsTrackerRoutes from './routes/gpsTrackers';
+import ocrRoutes from './routes/ocr';
 
 dotenv.config();
 
@@ -27,7 +29,7 @@ app.use(cors({
   exposedHeaders: ['Authorization'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '10mb' }));
 
 // Health check
 app.get('/health', (req, res) => {
@@ -48,6 +50,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/google', googleRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/otp', otpRoutes);
+app.use('/api/gps-trackers', gpsTrackerRoutes);
+app.use('/api/ocr', ocrRoutes);
 
 // Only listen when not in test environment
 if (process.env.NODE_ENV !== 'test') {

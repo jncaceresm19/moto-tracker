@@ -3,12 +3,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface NearbyPlace {
   id: string;
   name: string;
-  category: 'taller' | 'vulcanizacion' | 'medico' | 'carabineros';
+  category: 'taller' | 'vulcanizacion' | 'medico' | 'carabineros' | 'grua';
   latitude: number;
   longitude: number;
   address: string;
   distance: number;
-  // phone, rating, openNow removed to stay in free tier
+  phone?: string;
+  placeId?: string;
 }
 
 const API_URL = 'http://192.168.100.9:3001';
@@ -132,6 +133,12 @@ export async function getNearbyPlaces(
     { category: 'medico', type: 'hospital', keyword: '' },
     // COMISARÍAS
     { category: 'carabineros', type: 'police', keyword: '' },
+    // GRÚAS
+    { category: 'grua', type: '', keyword: 'grúa' },
+    { category: 'grua', type: '', keyword: 'motogrúa' },
+    { category: 'grua', type: '', keyword: 'auxilio mecánico' },
+    { category: 'grua', type: '', keyword: 'remolque' },
+    { category: 'grua', type: '', keyword: 'auxilio vehicular' },
   ];
 
   const allPlaces: NearbyPlace[] = [];
@@ -198,6 +205,14 @@ export async function getNearbyPlaces(
         if (!accepted) console.log('[NEARBY] ✗ Skip carabineros:', r.name);
       }
 
+      if (category === 'grua') {
+        const isGrua = combined.includes('grúa') || combined.includes('grua') || combined.includes('motogrúa') || combined.includes('motogrua');
+        const isRemolque = combined.includes('remolque') || combined.includes('arrastra');
+        const isAuxilio = combined.includes('auxilio mecánico') || combined.includes('auxilio mecanico') || combined.includes('auxilio vehicular');
+        accepted = isGrua || isRemolque || isAuxilio;
+        if (!accepted) console.log('[NEARBY] ✗ Skip grua:', r.name);
+      }
+
       if (accepted) {
         console.log('[NEARBY] ✓', r.name, '|', category, '|', dist.toFixed(1), 'km');
         allPlaces.push({
@@ -208,7 +223,7 @@ export async function getNearbyPlaces(
           longitude: placeLon,
           address: r.vicinity || '',
           distance: dist,
-          // phone and rating removed to stay in free tier
+          placeId: r.place_id,
         });
       }
     }
@@ -218,7 +233,7 @@ export async function getNearbyPlaces(
   }
 
   // Group by category with limits (taller/vulca prioritized)
-  const limits: Record<string, number> = { taller: 6, vulcanizacion: 6, medico: 2, carabineros: 2 };
+  const limits: Record<string, number> = { taller: 6, vulcanizacion: 6, medico: 2, carabineros: 2, grua: 4 };
   const grouped: Record<string, NearbyPlace[]> = {};
   for (const place of allPlaces) {
     if (!grouped[place.category]) grouped[place.category] = [];
@@ -240,6 +255,28 @@ export async function getNearbyPlaces(
     await saveLastQueriedLocation(lat, lon);
   } catch {}
 
+  // Fetch phone numbers for grua places (Place Details API)
+  const gruaWithPlaceId = result.filter(p => p.category === 'grua' && p.placeId);
+  if (gruaWithPlaceId.length > 0) {
+    console.log('[NEARBY] Fetching phone for', gruaWithPlaceId.length, 'grua places');
+    for (const place of gruaWithPlaceId) {
+      try {
+        const resp = await fetch(`${API_URL}/api/google/places/${place.placeId}/details`);
+        const data = await resp.json();
+        if (data.result?.formatted_phone_number) {
+          place.phone = data.result.formatted_phone_number;
+          console.log('[NEARBY] Phone for', place.name, ':', place.phone);
+        }
+      } catch (e) {
+        console.log('[NEARBY] Phone fetch error for', place.name, e);
+      }
+    }
+    // Re-cache with phone numbers
+    try {
+      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(result));
+    } catch {}
+  }
+
   return result;
 }
 
@@ -249,6 +286,7 @@ export function getCategoryIcon(category: NearbyPlace['category']): string {
     case 'vulcanizacion': return 'ellipse';
     case 'medico': return 'medkit';
     case 'carabineros': return 'shield-checkmark';
+    case 'grua': return 'car';
   }
 }
 
@@ -258,6 +296,7 @@ export function getCategoryLabel(category: NearbyPlace['category']): string {
     case 'vulcanizacion': return 'Vulcanización';
     case 'medico': return 'Médico';
     case 'carabineros': return 'Carabineros';
+    case 'grua': return 'Motogrúa';
   }
 }
 
@@ -267,6 +306,7 @@ export function getCategoryColor(category: NearbyPlace['category']): string {
     case 'vulcanizacion': return '#8B5CF6';
     case 'medico': return '#EF4444';
     case 'carabineros': return '#1E40AF';
+    case 'grua': return '#059669';
   }
 }
 

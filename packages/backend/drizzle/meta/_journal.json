@@ -8,6 +8,34 @@
       "when": 1783911543789,
       "tag": "0000_add_photo_url",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784259443339,
+      "tag": "0001_gps_trackers",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784678450856,
+      "tag": "0002_add_vehicle_id_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784680652571,
+      "tag": "0003_add_padron_back",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784691566411,
+      "tag": "0004_fair_blur",
+      "breakpoints": true
     }
   ]
 }

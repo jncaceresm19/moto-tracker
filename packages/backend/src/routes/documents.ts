@@ -26,7 +26,7 @@ const documentTypes = [
 
 const documentStatuses = ['valid', 'expiring', 'expired'] as const;
 
-const imageRefine = (v: string) => v.startsWith('data:image/') || /^https?:\/\//.test(v);
+const imageRefine = (v: string) => v.startsWith('data:image/') || v.startsWith('data:application/pdf') || /^https?:\/\//.test(v);
 
 const createDocumentSchema = z.object({
   type: z.enum(documentTypes),

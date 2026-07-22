@@ -1,0 +1,1 @@
+ALTER TABLE `fuel_records` ADD `kilometers_at_fill` real;

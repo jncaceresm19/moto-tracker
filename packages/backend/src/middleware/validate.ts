@@ -13,10 +13,12 @@ export function validate(schema: ZodSchema, source: RequestPart = 'body') {
       next();
     } catch (error) {
       if (error instanceof ZodError) {
+        console.log('[VALIDATE] Source:', source, 'Body received:', JSON.stringify(req[source]));
         const details = error.errors.map((e) => ({
           path: e.path.join('.'),
           message: e.message,
         }));
+        console.log('[VALIDATE] Zod errors:', JSON.stringify(details));
         const errorResponse = createErrorResponse(
           'VALIDATION_ERROR',
           'Validation failed',

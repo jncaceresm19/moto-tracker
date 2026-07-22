@@ -163,6 +163,13 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="motorcycle/[id]/maintenance-history"
+        options={{
+          href: null,
+          title: 'Mantención',
+        }}
+      />
+      <Tabs.Screen
         name="my-publications"
         options={{
           href: null,
@@ -199,6 +206,14 @@ export default function AppLayout() {
         options={{
           href: null,
           title: t('admin'),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="post-detail"
+        options={{
+          href: null,
+          title: 'Publicación',
           headerShown: false,
         }}
       />

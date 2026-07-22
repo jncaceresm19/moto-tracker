@@ -45,9 +45,9 @@ export function CustomAlert({ visible, title, message, buttons, icon, iconColor,
                 key={i}
                 style={[
                   styles.button,
-                  btn.style === 'cancel' 
+                  btn.style === 'cancel'
                     ? { backgroundColor: colors.surfaceSecondary || colors.inputBg }
-                    : btn.style === 'destructive' 
+                    : btn.style === 'destructive'
                       ? styles.destructiveBtn
                       : { backgroundColor: primary },
                   btn.style === 'cancel' && { borderWidth: 1, borderColor: colors.border },
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 30,
     paddingVertical: 14,
     alignItems: 'center',
   },

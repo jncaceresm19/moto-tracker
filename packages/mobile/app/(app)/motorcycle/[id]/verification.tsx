@@ -127,6 +127,24 @@ export default function VerificationScreen() {
   const licenciaStatus = getDocumentStatus(licencia);
   const seguroStatus = getDocumentStatus(seguro);
 
+  // Lista unificada para renderizar el card agrupado de documentos
+  const documentRows = [
+    { key: 'permiso', label: 'Permiso de Circulación', icon: 'document-text-outline' as const, status: permisoStatus },
+    { key: 'rt', label: 'Revisión Técnica', icon: 'construct-outline' as const, status: rtStatus },
+    { key: 'licencia', label: 'Licencia de Conducir', icon: 'card-outline' as const, status: licenciaStatus },
+    { key: 'seguro', label: 'Seguro Obligatorio', icon: 'shield-checkmark-outline' as const, status: seguroStatus },
+    {
+      key: 'encargo',
+      label: 'Encargo por Robo',
+      icon: (encargoRobo ? 'alert-circle-outline' : 'checkmark-circle-outline') as const,
+      status: {
+        label: encargoRobo ? 'Activo' : 'Sin encargo',
+        color: encargoRobo ? '#B42318' : '#3D7A2E',
+        icon: (encargoRobo ? 'alert-circle-outline' : 'checkmark-circle-outline') as const,
+      },
+    },
+  ];
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Status Card */}
@@ -146,115 +164,68 @@ export default function VerificationScreen() {
         </View>
       </View>
 
-      {/* Verification Details */}
-      {verificada && (
+      {/* Verification Details — agrupado en un solo card con divisores */}
+      {verificada && (verificadaEn || verificadaPor) && (
         <View style={[styles.section, { paddingBottom: 4 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Detalles</Text>
-
-          {/* Verification Date */}
-          {verificadaEn && (
-            <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.detailIcon, { backgroundColor: '#E6F1FB' }]}>
-                <Ionicons name="calendar-outline" size={18} color="#185FA5" />
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Detalles</Text>
+          <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {verificadaEn && (
+              <>
+                <View style={styles.groupRow}>
+                  <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
+                  <View style={styles.groupRowContent}>
+                    <Text style={[styles.groupRowLabel, { color: colors.textMuted }]}>Fecha de Verificación</Text>
+                    <Text style={[styles.groupRowValue, { color: colors.text }]}>
+                      {verificadaEn.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </Text>
+                  </View>
+                </View>
+                {verificadaPor && <View style={[styles.groupDivider, { backgroundColor: colors.border }]} />}
+              </>
+            )}
+            {verificadaPor && (
+              <View style={styles.groupRow}>
+                <Ionicons name="document-text-outline" size={18} color={colors.textSecondary} />
+                <View style={styles.groupRowContent}>
+                  <Text style={[styles.groupRowLabel, { color: colors.textMuted }]}>Método de Verificación</Text>
+                  <Text style={[styles.groupRowValue, { color: colors.text }]}>
+                    {getVerificationMethodLabel(verificadaPor)}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.detailContent}>
-                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Fecha de Verificación</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>
-                  {verificadaEn.toLocaleDateString('es-CL', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* Verification Method */}
-          {verificadaPor && (
-            <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.detailIcon, { backgroundColor: '#F3E8FF' }]}>
-                <Ionicons name="document-text-outline" size={18} color="#6B21A8" />
-              </View>
-              <View style={styles.detailContent}>
-                <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Método de Verificación</Text>
-                <Text style={[styles.detailValue, { color: colors.text }]}>
-                  {getVerificationMethodLabel(verificadaPor)}
-                </Text>
-              </View>
-            </View>
-          )}
+            )}
+          </View>
         </View>
       )}
 
-      {/* Document Status Section */}
+      {/* Document Status Section — agrupado en un solo card con divisores */}
       <View style={[styles.section, { paddingTop: 0 }]}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Documentos</Text>
-
-        {/* Permiso de Circulación */}
-        <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: '#E6F1FB' }]}>
-            <Ionicons name="document-text-outline" size={18} color="#185FA5" />
-          </View>
-          <View style={styles.detailContent}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Permiso de Circulación</Text>
-            <Text style={[styles.detailValue, { color: permisoStatus.color }]}>
-              {permisoStatus.label}
-            </Text>
-          </View>
-          <Ionicons name={permisoStatus.icon} size={18} color={permisoStatus.color} />
-        </View>
-
-        {/* Revisión Técnica */}
-        <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: rtStatus.color === '#3D7A2E' ? '#EAF3E6' : rtStatus.color === '#C79000' ? '#FFF6D9' : '#FDEAEA' }]}>
-            <Ionicons name="construct-outline" size={18} color={rtStatus.color === '#3D7A2E' ? '#0F6E56' : rtStatus.color === '#C79000' ? '#8A6D00' : '#B42318'} />
-          </View>
-          <View style={styles.detailContent}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Revisión Técnica</Text>
-            <Text style={[styles.detailValue, { color: rtStatus.color }]}>
-              {rtStatus.label}
-            </Text>
-          </View>
-          <Ionicons name={rtStatus.icon} size={18} color={rtStatus.color} />
-        </View>
-
-        {/* Licencia */}
-        <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: '#FAEEDA' }]}>
-            <Ionicons name="card-outline" size={18} color="#854F0B" />
-          </View>
-          <View style={styles.detailContent}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Licencia de Conducir</Text>
-            <Text style={[styles.detailValue, { color: licenciaStatus.color }]}>
-              {licenciaStatus.label}
-            </Text>
-          </View>
-          <Ionicons name={licenciaStatus.icon} size={18} color={licenciaStatus.color} />
-        </View>
-
-        {/* Seguro Obligatorio */}
-        <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: '#FBEAF0' }]}>
-            <Ionicons name="shield-checkmark-outline" size={18} color="#993556" />
-          </View>
-          <View style={styles.detailContent}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Seguro Obligatorio</Text>
-            <Text style={[styles.detailValue, { color: seguroStatus.color }]}>
-              {seguroStatus.label}
-            </Text>
-          </View>
-          <Ionicons name={seguroStatus.icon} size={18} color={seguroStatus.color} />
-        </View>
-
-        {/* Encargo por Robo */}
-        <View style={[styles.detailRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.detailIcon, { backgroundColor: encargoRobo ? '#FDEAEA' : '#EAF3E6' }]}>
-            <Ionicons name={encargoRobo ? 'alert-circle-outline' : 'checkmark-circle-outline'} size={18} color={encargoRobo ? '#B42318' : '#3D7A2E'} />
-          </View>
-          <View style={styles.detailContent}>
-            <Text style={[styles.detailLabel, { color: colors.textMuted }]}>Encargo por Robo</Text>
-            <Text style={[styles.detailValue, { color: encargoRobo ? '#B42318' : '#3D7A2E' }]}>
-              {encargoRobo ? 'Activo' : 'Sin encargo'}
-            </Text>
-          </View>
-          <Ionicons name={encargoRobo ? 'alert-circle-outline' : 'checkmark-circle-outline'} size={18} color={encargoRobo ? '#B42318' : '#3D7A2E'} />
+        <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Documentos</Text>
+        <View style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {documentRows.map((doc, index) => {
+            const isPending = doc.status.color === '#999';
+            return (
+              <React.Fragment key={doc.key}>
+                <View style={[styles.groupRow, isPending && { backgroundColor: colors.primary + '12' }]}>
+                  <Ionicons name={doc.icon} size={18} color={isPending ? colors.primary : doc.status.color} />
+                  <View style={styles.groupRowContent}>
+                    <Text style={[styles.groupRowLabel, { color: colors.textMuted }]}>{doc.label}</Text>
+                    <Text style={[styles.groupRowValue, { color: isPending ? colors.primary : doc.status.color }]}>
+                      {isPending ? `${doc.status.label}, agregar ahora` : doc.status.label}
+                    </Text>
+                  </View>
+                  <Ionicons
+                    name={isPending ? 'chevron-forward' : doc.status.icon}
+                    size={18}
+                    color={isPending ? colors.primary : doc.status.color}
+                  />
+                </View>
+                {index < documentRows.length - 1 && (
+                  <View style={[styles.groupDivider, { backgroundColor: colors.border }]} />
+                )}
+              </React.Fragment>
+            );
+          })}
         </View>
       </View>
 
@@ -298,7 +269,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     margin: 16,
-    marginBottom: 8,
+    marginBottom: 1,
     borderRadius: 12,
     borderWidth: 1,
     gap: 14,
@@ -316,28 +287,34 @@ const styles = StyleSheet.create({
 
   // Sections
   section: { padding: 16, paddingTop: 8 },
-  sectionTitle: { fontSize: 15, fontWeight: '600', marginBottom: 12 },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 12,
+    marginTop: 12
+  },
 
-  // Detail Row
-  detailRow: {
+  // Card agrupado (reemplaza los detailRow sueltos)
+  groupCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  groupRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     gap: 12,
-    borderWidth: 1,
   },
-  detailIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
+  groupRowContent: { flex: 1 },
+  groupRowLabel: { fontSize: 12, marginBottom: 2 },
+  groupRowValue: { fontSize: 12, fontWeight: '500' },
+  groupDivider: {
+    height: 1,
+    marginLeft: 46,
   },
-  detailContent: { flex: 1 },
-  detailLabel: { fontSize: 12, marginBottom: 2 },
-  detailValue: { fontSize: 15, fontWeight: '600' },
 
   // Info Card
   infoCard: {
@@ -348,4 +325,4 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center' },
   infoTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   infoText: { fontSize: 13, lineHeight: 18 },
-});
+}); 

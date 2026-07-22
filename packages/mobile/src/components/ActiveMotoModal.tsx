@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../theme-context';
 import { useLanguage } from '../language-context';
-import { Motorcycle, updateMotorcycle } from '../api';
+import { Motorcycle } from '../api';
 import { ActiveMoto, formatActivationTime } from '../services/activeMoto';
 import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
 
@@ -15,7 +15,7 @@ interface ActiveMotoModalProps {
   motorcycles: Motorcycle[];
   activeMoto: ActiveMoto | null;
   activationAddress?: string;
-  onActivate: (motorcycleId: string) => void;
+  onActivate: (motorcycleId: string, activationPhotoUrl?: string) => void;
   onDeactivate: () => void;
   onReportTheft: () => void;
 }
@@ -62,9 +62,11 @@ export function ActiveMotoModal({
       const manipulated = await ImageManipulator.manipulateAsync(
         result.assets[0].uri,
         [{ resize: { width: 800 } }],
-        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
-      setPhotoUri(manipulated.uri);
+      if (manipulated.base64) {
+        setPhotoUri(`data:image/jpeg;base64,${manipulated.base64}`);
+      }
     }
   };
 
@@ -72,16 +74,13 @@ export function ActiveMotoModal({
     if (!selectedMoto) return;
     setSaving(true);
     try {
-      if (photoUri) {
-        await updateMotorcycle(selectedMoto.id, { imageUrl: photoUri });
-      }
-      onActivate(selectedMoto.id);
+      onActivate(selectedMoto.id, photoUri || undefined);
       setShowPhotoStep(false);
       setSelectedMoto(null);
       setPhotoUri(null);
       onClose();
     } catch (e) {
-      console.log('[ACTIVATE] Error saving photo:', e);
+      console.log('[ACTIVATE] Error:', e);
       onActivate(selectedMoto.id);
       setShowPhotoStep(false);
       setSelectedMoto(null);
@@ -347,7 +346,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 30,
     borderWidth: 1,
   },
   deactivateText: {
@@ -360,7 +359,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 30,
   },
   theftText: {
     color: '#fff',
@@ -455,7 +454,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     padding: 14,
-    borderRadius: 12,
+    borderRadius: 30,
   },
   activateBtnText: {
     color: '#fff',

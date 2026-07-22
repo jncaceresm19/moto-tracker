@@ -85,7 +85,7 @@ export function DashboardPanel({
         <View style={styles.odometerSection}>
           <Text style={styles.odometerTime}>{lastLocationTime}</Text>
           <Text style={styles.odometerLabel}>
-            {isActive ? (activationTimeAgo ? `Activa hace ${activationTimeAgo}` : t('activeSince')) : t('lastLocation')}
+            {isActive ? (activationTimeAgo ? `Activa ${activationTimeAgo}` : t('activeSince')) : t('lastLocation')}
           </Text>
         </View>
 

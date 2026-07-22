@@ -88,6 +88,42 @@ router.get('/places', async (req: Request, res: Response) => {
   }
 });
 
+// Proxy to Google Place Details API (for phone numbers, etc.)
+router.get('/places/:placeId/details', async (req: Request, res: Response) => {
+  try {
+    const { placeId } = req.params;
+
+    if (!placeId) {
+      return res.status(400).json({ error: 'placeId is required' });
+    }
+
+    const cacheKey = `place-details:${placeId}`;
+
+    const cached = getCache(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=formatted_phone_number,international_phone_number&key=${GOOGLE_API_KEY}`;
+
+    console.log('[GOOGLE-API] Place Details request:', placeId);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    console.log('[GOOGLE-API] Place Details status:', data.status);
+
+    if (data.status === 'OK') {
+      setCache(cacheKey, data);
+    }
+
+    res.json(data);
+  } catch (error) {
+    console.error('[GOOGLE-API] Place Details error:', error);
+    res.status(500).json({ error: 'Failed to fetch place details' });
+  }
+});
+
 // Proxy to Google Geocoding API
 router.get('/geocode', async (req: Request, res: Response) => {
   try {

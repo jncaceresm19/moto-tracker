@@ -122,8 +122,9 @@ export default function ProfileScreen() {
   }, []);
 
   const loadBiometricStatus = async () => {
+    if (!user) return;
     const available = await hasBiometricHardware();
-    const enabled = await isBiometricEnabled();
+    const enabled = await isBiometricEnabled(user.id);
     setBiometricAvailable(available);
     setBiometricEnabled(enabled);
   };
@@ -140,10 +141,11 @@ export default function ProfileScreen() {
   };
 
   const toggleBiometric = async () => {
+    if (!user) return;
     if (biometricEnabled) {
       const authenticated = await authenticateWithBiometrics();
       if (authenticated) {
-        await disableBiometric();
+        await disableBiometric(user.id);
         setBiometricEnabled(false);
       }
     } else {
@@ -170,7 +172,7 @@ export default function ProfileScreen() {
 
       const authenticated = await authenticateWithBiometrics();
       if (authenticated) {
-        await enableBiometric();
+        await enableBiometric(user.id);
         setBiometricEnabled(true);
       }
     }
@@ -417,16 +419,32 @@ export default function ProfileScreen() {
     section: { backgroundColor: colors.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.borderLight },
     rowText: { fontSize: 16, color: colors.text },
-    logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 32, marginHorizontal: 16, paddingVertical: 14, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.danger },
+    logoutBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 32, marginHorizontal: 16, paddingVertical: 14, backgroundColor: colors.surface, borderRadius: 30, borderWidth: 1, borderColor: colors.danger },
     logoutBtnText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
     version: { textAlign: 'center', color: colors.textMuted, fontSize: 12, marginTop: 16, marginBottom: 32 },
     modal: { flex: 1, backgroundColor: colors.background },
     modalScroll: { padding: 20 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text },
+    modalTopRow: {
+      flexDirection: 'row',
+      marginBottom: 4,
+    },
+    modalLogoContainer: {
+      alignItems: 'center',
+      paddingBottom: 16,
+      marginBottom: 16,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.textMuted,
+      marginTop: -60,
+      marginBottom: 30,
+    },
     cancel: { color: colors.textSecondary, fontSize: 16 },
     input: { borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10, backgroundColor: colors.inputBg, color: colors.text },
     errorText: { color: colors.danger, fontSize: 12, marginBottom: 8, marginTop: -6 },
-    saveBtn: { backgroundColor: colors.success, borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+    saveBtn: { backgroundColor: colors.success, borderRadius: 30, padding: 14, alignItems: 'center', marginTop: 8 },
     saveBtnText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
     avatarText: { color: colors.primaryText, fontSize: 32, fontWeight: 'bold' },
     badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, backgroundColor: colors.success },
@@ -440,10 +458,10 @@ export default function ProfileScreen() {
     accountInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
     accountInfoLabel: { fontSize: 13, flex: 1, color: colors.textSecondary },
     accountInfoValue: { fontSize: 13, fontWeight: '500', color: colors.text },
-    deleteAccountBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 20, paddingVertical: 14, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.danger },
+    deleteAccountBtn: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 20, paddingVertical: 14, backgroundColor: colors.surface, borderRadius: 30, borderWidth: 1, borderColor: colors.danger },
     deleteAccountBtnText: { color: colors.danger, fontSize: 16, fontWeight: '600' },
     // --- Password card / requirements / strength / tip / forgot-password ---
-    passwordCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16, marginBottom: 5 },
+    passwordCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16, marginBottom: 5, marginTop: -20 },
     requirementsCard: { marginTop: 20, borderRadius: 10, padding: 14, backgroundColor: colors.surfaceSecondary },
     requirementsCardTitle: { fontSize: 13, fontWeight: '600', color: colors.textSecondary, marginBottom: 12 },
     requirementsCardRow: { flexDirection: 'row', alignItems: 'stretch', gap: 14 },
@@ -462,7 +480,7 @@ export default function ProfileScreen() {
     forgotPassword: { alignItems: 'center', marginTop: 25 },
     forgotPasswordText: { fontSize: 13, color: colors.primary },
     // --- Edit profile card ---
-    profileCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16 },
+    profileCard: { backgroundColor: colors.inputBg, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 16, marginTop: -20 },
     // --- Delete account survey (Pasos 1 y 2) ---
     deleteFlowOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
     deleteFlowCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 20 },
@@ -489,7 +507,7 @@ export default function ProfileScreen() {
     tutorialDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.border },
     tutorialDotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: colors.primary },
     tutorialActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
-    tutorialActionBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 10 },
+    tutorialActionBtn: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 30 },
     tutorialActionBtnText: { fontSize: 16, fontWeight: '600' },
   });
 
@@ -567,7 +585,7 @@ export default function ProfileScreen() {
           </View>
           <View style={[dynamicStyles.badge, { backgroundColor: motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? '#1DA1F2' : colors.success }]}>
             <Text style={dynamicStyles.badgeText}>
-              {motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? 'Moto-Traker Verificado' : t('connected')}
+              {motorcyclesVerifiedCount && motorcyclesVerifiedCount > 0 ? 'Verificado' : t('connected')}
             </Text>
           </View>
         </View>
@@ -623,7 +641,8 @@ export default function ProfileScreen() {
             style={dynamicStyles.row}
             activeOpacity={0.8}
             onLongPress={async () => {
-              await resetBiometricPreference();
+              if (!user) return;
+              await resetBiometricPreference(user.id);
               await loadBiometricStatus();
               showAlert('Debug', t('debugBiometricReset'), [{ text: 'OK' }], 'information-circle', '#007AFF');
             }}
@@ -723,11 +742,23 @@ export default function ProfileScreen() {
       {/* Change Password Modal */}
       <Modal visible={showChangePassword} animationType="slide" presentationStyle="pageSheet">
         <View style={[dynamicStyles.modal, dynamicStyles.modalScroll]}>
-          <View style={styles.modalHeader}>
-            <Text style={dynamicStyles.modalTitle}>{t('changePassword')}</Text>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => { setShowChangePassword(false); setErrors({}); setPasswords({ current: '', newPass: '', confirm: '' }); }}>
+          <View style={dynamicStyles.modalTopRow}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={{ marginLeft: 'auto' }}
+              onPress={() => { setShowChangePassword(false); setErrors({}); setPasswords({ current: '', newPass: '', confirm: '' }); }}
+            >
               <Text style={dynamicStyles.cancel}>{t('cancel')}</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={dynamicStyles.modalLogoContainer}>
+            <Image
+              source={require('../../assets/nombre.jpeg')}
+              style={styles.modalLogo}
+              resizeMode="contain"
+            />
+            <Text style={dynamicStyles.modalSubtitle}>{t('changePassword')}</Text>
           </View>
 
           <View style={dynamicStyles.passwordCard}>
@@ -812,7 +843,6 @@ export default function ProfileScreen() {
               {saving ? <ActivityIndicator color={colors.accentText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
             </TouchableOpacity>
           </View>
-          <View style={dynamicStyles.divider} />
           {/* Password requirements — card style matching accountInfo, con el logo a la derecha */}
           <View style={dynamicStyles.requirementsCard}>
             <Text style={dynamicStyles.requirementsCardTitle}>Tu contraseña debe tener</Text>
@@ -844,7 +874,6 @@ export default function ProfileScreen() {
               />
             </View>
           </View>
-          <View style={dynamicStyles.divider} />
 
           {/* Security tip */}
           <View style={dynamicStyles.securityTip}>
@@ -863,11 +892,23 @@ export default function ProfileScreen() {
       <Modal visible={showEditProfile} animationType="slide" presentationStyle="pageSheet">
         <View style={dynamicStyles.modal}>
           <ScrollView contentContainerStyle={dynamicStyles.modalScroll} showsVerticalScrollIndicator={false}>
-            <View style={styles.modalHeader}>
-              <Text style={dynamicStyles.modalTitle}>{t('editProfile')}</Text>
-              <TouchableOpacity activeOpacity={0.6} onPress={() => { setShowEditProfile(false); setProfileErrors({}); }}>
+            <View style={dynamicStyles.modalTopRow}>
+              <TouchableOpacity
+                activeOpacity={0.6}
+                style={{ marginLeft: 'auto' }}
+                onPress={() => { setShowEditProfile(false); setProfileErrors({}); }}
+              >
                 <Text style={dynamicStyles.cancel}>{t('cancel')}</Text>
               </TouchableOpacity>
+            </View>
+
+            <View style={dynamicStyles.modalLogoContainer}>
+              <Image
+                source={require('../../assets/nombre.jpeg')}
+                style={styles.modalLogo}
+                resizeMode="contain"
+              />
+              <Text style={dynamicStyles.modalSubtitle}>{t('editProfile')}</Text>
             </View>
 
             <View style={dynamicStyles.profileCard}>
@@ -925,9 +966,6 @@ export default function ProfileScreen() {
                 {savingProfile ? <ActivityIndicator color={colors.success} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}
               </TouchableOpacity>
             </View>
-
-            {/* Divider */}
-            <View style={dynamicStyles.divider} />
 
             {/* Account Info */}
             <View style={dynamicStyles.accountInfo}>
@@ -1240,5 +1278,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#1DA1F2',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalLogo: {
+    width: 300,
+    height: 150,
+    marginTop: -30,
   },
 });

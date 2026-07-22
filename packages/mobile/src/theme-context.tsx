@@ -76,7 +76,7 @@ const lightTheme: ThemeColors = {
   statusBarStyle: 'dark-content',
   // Dashboard colors
   ink: '#171B26',
-  inkSoft: '#5A6478',
+  inkSoft: '#5d785a',
   inkFaint: '#93A0B4',
   alertRed: '#E14336',
   alertRedBg: '#FDEBEA',

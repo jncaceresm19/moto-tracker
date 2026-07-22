@@ -14,19 +14,112 @@ interface WeatherCardProps {
 }
 
 type WeatherMood = 'clear' | 'cloudy' | 'rain' | 'storm';
+type Season = 'verano' | 'otono' | 'invierno' | 'primavera';
 
-function getWeatherMood(condition: string): WeatherMood {
+interface WeatherInfo {
+  mood: WeatherMood;
+  icon: keyof typeof Ionicons.glyphMap;
+}
+
+// Una sola fuente de verdad: mood e ícono se determinan juntos,
+// así nunca quedan desincronizados (ej: llovizna ya no puede mostrar ícono de "solo nublado").
+function getWeatherInfo(condition: string): WeatherInfo {
   const c = condition.toLowerCase();
-  if (c.includes('despejado') || c.includes('clear')) return 'clear';
-  if (c.includes('lluvia') || c.includes('rain') || c.includes('llovizna') || c.includes('drizzle')) return 'rain';
-  if (c.includes('tormenta') || c.includes('thunder') || c.includes('chubasco') || c.includes('shower')) return 'storm';
-  return 'cloudy';
+
+  if (c.includes('despejado') || c.includes('clear')) {
+    return { mood: 'clear', icon: 'sunny' };
+  }
+  if (c.includes('tormenta') || c.includes('thunder')) {
+    return { mood: 'storm', icon: 'thunderstorm' };
+  }
+  if (c.includes('chubasco') || c.includes('shower')) {
+    return { mood: 'storm', icon: 'thunderstorm' };
+  }
+  if (c.includes('llovizna') || c.includes('drizzle')) {
+    return { mood: 'rain', icon: 'rainy' };
+  }
+  if (c.includes('lluvia') || c.includes('rain')) {
+    return { mood: 'rain', icon: 'rainy' };
+  }
+  if (c.includes('nieve') || c.includes('snow')) {
+    return { mood: 'cloudy', icon: 'snow' };
+  }
+  if (c.includes('neblina') || c.includes('fog')) {
+    return { mood: 'cloudy', icon: 'cloud' };
+  }
+  if (c.includes('nublado') || c.includes('cloud')) {
+    return { mood: 'cloudy', icon: 'cloudy' };
+  }
+
+  return { mood: 'cloudy', icon: 'cloudy' };
+}
+
+// Hemisferio sur (Chile): verano dic-feb, otoño mar-may, invierno jun-ago, primavera sep-nov
+function getCurrentSeason(): Season {
+  const month = new Date().getMonth() + 1; // 1-12
+  if (month === 12 || month <= 2) return 'verano';
+  if (month >= 3 && month <= 5) return 'otono';
+  if (month >= 6 && month <= 8) return 'invierno';
+  return 'primavera';
+}
+
+// Color base del sol según estación (para ícono y degradado)
+function getSunColor(season: Season): string {
+  switch (season) {
+    case 'verano':
+      return '#F5A623'; // sol fuerte, cálido
+    case 'otono':
+      return '#D98A3D'; // dorado más apagado
+    case 'invierno':
+      return '#E8C05A'; // amarillo pálido, luz débil
+    case 'primavera':
+    default:
+      return '#F2C94C'; // amarillo fresco
+  }
+}
+
+// Convierte un hex (#RRGGBB) a "r, g, b" para armar rgba() en el degradado
+function hexToRgbString(hex: string): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+// Aclara un color hex mezclándolo con blanco. amount 0-1 (0 = igual, 1 = blanco puro)
+function lightenColor(hex: string, amount: number): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  const lr = Math.round(r + (255 - r) * amount);
+  const lg = Math.round(g + (255 - g) * amount);
+  const lb = Math.round(b + (255 - b) * amount);
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(lr)}${toHex(lg)}${toHex(lb)}`;
+}
+
+function getWeatherIconColor(mood: WeatherMood, primary: string, secondary: string): string {
+  switch (mood) {
+    case 'clear':
+      return getSunColor(getCurrentSeason());
+    case 'cloudy':
+      return secondary; // gris
+    case 'rain':
+      return lightenColor(primary, 0.45); // primary más suave
+    case 'storm':
+    default:
+      return primary; // sin cambios por ahora
+  }
 }
 
 function getWeatherGradient(mood: WeatherMood, surfaceColor: string): [string, string] {
   switch (mood) {
-    case 'clear':
-      return ['rgba(245, 166, 35, 0.22)', surfaceColor];
+    case 'clear': {
+      const rgb = hexToRgbString(getSunColor(getCurrentSeason()));
+      return [`rgba(${rgb}, 0.22)`, surfaceColor];
+    }
     case 'rain':
       return ['rgba(24, 95, 165, 0.28)', surfaceColor];
     case 'storm':
@@ -35,19 +128,6 @@ function getWeatherGradient(mood: WeatherMood, surfaceColor: string): [string, s
     default:
       return ['rgba(96, 130, 168, 0.18)', surfaceColor];
   }
-}
-
-function getWeatherIcon(condition: string): keyof typeof Ionicons.glyphMap {
-  const c = condition.toLowerCase();
-  if (c.includes('despejado') || c.includes('clear')) return 'sunny';
-  if (c.includes('nublado') || c.includes('cloud')) return 'cloudy';
-  if (c.includes('neblina') || c.includes('fog')) return 'cloud';
-  if (c.includes('lluvia') || c.includes('rain')) return 'rainy';
-  if (c.includes('llovizna') || c.includes('drizzle')) return 'cloudy-night';
-  if (c.includes('nieve') || c.includes('snow')) return 'snow';
-  if (c.includes('chubasco') || c.includes('shower')) return 'thunderstorm';
-  if (c.includes('tormenta') || c.includes('thunder')) return 'thunderstorm';
-  return 'cloudy';
 }
 
 export function WeatherCard({
@@ -60,9 +140,9 @@ export function WeatherCard({
 }: WeatherCardProps) {
   const { colors } = useTheme();
 
-  const icon = getWeatherIcon(weatherCondition);
-  const mood = getWeatherMood(weatherCondition);
+  const { mood, icon } = getWeatherInfo(weatherCondition);
   const [gradientStart, gradientEnd] = getWeatherGradient(mood, colors.surface);
+  const iconColor = getWeatherIconColor(mood, colors.primary, colors.textSecondary);
 
   const hasRain = rainProbability != null && rainProbability > 0;
 
@@ -74,8 +154,13 @@ export function WeatherCard({
         end={{ x: 1, y: 1 }}
         style={[styles.card, { borderColor: colors.border }]}
       >
-        <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-          <Ionicons name={icon} size={28} color={colors.primary} />
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: iconColor + '2A', borderColor: iconColor },
+          ]}
+        >
+          <Ionicons name={icon} size={28} color={iconColor} />
         </View>
 
         <View style={styles.content}>
@@ -111,6 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1.5,
   },
   content: {
     flex: 1,

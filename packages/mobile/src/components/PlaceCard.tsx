@@ -18,6 +18,14 @@ export function PlaceCard({ place }: PlaceCardProps) {
     Linking.openURL(url);
   };
 
+  const handleLlamar = () => {
+    if (place.phone) {
+      // Clean phone number: remove spaces, dashes, parentheses
+      const cleanPhone = place.phone.replace(/[\s\-\(\)\+]/g, '');
+      Linking.openURL(`tel:${cleanPhone}`);
+    }
+  };
+
   return (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {/* Category badge + distance */}
@@ -40,14 +48,36 @@ export function PlaceCard({ place }: PlaceCardProps) {
         </View>
       ) : null}
 
-      {/* Ver ruta button */}
-      <TouchableOpacity
-        style={[styles.viewBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}
-        onPress={handleVerRuta}
-      >
-        <Ionicons name="navigate" size={14} color="#fff" />
-        <Text style={styles.viewBtnText}>Ver ruta</Text>
-      </TouchableOpacity>
+      {/* Phone - only show for non-grua places (grua has call button) */}
+      {place.phone && place.category !== 'grua' ? (
+        <View style={styles.infoRow}>
+          <Ionicons name="call-outline" size={12} color={colors.inkFaint} />
+          <Text style={[styles.infoText, { color: colors.inkFaint }]}>{place.phone}</Text>
+        </View>
+      ) : null}
+
+      {/* Action buttons */}
+      <View style={styles.actions}>
+        {place.category === 'grua' && place.phone ? (
+          <TouchableOpacity
+            style={[styles.callBtn, { backgroundColor: '#059669', flex: 1 }]}
+            activeOpacity={0.8}
+            onPress={handleLlamar}
+          >
+            <Ionicons name="call" size={14} color="#fff" />
+            <Text style={styles.callBtnText}>Llamar</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.viewBtn, { backgroundColor: colors.primary, flex: 1 }]}
+            activeOpacity={0.8}
+            onPress={handleVerRuta}
+          >
+            <Ionicons name="navigate" size={14} color="#fff" />
+            <Text style={styles.viewBtnText}>Ver ruta</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -65,6 +95,9 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
   infoText: { fontSize: 11, flex: 1 },
-  viewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 8, paddingVertical: 7, borderRadius: 8 },
-  viewBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  actions: { flexDirection: 'row', gap: 6, marginTop: 8 },
+  callBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 7, paddingHorizontal: 8, borderRadius: 30 },
+  callBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  viewBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 7, paddingHorizontal: 8, borderRadius: 30 },
+  viewBtnText: { color: '#fff', fontSize: 11, fontWeight: '700' },
 });

@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
@@ -30,10 +30,11 @@ export default function FuelScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
+  const [motorcycleKm, setMotorcycleKm] = useState(0);
 
   // Modal state for records CRUD
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ stationName: '', liters: '', pricePerLiter: '', location: '', recordedAt: '', notes: '' });
+  const [form, setForm] = useState({ stationName: '', liters: '', pricePerLiter: '', location: '', octane: '', kilometersAtFill: '', recordedAt: '', notes: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -47,8 +48,13 @@ export default function FuelScreen() {
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
   useEffect(() => {
+    const titles: Record<string, string> = {
+      records: 'Registro de Cargas',
+      consumption: 'Consumo Promedio',
+      charts: 'Gráficos',
+    };
     navigation.setOptions({
-      title: selectedSection === 'records' ? 'Registro de Cargas' : 'Combustible',
+      title: selectedSection ? titles[selectedSection] ?? 'Combustible' : 'Combustible',
       headerLeft: () => (
         <TouchableOpacity
           onPress={() => {
@@ -71,6 +77,7 @@ export default function FuelScreen() {
     try {
       const [moto, fuelRecords] = await Promise.all([getMotorcycle(id), listFuelRecords(id)]);
       setMotorcycle(moto);
+      setMotorcycleKm(moto.currentKilometers);
       setRecords(fuelRecords);
     } catch (e: any) {
       const msg = e?.status === 401 ? t('sessionExpired') : t('failedToLoad');
@@ -99,7 +106,7 @@ export default function FuelScreen() {
 
   // --- Records CRUD ---
   const openCreate = () => {
-    setForm({ stationName: '', liters: '', pricePerLiter: '', location: '', recordedAt: new Date().toISOString().split('T')[0], notes: '' });
+    setForm({ stationName: '', liters: '', pricePerLiter: '', location: '', octane: '', kilometersAtFill: String(motorcycleKm || ''), recordedAt: new Date().toISOString().split('T')[0], notes: '' });
     setErrors({});
     setShowModal(true);
   };
@@ -154,6 +161,8 @@ export default function FuelScreen() {
         liters: Number(form.liters),
         pricePerLiter: Number(form.pricePerLiter),
         location: form.location || undefined,
+        octane: form.octane || undefined,
+        kilometersAtFill: form.kilometersAtFill && !isNaN(Number(form.kilometersAtFill)) ? Number(form.kilometersAtFill) : undefined,
         recordedAt: new Date(form.recordedAt).toISOString(),
         notes: form.notes || undefined,
       };
@@ -195,6 +204,46 @@ export default function FuelScreen() {
   const totalSpent = records.reduce((sum, r) => sum + r.totalCost, 0);
   const totalLiters = records.reduce((sum, r) => sum + r.liters, 0);
 
+  // --- Consumption Calculation ---
+  const consumptionData = useMemo(() => {
+    const sorted = [...records]
+      .filter((r) => r.kilometersAtFill != null)
+      .sort((a, b) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime());
+
+    const entries: { index: number; kmDiff: number; liters: number; kmPerLiter: number; date: string }[] = [];
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1];
+      const curr = sorted[i];
+      const kmDiff = curr.kilometersAtFill! - prev.kilometersAtFill!;
+      if (kmDiff <= 0) continue;
+      entries.push({
+        index: i,
+        kmDiff,
+        liters: curr.liters,
+        kmPerLiter: kmDiff / curr.liters,
+        date: curr.recordedAt,
+      });
+    }
+    const avg = entries.length > 0 ? entries.reduce((s, e) => s + e.kmPerLiter, 0) / entries.length : 0;
+    const maxConsumption = entries.length > 0 ? Math.max(...entries.map((e) => e.kmPerLiter)) : 0;
+    return { entries, avg, maxConsumption };
+  }, [records]);
+
+  // --- Monthly Expenses ---
+  const monthlyExpenses = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of records) {
+      const monthKey = new Date(r.recordedAt).toLocaleDateString('es-CL', { month: 'short', year: '2-digit' });
+      map.set(monthKey, (map.get(monthKey) || 0) + r.totalCost);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => {
+        const [mA, yA] = a[0].split(' ');
+        const [mB, yB] = b[0].split(' ');
+        return parseInt(yA) - parseInt(yB) || 0;
+      });
+  }, [records]);
+
   // --- Sections ---
   const sections: FuelSection[] = [
     {
@@ -216,7 +265,7 @@ export default function FuelScreen() {
     {
       id: 'consumption',
       title: 'Consumo Promedio',
-      subtitle: 'km/L de tu moto',
+      subtitle: consumptionData.avg > 0 ? `${consumptionData.avg.toFixed(1)} km/L` : 'km/L de tu moto',
       icon: 'speedometer-outline',
       iconBg: '#FAEEDA',
       iconColor: '#854F0B',
@@ -224,7 +273,7 @@ export default function FuelScreen() {
     {
       id: 'graphics',
       title: 'Gráficos',
-      subtitle: 'Tendencias de consumo y gastos',
+      subtitle: `${consumptionData.entries.length} datos de consumo · ${monthlyExpenses.length} meses`,
       icon: 'bar-chart-outline',
       iconBg: '#F3E8FF',
       iconColor: '#6B21A8',
@@ -239,9 +288,9 @@ export default function FuelScreen() {
         ? `Has gastado un total de $${totalSpent.toLocaleString('es-CL')} en ${totalLiters.toFixed(1)} litros de combustible.`
         : 'Aún no tienes registros de combustible.', [{ text: 'OK' }], 'wallet-outline', colors.primary);
     } else if (section.id === 'consumption') {
-      showAlert('Consumo Promedio', 'Próximamente podrás ver el consumo promedio de tu moto (km/L) y comparar con otros períodos.', [{ text: 'OK' }], 'speedometer-outline', colors.primary);
+      setSelectedSection('consumption');
     } else if (section.id === 'graphics') {
-      showAlert('Gráficos', 'Próximamente podrás ver gráficos de tendencias de consumo, gastos por mes y comparativas.', [{ text: 'OK' }], 'bar-chart-outline', colors.primary);
+      setSelectedSection('charts');
     }
   };
 
@@ -279,11 +328,19 @@ export default function FuelScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Divider + price per liter / liters */}
+      {/* Divider + price per liter / liters / octane */}
       <View style={[styles.recordBottomRow, { borderTopColor: colors.border }]}>
         <Text style={[styles.recordPrice, { color: colors.textMuted }]}>${item.pricePerLiter.toLocaleString('es-CL')}/L</Text>
-        <Text style={[styles.recordLiters, { color: colors.primary }]}>{item.liters.toFixed(1)} L</Text>
+        <Text style={[styles.recordLiters, { color: colors.textMuted }]}>{item.liters.toFixed(1)} L{item.octane ? ` · ${item.octane} octanos` : ''}</Text>
       </View>
+
+      {/* Kilometers at fill */}
+      {item.kilometersAtFill != null && (
+        <View style={styles.recordKmRow}>
+          <Ionicons name="speedometer-outline" size={13} color={colors.textMuted} />
+          <Text style={[styles.recordKm, { color: colors.textMuted }]}>{item.kilometersAtFill.toLocaleString('es-CL')} km</Text>
+        </View>
+      )}
 
       {/* Date with calendar icon */}
       <View style={styles.recordDateRow}>
@@ -336,10 +393,10 @@ export default function FuelScreen() {
             <View style={[styles.modal, { backgroundColor: colors.background }]}>
               <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Nueva Carga</Text>
-                <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.primary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+                <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
               </View>
 
-              <View style={{ flex: 1, padding: 20 }}>
+              <ScrollView style={{ flex: 1, padding: 20 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
                 <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Bencinera</Text>
                 <TextInput
                   style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
@@ -394,6 +451,35 @@ export default function FuelScreen() {
                 />
                 {errors.pricePerLiter ? <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.pricePerLiter}</Text> : null}
 
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Octanos</Text>
+                <View style={styles.octaneRow}>
+                  {(['93', '95', '97'] as const).map((val) => (
+                    <TouchableOpacity
+                      key={val}
+                      style={[
+                        styles.octaneBtn,
+                        { borderColor: colors.inputBorder, backgroundColor: colors.surface },
+                        form.octane === val && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                      onPress={() => setForm((p) => ({ ...p, octane: p.octane === val ? '' : val }))}
+                    >
+                      <Text style={[styles.octaneBtnText, { color: colors.text }, form.octane === val && { color: '#fff' }]}>
+                        {val}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Kilometraje al cargar</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
+                  placeholder="Ej: 12500"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  value={form.kilometersAtFill}
+                  onChangeText={(txt) => setForm((p) => ({ ...p, kilometersAtFill: txt }))}
+                />
+
                 <TouchableOpacity style={[styles.input, { borderColor: errors.recordedAt ? '#FF3B30' : colors.inputBorder }]} onPress={() => setShowDatePicker(true)}>
                   <Text style={{ fontSize: 15, color: form.recordedAt ? colors.text : colors.textMuted }}>
                     {form.recordedAt ? formatDate(form.recordedAt) : t('selectDate')}
@@ -440,10 +526,166 @@ export default function FuelScreen() {
                 <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave} disabled={saving}>
                   {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
                 </TouchableOpacity>
-              </View>
+              </ScrollView>
             </View>
           </KeyboardAvoidingView>
         </Modal>
+
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          buttons={alertButtons}
+          icon={alertIcon}
+          iconColor={alertIconColor}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
+
+  // --- Consumption View ---
+  if (selectedSection === 'consumption') {
+    const { entries, avg } = consumptionData;
+    const hasKmData = records.some((r) => r.kilometersAtFill != null);
+
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+          {!hasKmData ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="speedometer-outline" size={48} color={colors.textMuted} style={{ marginBottom: 8 }} />
+              <Text style={[styles.empty, { color: colors.textMuted }]}>Sin datos de consumo</Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }, { textAlign: 'center' }]}>
+                Para calcular el consumo necesitas registrar el kilometraje al momento de cargar combustible.
+              </Text>
+            </View>
+          ) : entries.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="speedometer-outline" size={48} color={colors.textMuted} style={{ marginBottom: 8 }} />
+              <Text style={[styles.empty, { color: colors.textMuted }]}>Se necesitan al menos 2 cargas con km</Text>
+              <Text style={[styles.emptySub, { color: colors.textMuted }, { textAlign: 'center' }]}>
+                El consumo se calcula comparando el kilometraje entre dos cargas consecutivas.
+              </Text>
+            </View>
+          ) : (
+            <>
+              {/* Average consumption card */}
+              <View style={[styles.avgCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Ionicons name="speedometer" size={32} color={colors.primary} />
+                <Text style={[styles.avgValue, { color: colors.primary }]}>{avg.toFixed(1)}</Text>
+                <Text style={[styles.avgUnit, { color: colors.primary }]}>km/L</Text>
+                <Text style={[styles.avgLabel, { color: colors.primary }]}>Consumo Promedio</Text>
+                <Text style={[styles.avgSub, { color: colors.primary + '99' }]}>
+                  Basado en {entries.length} carga{entries.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
+
+              {/* Last consumptions */}
+              <Text style={[styles.sectionLabel, { color: colors.text }]}>Últimas cargas</Text>
+              {[...entries].reverse().slice(0, 10).map((entry, i) => {
+                const barWidth = avg > 0 ? (entry.kmPerLiter / (avg * 1.5)) * 100 : 0;
+                const date = new Date(entry.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+                return (
+                  <View key={i} style={[styles.consumptionRow, { borderBottomColor: colors.border + '40' }]}>
+                    <View style={styles.consumptionLeft}>
+                      <Text style={[styles.consumptionDate, { color: colors.textMuted }]}>{date}</Text>
+                      <Text style={[styles.consumptionDetail, { color: colors.textMuted }]}>
+                        {entry.liters.toFixed(1)}L · {entry.kmDiff.toLocaleString('es-CL')} km
+                      </Text>
+                    </View>
+                    <View style={styles.consumptionRight}>
+                      <View style={[styles.consumptionBar, { backgroundColor: colors.border }]}>
+                        <View style={[styles.consumptionFill, { width: `${Math.min(barWidth, 100)}%`, backgroundColor: colors.primary }]} />
+                      </View>
+                      <Text style={[styles.consumptionValue, { color: colors.text }]}>{entry.kmPerLiter.toFixed(1)}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </>
+          )}
+        </ScrollView>
+
+        <CustomAlert
+          visible={alertVisible}
+          title={alertTitle}
+          message={alertMessage}
+          buttons={alertButtons}
+          icon={alertIcon}
+          iconColor={alertIconColor}
+          onClose={() => setAlertVisible(false)}
+        />
+      </View>
+    );
+  }
+
+  // --- Charts View ---
+  if (selectedSection === 'charts') {
+    const { entries, avg, maxConsumption } = consumptionData;
+    const maxExpense = monthlyExpenses.length > 0 ? Math.max(...monthlyExpenses.map(([, v]) => v)) : 0;
+
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+          {/* Consumption trend */}
+          <Text style={[styles.sectionLabel, { color: colors.text }]}>Tendencia de Consumo</Text>
+          <Text style={[styles.chartSub, { color: colors.textMuted }]}>km/L por carga (últimas 10)</Text>
+          {entries.length === 0 ? (
+            <Text style={[styles.emptySub, { color: colors.textMuted, marginTop: 12 }]}>
+              Registra al menos 2 cargas con kilometraje para ver tendencias.
+            </Text>
+          ) : (
+            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {[...entries].reverse().slice(0, 10).map((entry, i) => {
+                const pct = maxConsumption > 0 ? (entry.kmPerLiter / maxConsumption) * 100 : 0;
+                const date = new Date(entry.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
+                const isLow = entry.kmPerLiter < avg * 0.85;
+                return (
+                  <View key={i} style={[styles.chartRow, { borderBottomColor: colors.border + '30' }]}>
+                    <Text style={[styles.chartLabel, { color: colors.textMuted }]}>{date}</Text>
+                    <View style={styles.chartBarTrack}>
+                      <View style={[styles.chartBarFill, {
+                        width: `${Math.min(pct, 100)}%`,
+                        backgroundColor: isLow ? colors.danger : colors.success,
+                      }]} />
+                    </View>
+                    <Text style={[styles.chartValue, { color: colors.text }]}>{entry.kmPerLiter.toFixed(1)}</Text>
+                  </View>
+                );
+              })}
+              <Text style={[styles.chartAvg, { color: colors.textMuted }]}>
+                Promedio: {avg.toFixed(1)} km/L
+              </Text>
+            </View>
+          )}
+
+          {/* Monthly expenses */}
+          <Text style={[styles.sectionLabel, { color: colors.text, marginTop: 24 }]}>Gastos por Mes</Text>
+          {monthlyExpenses.length === 0 ? (
+            <Text style={[styles.emptySub, { color: colors.textMuted, marginTop: 12 }]}>
+              No hay registros de combustible para mostrar.
+            </Text>
+          ) : (
+            <View style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {monthlyExpenses.slice(-12).map(([month, total], i) => {
+                const pct = maxExpense > 0 ? (total / maxExpense) * 100 : 0;
+                return (
+                  <View key={i} style={[styles.chartRow, { borderBottomColor: colors.border + '30' }]}>
+                    <Text style={[styles.chartLabel, { color: colors.textMuted }]}>{month}</Text>
+                    <View style={styles.chartBarTrack}>
+                      <View style={[styles.chartBarFill, {
+                        width: `${pct}%`,
+                        backgroundColor: '#FF9500',
+                      }]} />
+                    </View>
+                    <Text style={[styles.chartValue, { color: colors.text }]}>${total.toLocaleString('es-CL')}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
 
         <CustomAlert
           visible={alertVisible}
@@ -645,6 +887,25 @@ const styles = StyleSheet.create({
   },
   locationBtnText: { fontSize: 14, fontWeight: '600' },
 
+  // Octane Selector
+  octaneRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  octaneBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+  },
+  octaneBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
   // Modal
   modal: { flex: 1 },
   modalHeader: {
@@ -676,7 +937,7 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 14 },
   totalValue: { fontSize: 18, fontWeight: '700' },
   saveBtn: {
-    borderRadius: 8,
+    borderRadius: 30,
     padding: 14,
     alignItems: 'center',
     marginTop: 20,
@@ -691,4 +952,85 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center' },
   infoTitle: { fontSize: 13, fontWeight: '600', flex: 1 },
   infoText: { fontSize: 13, lineHeight: 18 },
+
+  // Record kilometers
+  recordKmRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  recordKm: { fontSize: 12 },
+
+  // Average consumption
+  avgCard: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 24,
+  },
+  avgValue: { fontSize: 48, fontWeight: '800', marginTop: 8 },
+  avgUnit: { fontSize: 16, fontWeight: '600', marginTop: -4 },
+  avgLabel: { fontSize: 14, fontWeight: '600', marginTop: 8 },
+  avgSub: { fontSize: 12, marginTop: 4 },
+
+  // Section label
+  sectionLabel: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
+
+  // Consumption list rows
+  consumptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  consumptionLeft: { flex: 1 },
+  consumptionDate: { fontSize: 12 },
+  consumptionDetail: { fontSize: 10, marginTop: 1 },
+  consumptionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+  },
+  consumptionBar: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  consumptionFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  consumptionValue: { fontSize: 14, fontWeight: '700', width: 50, textAlign: 'right' },
+
+  // Chart card
+  chartCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 14,
+  },
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  chartLabel: { fontSize: 11, width: 44 },
+  chartBarTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#E5E5EA',
+    overflow: 'hidden',
+  },
+  chartBarFill: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  chartValue: { fontSize: 12, fontWeight: '600', width: 60, textAlign: 'right' },
+  chartAvg: { fontSize: 12, marginTop: 10, textAlign: 'center' },
+  chartSub: { fontSize: 12, marginTop: -4, marginBottom: 8 },
 });

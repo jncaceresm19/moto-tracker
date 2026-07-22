@@ -27,6 +27,9 @@ const createMotorcycleSchema = z.object({
   imageUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').optional(),
   gpsTracker: z.string().max(100).nullable().optional(),
   color: z.string().max(50).nullable().optional(),
+  engineNumber: z.string().min(1, 'Engine number is required').max(100),
+  chassisNumber: z.string().min(1, 'Chassis number is required').max(100),
+  serialNumber: z.string().max(100).nullable().optional(),
 });
 
 const updateMotorcycleSchema = z.object({
@@ -40,6 +43,9 @@ const updateMotorcycleSchema = z.object({
   imageUrl: z.string().refine((v) => v.startsWith('data:image/') || /^https?:\/\//.test(v), 'Invalid image').nullable().optional(),
   gpsTracker: z.string().max(100).nullable().optional(),
   color: z.string().max(50).nullable().optional(),
+  engineNumber: z.string().min(1).max(100).optional(),
+  chassisNumber: z.string().min(1).max(100).optional(),
+  serialNumber: z.string().max(100).nullable().optional(),
 });
 
 const motorcycleIdParam = z.object({
@@ -116,7 +122,7 @@ router.get('/:id', validateParams(motorcycleIdParam), async (req: Request, res: 
 router.post('/', validateBody(createMotorcycleSchema), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { brand, model, year, licensePlate, brandId, modelId, currentKilometers, imageUrl, gpsTracker, color } = req.body;
+    const { brand, model, year, licensePlate, brandId, modelId, currentKilometers, imageUrl, gpsTracker, color, engineNumber, chassisNumber, serialNumber } = req.body;
 
     // Check for duplicate license plate
     const existing = await db
@@ -147,6 +153,9 @@ router.post('/', validateBody(createMotorcycleSchema), async (req: Request, res:
       imageUrl: imageUrl ?? null,
       gpsTracker: gpsTracker ?? null,
       color: color ?? null,
+      engineNumber: engineNumber ?? null,
+      chassisNumber: chassisNumber ?? null,
+      serialNumber: serialNumber ?? null,
       createdAt: now,
       updatedAt: now,
     });
@@ -272,6 +281,9 @@ const verifyMotorcycleSchema = z.object({
   carnetFrontUrl: z.string().optional(),
   carnetBackUrl: z.string().optional(),
   selfieUrl: z.string().optional(),
+  padronBackUrl: z.string().optional(),
+  extractedPatente: z.string().optional(),
+  extractedRut: z.string().optional(),
 });
 
 // --- GET /api/motorcycles/:id/verification-status ---
@@ -325,7 +337,7 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
   try {
     const userId = req.user!.userId;
     const motorcycleId = getMotorcycleId(req);
-    const { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl } = req.body;
+    const { padronUrl, carnetFrontUrl, carnetBackUrl, selfieUrl, padronBackUrl, extractedPatente, extractedRut } = req.body;
 
     console.log('[VERIFY] Request for motorcycle:', motorcycleId);
 
@@ -372,6 +384,20 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
     ]);
     console.log('[VERIFY] RT check:', rtCheck, 'Theft check:', theftCheck);
 
+    // Validate padrón back PPU if provided
+    let ppuMatch = true;
+    if (extractedPatente) {
+      const normalizedExtracted = extractedPatente.replace(/[\s-]/g, '').toUpperCase();
+      const normalizedRegistered = moto.licensePlate.replace(/[\s-]/g, '').toUpperCase();
+      ppuMatch = normalizedExtracted === normalizedRegistered;
+      console.log('[VERIFY] PPU match:', ppuMatch, '(extracted:', normalizedExtracted, 'registered:', normalizedRegistered, ')');
+    }
+
+    const warnings: string[] = [];
+    if (!rtCheck.vigente) warnings.push('Revisión técnica no vigente');
+    if (theftCheck.encargo) warnings.push('Este vehículo tiene encargo por robo');
+    if (extractedPatente && !ppuMatch) warnings.push('La patente del dorso no coincide con la registrada');
+
     // For now, accept padrón-only verification for all users
     // ClaveÚnica identity verification will be enabled later
     await db.update(motorcycles).set({
@@ -379,6 +405,8 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
       verificadaEn: new Date(),
       verificadaPor: 'padron',
       fotoConPatente: padronUrl,
+      padronBackUrl: padronBackUrl ?? null,
+      rutTitular: extractedRut ?? null,
       rtVigente: rtCheck.vigente,
       encargoRobo: theftCheck.encargo,
       updatedAt: new Date(),
@@ -391,10 +419,8 @@ router.post('/:id/verify', validateBody(verifyMotorcycleSchema), async (req: Req
         verificadaPor: 'padron',
         rtVigente: rtCheck.vigente,
         encargoRobo: theftCheck.encargo,
-        warnings: [
-          ...(!rtCheck.vigente ? ['Revisión técnica no vigente'] : []),
-          ...(theftCheck.encargo ? ['Este vehículo tiene encargo por robo'] : []),
-        ],
+        ppuMatch,
+        warnings,
       },
     });
   } catch (err) {

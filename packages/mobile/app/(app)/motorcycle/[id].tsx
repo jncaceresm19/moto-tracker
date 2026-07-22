@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { View, Image, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/theme-context';
 import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle, listDocuments, Document, listMaintenance, MaintenanceRecord, listKilometers, KilometerEntry } from '../../../src/api';
@@ -16,7 +18,7 @@ export default function MotorcycleDetailScreen() {
   const [motorcycle, setMotorcycle] = useState<Motorcycle | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', gpsTracker: '', color: '' });
+  const [form, setForm] = useState({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', color: '', engineNumber: '', chassisNumber: '', serialNumber: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
@@ -26,9 +28,43 @@ export default function MotorcycleDetailScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [gpsEnabled, setGpsEnabled] = useState(false);
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
   const [kmEntries, setKmEntries] = useState<KilometerEntry[]>([]);
+
+  const pickImage = async (fromCamera: boolean) => {
+    const permission = fromCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      showAlert(t('permissionNeeded'), fromCamera ? t('permissionCamera') : t('permissionGallery'), [{ text: 'OK' }], 'lock-closed', '#FF9500');
+      return;
+    }
+
+    const result = fromCamera
+      ? await ImagePicker.launchCameraAsync({ quality: 1.0, base64: true })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 1.0, base64: true });
+
+    if (!result.canceled && result.assets[0]) {
+      let uri: string;
+      if (result.assets[0].base64) {
+        uri = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      } else {
+        const b64 = await FileSystemLegacy.readAsStringAsync(result.assets[0].uri, {
+          encoding: 'base64',
+        });
+        uri = `data:image/jpeg;base64,${b64}`;
+      }
+      setImageUri(uri);
+    }
+  };
+
+  const showImageOptions = () => {
+    setShowPhotoModal(true);
+  };
 
   const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
@@ -76,14 +112,17 @@ export default function MotorcycleDetailScreen() {
   const openEdit = () => {
     if (!motorcycle) return;
     setErrors({});
+    setImageUri(motorcycle.imageUrl || null);
     setForm({
       brand: motorcycle.brand,
       model: motorcycle.model,
       year: String(motorcycle.year),
       licensePlate: motorcycle.licensePlate,
       currentKilometers: String(motorcycle.currentKilometers),
-      gpsTracker: motorcycle.gpsTracker || '',
       color: motorcycle.color || '',
+      engineNumber: motorcycle.engineNumber || '',
+      chassisNumber: motorcycle.chassisNumber || '',
+      serialNumber: motorcycle.serialNumber || '',
     });
     setEditing(true);
   };
@@ -104,11 +143,13 @@ export default function MotorcycleDetailScreen() {
         year: Number(form.year),
         licensePlate: form.licensePlate,
         currentKilometers: form.currentKilometers ? Number(form.currentKilometers) : undefined,
-        gpsTracker: form.gpsTracker || undefined,
         color: form.color || undefined,
+        engineNumber: form.engineNumber || undefined,
+        chassisNumber: form.chassisNumber || undefined,
+        serialNumber: form.serialNumber || undefined,
+        imageUrl: imageUri || undefined,
       });
       setMotorcycle(updated);
-      setGpsEnabled(!!updated.gpsTracker);
       setEditing(false);
       showAlert(t('success'), t('motorcycleUpdated'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
     } catch (e: any) {
@@ -413,41 +454,77 @@ export default function MotorcycleDetailScreen() {
 
       <Modal visible={editing} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={styles.modal} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('editMotorcycle')}</Text>
-              <TouchableOpacity onPress={() => setEditing(false)}><Text style={styles.cancel}>{t('cancel')}</Text></TouchableOpacity>
+          <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+            <View style={styles.modalTopRow}>
+              <TouchableOpacity onPress={() => setEditing(false)} style={{ marginLeft: 'auto' }}>
+                <Text style={[styles.cancel, { color: colors.textSecondary }]}>{t('cancel')}</Text>
+              </TouchableOpacity>
             </View>
 
-            {motorcycle?.verificada && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, padding: 10, borderRadius: 8, backgroundColor: colors.amberBg, borderWidth: 1, borderColor: colors.amber }}>
-                <Ionicons name="lock-closed" size={16} color={colors.amber} />
-                <Text style={{ fontSize: 13, color: colors.amber, flex: 1 }}>Moto verificada — datos bloqueados por seguridad</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 24 }}>
+              <View style={styles.modalLogoContainer}>
+                <Image
+                  source={require('../../../assets/nombre.jpeg')}
+                  style={styles.modalLogo}
+                  resizeMode="contain"
+                />
+                <Text style={styles.modalSubtitle}>{t('editMotorcycle')}</Text>
               </View>
-            )}
 
-            <TextInput style={styles.input} placeholder="Brand *" value={form.brand} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, brand: txt })); setErrors((p) => ({ ...p, brand: '' })); }} />
-            {errors.brand ? <Text style={styles.errorText}>{errors.brand}</Text> : null}
-            <TextInput style={styles.input} placeholder="Model *" value={form.model} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, model: txt })); setErrors((p) => ({ ...p, model: '' })); }} />
-            {errors.model ? <Text style={styles.errorText}>{errors.model}</Text> : null}
-            <TextInput style={styles.input} placeholder="Year *" keyboardType="numeric" value={form.year} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, year: txt })); setErrors((p) => ({ ...p, year: '' })); }} />
-            {errors.year ? <Text style={styles.errorText}>{errors.year}</Text> : null}
-            {errors.licensePlate ? <Text style={styles.errorText}>{errors.licensePlate}</Text> : null}
+              {motorcycle?.verificada && (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginBottom: 12, padding: 8, borderRadius: 8, backgroundColor: colors.amberBg, borderWidth: 1, borderColor: colors.amber }}>
+                  <Ionicons name="lock-closed" size={13} color={colors.amber} style={{ marginTop: 1 }} />
+                  <Text style={{ fontSize: 11.5, lineHeight: 15, color: colors.amber, flex: 1 }}>Moto verificada — datos bloqueados por seguridad</Text>
+                </View>
+              )}
 
-            <TextInput style={styles.input} placeholder="License Plate *" value={form.licensePlate} editable={!motorcycle?.verificada} onChangeText={(txt) => { setForm((p) => ({ ...p, licensePlate: txt })); setErrors((p) => ({ ...p, licensePlate: '' })); }} />
-            <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} editable={!motorcycle?.verificada} onChangeText={(txt) => setForm((p) => ({ ...p, currentKilometers: txt }))} />
-            <TextInput style={styles.input} placeholder="Color" value={form.color} editable={!motorcycle?.verificada} onChangeText={(txt) => setForm((p) => ({ ...p, color: txt }))} />
-            <View style={{ marginTop: 10, marginBottom: 6 }}>
-              <Text style={{ fontSize: 14, fontWeight: '600' }}>{t('gpsQuestion')}</Text>
-              <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{t('gpsQuestionHint')}</Text>
-            </View>
-            <TextInput style={styles.input} placeholder={t('gpsIdPlaceholder')} value={form.gpsTracker} onChangeText={(txt) => setForm((p) => ({ ...p, gpsTracker: txt }))} />
-            <Text style={{ fontSize: 12, color: '#666', marginTop: 4, marginBottom: 4 }}>{t('gpsQuestionHint2')}</Text>
-            <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
-              {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
-            </TouchableOpacity>
+              {/* Photo — the ONLY editable field */}
+              <TouchableOpacity style={styles.photoBtn} onPress={showImageOptions}>
+                {imageUri ? (
+                  <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
+                ) : (
+                  <View style={styles.photoPlaceholder}>
+                    <Text style={styles.photoPlaceholderIcon}>📷</Text>
+                    <Text style={styles.photoPlaceholderText}>{t('tapToAddMotoPhoto')}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <TextInput style={styles.input} placeholder="Year" keyboardType="numeric" value={form.year} editable={false} />
+              <TextInput style={styles.input} placeholder="Brand" value={form.brand} editable={false} />
+              <TextInput style={styles.input} placeholder="Model" value={form.model} editable={false} />
+              <TextInput style={styles.input} placeholder="N° Motor" value={form.engineNumber} editable={false} />
+              <TextInput style={styles.input} placeholder="N° Chasis" value={form.chassisNumber} editable={false} />
+              <TextInput style={styles.input} placeholder="N° Serie" value={form.serialNumber} editable={false} />
+              <TextInput style={styles.input} placeholder="License Plate" value={form.licensePlate} editable={false} />
+              <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} editable={false} />
+              <TextInput style={styles.input} placeholder="Color" value={form.color} editable={false} />
+              <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
+                {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Photo Options Modal */}
+      <Modal visible={showPhotoModal} transparent animationType="fade">
+        <View style={styles.photoModalOverlay}>
+          <View style={[styles.photoModalContent, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.photoModalClose} onPress={() => setShowPhotoModal(false)}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.photoModalTitle, { color: colors.text }]}>{t('addMotoPhoto')}</Text>
+            <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(true); }}>
+              <Ionicons name="camera" size={20} color="#fff" />
+              <Text style={styles.photoModalBtnText}>{t('takePhoto')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.photoModalBtn, { backgroundColor: colors.primary }]} onPress={() => { setShowPhotoModal(false); pickImage(false); }}>
+              <Ionicons name="images" size={20} color="#fff" />
+              <Text style={styles.photoModalBtnText}>{t('chooseFromGallery')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
 
       <CustomAlert
@@ -636,14 +713,103 @@ const styles = StyleSheet.create({
   alertTitle: { fontSize: 14, fontWeight: '600' },
   alertSubtitle: { fontSize: 12, marginTop: 2 },
 
+  // Photo button
+  photoBtn: {
+    width: '100%',
+    height: 90,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 10,
+    backgroundColor: '#f0f0f0',
+  },
+  photoPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    gap: 10,
+  },
+  photoPlaceholderIcon: {
+    fontSize: 22,
+  },
+  photoPlaceholderText: {
+    color: '#666',
+    fontSize: 12,
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  photoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  photoModalContent: {
+    width: '80%',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+  },
+  photoModalClose: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  photoModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 24,
+    marginTop: 8,
+  },
+  photoModalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  photoModalBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
   // Modal
   modal: { flex: 1, padding: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  cancel: { color: '#007AFF', fontSize: 16 },
+  modalTopRow: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  modalLogoContainer: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modalLogo: {
+    width: 300,
+    height: 150,
+    marginTop: -30,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#666',
+    marginTop: -60,
+    marginBottom: 30,
+  },
+  cancel: { fontSize: 16 },
   input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
-  saveBtn: { backgroundColor: '#1F9D63', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 8 },
+  saveBtn: { backgroundColor: '#1F9D63', borderRadius: 30, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   mapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1F9D63', borderRadius: 10, padding: 12, marginTop: 4, marginBottom: 8 },
   mapBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },

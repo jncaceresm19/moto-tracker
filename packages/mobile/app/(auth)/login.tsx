@@ -183,7 +183,7 @@ export default function LoginScreen() {
     },
     button: {
       backgroundColor: colors.primary,
-      borderRadius: 10,
+      borderRadius: 30,
       paddingVertical: 16,
       alignItems: 'center',
       marginTop: 6,

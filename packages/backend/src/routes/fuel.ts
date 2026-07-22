@@ -19,6 +19,8 @@ const createFuelRecordSchema = z.object({
   liters: z.number().positive('Liters must be positive'),
   pricePerLiter: z.number().positive('Price per liter must be positive'),
   location: z.string().max(500).optional(),
+  octane: z.enum(['93', '95', '97']).optional(),
+  kilometersAtFill: z.number().positive('Kilometers must be positive').optional(),
   recordedAt: z.string().datetime('Invalid recorded date'),
   notes: z.string().max(500).optional(),
 });
@@ -28,6 +30,8 @@ const updateFuelRecordSchema = z.object({
   liters: z.number().positive().optional(),
   pricePerLiter: z.number().positive().optional(),
   location: z.string().max(500).nullable().optional(),
+  octane: z.enum(['93', '95', '97']).nullable().optional(),
+  kilometersAtFill: z.number().positive().nullable().optional(),
   recordedAt: z.string().datetime().optional(),
   notes: z.string().max(500).nullable().optional(),
 });
@@ -73,7 +77,7 @@ router.post('/', validateBody(createFuelRecordSchema), async (req: Request, res:
       return;
     }
 
-    const { stationName, liters, pricePerLiter, location, recordedAt, notes } = req.body;
+    const { stationName, liters, pricePerLiter, location, octane, kilometersAtFill, recordedAt, notes } = req.body;
     const totalCost = liters * pricePerLiter;
     const now = new Date();
     const entryId = crypto.randomUUID();
@@ -86,6 +90,8 @@ router.post('/', validateBody(createFuelRecordSchema), async (req: Request, res:
       pricePerLiter,
       totalCost,
       location: location ?? null,
+      octane: octane ?? null,
+      kilometersAtFill: kilometersAtFill ?? null,
       recordedAt: new Date(recordedAt),
       notes: notes ?? null,
       createdAt: now,
@@ -239,6 +245,8 @@ router.put('/:entryId', validateParams(entryIdParam), validateBody(updateFuelRec
     if (req.body.liters !== undefined) updates.liters = req.body.liters;
     if (req.body.pricePerLiter !== undefined) updates.pricePerLiter = req.body.pricePerLiter;
     if (req.body.location !== undefined) updates.location = req.body.location;
+    if (req.body.octane !== undefined) updates.octane = req.body.octane;
+    if (req.body.kilometersAtFill !== undefined) updates.kilometersAtFill = req.body.kilometersAtFill;
     if (req.body.recordedAt !== undefined) updates.recordedAt = new Date(req.body.recordedAt);
     if (req.body.notes !== undefined) updates.notes = req.body.notes;
 
