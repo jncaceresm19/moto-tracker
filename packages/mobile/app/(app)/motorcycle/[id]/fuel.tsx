@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, RefreshControl, Keyboard, KeyboardAvoidingView, Platform, ScrollView, Dimensions } from 'react-native';
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Location from 'expo-location';
@@ -34,7 +34,7 @@ export default function FuelScreen() {
 
   // Modal state for records CRUD
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ stationName: '', liters: '', pricePerLiter: '', location: '', octane: '', kilometersAtFill: '', recordedAt: '', notes: '' });
+  const [form, setForm] = useState({ stationName: '', liters: '', pricePerLiter: '', location: '', octane: '', kilometersAtFill: '', recordedAt: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -106,7 +106,7 @@ export default function FuelScreen() {
 
   // --- Records CRUD ---
   const openCreate = () => {
-    setForm({ stationName: '', liters: '', pricePerLiter: '', location: '', octane: '', kilometersAtFill: String(motorcycleKm || ''), recordedAt: new Date().toISOString().split('T')[0], notes: '' });
+    setForm({ stationName: '', liters: '', pricePerLiter: '', location: '', octane: '', kilometersAtFill: String(motorcycleKm || ''), recordedAt: new Date().toISOString().split('T')[0] });
     setErrors({});
     setShowModal(true);
   };
@@ -164,7 +164,6 @@ export default function FuelScreen() {
         octane: form.octane || undefined,
         kilometersAtFill: form.kilometersAtFill && !isNaN(Number(form.kilometersAtFill)) ? Number(form.kilometersAtFill) : undefined,
         recordedAt: new Date(form.recordedAt).toISOString(),
-        notes: form.notes || undefined,
       };
 
       await createFuelRecord(id, data);
@@ -350,13 +349,11 @@ export default function FuelScreen() {
 
       {/* Location if exists */}
       {item.location ? (
-        <View style={styles.recordLocation}>
+        <View style={[styles.recordLocation, { borderTopColor: colors.border }]}>
           <Ionicons name="location-outline" size={12} color={colors.textMuted} />
           <Text style={[styles.recordLocationText, { color: colors.textMuted }]} numberOfLines={1}>{item.location}</Text>
         </View>
       ) : null}
-      {/* Notes if exists */}
-      {item.notes ? <Text style={[styles.recordNotes, { color: colors.textMuted }]}>{item.notes}</Text> : null}
     </View>
   );
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
@@ -391,71 +388,70 @@ export default function FuelScreen() {
         <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <View style={[styles.modal, { backgroundColor: colors.background }]}>
-              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Nueva Carga</Text>
-                <TouchableOpacity onPress={closeModal}><Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text></TouchableOpacity>
+              <View style={styles.modalTopRow}>
+                <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
+                </TouchableOpacity>
               </View>
 
-              <ScrollView style={{ flex: 1, padding: 20 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Bencinera</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
-                  placeholder="Ej: Copec, Shell, Petrobras..."
-                  placeholderTextColor={colors.textMuted}
-                  value={form.stationName}
-                  onChangeText={(txt) => setForm((p) => ({ ...p, stationName: txt }))}
-                />
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('locationOptional')}</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
-                  placeholder={t('locationPlaceholderFuel')}
-                  placeholderTextColor={colors.textMuted}
-                  value={form.location}
-                  onChangeText={(txt) => setForm((p) => ({ ...p, location: txt }))}
-                />
-                <TouchableOpacity
-                  style={[styles.locationBtn, { borderColor: colors.primary, opacity: gettingLocation ? 0.6 : 1 }]}
-                  onPress={getLocation}
-                  disabled={gettingLocation}
-                >
-                  {gettingLocation ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <>
-                      <Ionicons name="location" size={18} color={colors.primary} />
-                      <Text style={[styles.locationBtnText, { color: colors.primary }]}>Usar ubicación actual</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                <View style={styles.modalLogoContainer}>
+                  <Image
+                    source={require('../../../../assets/nombre.jpeg')}
+                    style={styles.modalLogo}
+                    resizeMode="contain"
+                  />
+                  <Text style={[styles.modalSubtitle, { color: colors.textMuted }]}>Nueva Carga</Text>
+                </View>
 
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('liters')} *</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: errors.liters ? '#FF3B30' : colors.inputBorder }]}
-                  placeholder="Ej: 5.5"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="decimal-pad"
-                  value={form.liters}
-                  onChangeText={(txt) => { setForm((p) => ({ ...p, liters: txt })); setErrors((p) => ({ ...p, liters: '' })); }}
-                />
-                {errors.liters ? <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.liters}</Text> : null}
+                {/* Total destacado */}
+                <View style={[styles.totalHero, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.totalHeroLabel}>Total de esta carga</Text>
+                  <Text style={styles.totalHeroValue}>
+                    {form.liters && form.pricePerLiter
+                      ? `$${(Number(form.liters) * Number(form.pricePerLiter)).toLocaleString('es-CL')}`
+                      : '$0'}
+                  </Text>
+                  <Text style={styles.totalHeroSub}>
+                    {form.liters || '0'} L × ${form.pricePerLiter || '0'}
+                  </Text>
+                </View>
 
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Precio por Litro ($) *</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: errors.pricePerLiter ? '#FF3B30' : colors.inputBorder }]}
-                  placeholder="Ej: 1200"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="decimal-pad"
-                  value={form.pricePerLiter}
-                  onChangeText={(txt) => { setForm((p) => ({ ...p, pricePerLiter: txt })); setErrors((p) => ({ ...p, pricePerLiter: '' })); }}
-                />
-                {errors.pricePerLiter ? <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.pricePerLiter}</Text> : null}
+                {/* Litros + Precio como stat boxes */}
+                <View style={styles.statRow}>
+                  <View style={[styles.statBox, { backgroundColor: colors.surfaceSecondary, borderColor: errors.liters ? colors.danger : colors.border }]}>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>{t('liters')} *</Text>
+                    <TextInput
+                      style={[styles.statInput, { color: colors.text }]}
+                      placeholder="5.5"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="decimal-pad"
+                      value={form.liters}
+                      onChangeText={(txt) => { setForm((p) => ({ ...p, liters: txt })); setErrors((p) => ({ ...p, liters: '' })); }}
+                    />
+                  </View>
+                  <View style={[styles.statBox, { backgroundColor: colors.surfaceSecondary, borderColor: errors.pricePerLiter ? colors.danger : colors.border }]}>
+                    <Text style={[styles.statLabel, { color: colors.textMuted }]}>Precio/Litro *</Text>
+                    <TextInput
+                      style={[styles.statInput, { color: colors.text }]}
+                      placeholder="1200"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="decimal-pad"
+                      value={form.pricePerLiter}
+                      onChangeText={(txt) => { setForm((p) => ({ ...p, pricePerLiter: txt })); setErrors((p) => ({ ...p, pricePerLiter: '' })); }}
+                    />
+                  </View>
+                </View>
+                {errors.liters ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.liters}</Text> : null}
+                {errors.pricePerLiter ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.pricePerLiter}</Text> : null}
 
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Octanos</Text>
+                {/* Octanaje */}
                 <View style={styles.octaneRow}>
-                  {(['93', '95', '97'] as const).map((val) => (
+                  {(["93'", "95'", "97'"] as const).map((val) => (
                     <TouchableOpacity
                       key={val}
+                      activeOpacity={0.7}
                       style={[
                         styles.octaneBtn,
                         { borderColor: colors.inputBorder, backgroundColor: colors.surface },
@@ -470,22 +466,60 @@ export default function FuelScreen() {
                   ))}
                 </View>
 
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Kilometraje al cargar</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder }]}
-                  placeholder="Ej: 12500"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="number-pad"
-                  value={form.kilometersAtFill}
-                  onChangeText={(txt) => setForm((p) => ({ ...p, kilometersAtFill: txt }))}
-                />
+                {/* Bencinera, ubicación, km, fecha — card agrupada */}
+                <View style={[styles.groupCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                  <View style={styles.groupRow}>
+                    <Ionicons name="storefront-outline" size={18} color={colors.textMuted} />
+                    <TextInput
+                      style={[styles.groupInput, { color: colors.text }]}
+                      placeholder="Bencinera (ej: Copec, Shell...)"
+                      placeholderTextColor={colors.textMuted}
+                      value={form.stationName}
+                      onChangeText={(txt) => setForm((p) => ({ ...p, stationName: txt }))}
+                    />
+                  </View>
+                  <View style={[styles.groupDivider, { backgroundColor: colors.border }]} />
 
-                <TouchableOpacity style={[styles.input, { borderColor: errors.recordedAt ? '#FF3B30' : colors.inputBorder }]} onPress={() => setShowDatePicker(true)}>
-                  <Text style={{ fontSize: 15, color: form.recordedAt ? colors.text : colors.textMuted }}>
-                    {form.recordedAt ? formatDate(form.recordedAt) : t('selectDate')}
-                  </Text>
-                </TouchableOpacity>
-                {errors.recordedAt ? <Text style={[styles.errorText, { color: '#FF3B30' }]}>{errors.recordedAt}</Text> : null}
+                  <View style={styles.groupRow}>
+                    <Ionicons name="location-outline" size={18} color={colors.textMuted} />
+                    <TextInput
+                      style={[styles.groupInput, { color: colors.text }]}
+                      placeholder={t('locationPlaceholderFuel')}
+                      placeholderTextColor={colors.textMuted}
+                      value={form.location}
+                      onChangeText={(txt) => setForm((p) => ({ ...p, location: txt }))}
+                    />
+                    <TouchableOpacity onPress={getLocation} disabled={gettingLocation}>
+                      {gettingLocation ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Text style={[styles.groupInlineAction, { color: colors.primary }]}>GPS</Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                  <View style={[styles.groupDivider, { backgroundColor: colors.border }]} />
+
+                  <View style={styles.groupRow}>
+                    <Ionicons name="speedometer-outline" size={18} color={colors.textMuted} />
+                    <TextInput
+                      style={[styles.groupInput, { color: colors.text }]}
+                      placeholder="Kilometraje al cargar"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="number-pad"
+                      value={form.kilometersAtFill}
+                      onChangeText={(txt) => setForm((p) => ({ ...p, kilometersAtFill: txt }))}
+                    />
+                  </View>
+                  <View style={[styles.groupDivider, { backgroundColor: colors.border }]} />
+
+                  <TouchableOpacity style={styles.groupRow} onPress={() => setShowDatePicker(true)}>
+                    <Ionicons name="calendar-outline" size={18} color={colors.textMuted} />
+                    <Text style={[styles.groupInput, { color: form.recordedAt ? colors.text : colors.textMuted, paddingVertical: 13 }]}>
+                      {form.recordedAt ? formatDate(form.recordedAt) : t('selectDate')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {errors.recordedAt ? <Text style={[styles.errorText, { color: colors.danger }]}>{errors.recordedAt}</Text> : null}
 
                 {showDatePicker && (
                   <DateTimePicker
@@ -503,28 +537,8 @@ export default function FuelScreen() {
                   />
                 )}
 
-                <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t('notes')} ({t('optional')})</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text, borderColor: colors.inputBorder, height: 80, textAlignVertical: 'top' }]}
-                  placeholder={t('notesPlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                  multiline
-                  value={form.notes}
-                  onChangeText={(txt) => setForm((p) => ({ ...p, notes: txt }))}
-                />
-
-                {/* Total preview */}
-                {form.liters && form.pricePerLiter && (
-                  <View style={[styles.totalPreview, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                    <Text style={[styles.totalLabel, { color: colors.textMuted }]}>Total:</Text>
-                    <Text style={[styles.totalValue, { color: colors.text }]}>
-                      ${(Number(form.liters) * Number(form.pricePerLiter)).toLocaleString('es-CL')}
-                    </Text>
-                  </View>
-                )}
-
                 <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSave} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
+                  {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Guardar</Text>}
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -577,12 +591,23 @@ export default function FuelScreen() {
                 <Text style={[styles.avgUnit, { color: colors.primary }]}>km/L</Text>
                 <Text style={[styles.avgLabel, { color: colors.primary }]}>Consumo Promedio</Text>
                 <Text style={[styles.avgSub, { color: colors.primary + '99' }]}>
-                  Basado en {entries.length} carga{entries.length !== 1 ? 's' : ''}
+                  Basado en {entries.length} tramo{entries.length !== 1 ? 's' : ''}
+                </Text>
+              </View>
+
+              {/* Info card explaining how it works */}
+              <View style={[styles.infoCard, { backgroundColor: colors.brandBlueBg, borderColor: colors.brandBlue, marginBottom: 20 }]}>
+                <View style={styles.infoRow}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.brandBlue + '99'} style={{ marginRight: 6 }} />
+                  <Text style={[styles.infoTitle, { color: colors.brandBlue + '99' }]}>¿Cómo se calcula?</Text>
+                </View>
+                <Text style={[styles.infoText, { color: colors.brandBlue + '99', marginTop: 6 }]}>
+                  Cada barra compara el kilometraje entre dos cargas consecutivas. Ej: si cargaste con 5.000 km y después con 5.200 km, y pusiste 5 litros, rindió 40 km/L en ese tramo. Solo aparecen tramos donde ambas cargas tienen kilometraje registrado.
                 </Text>
               </View>
 
               {/* Last consumptions */}
-              <Text style={[styles.sectionLabel, { color: colors.text }]}>Últimas cargas</Text>
+              <Text style={[styles.sectionLabel, { color: colors.text }]}>Últimos consumos</Text>
               {[...entries].reverse().slice(0, 10).map((entry, i) => {
                 const barWidth = avg > 0 ? (entry.kmPerLiter / (avg * 1.5)) * 100 : 0;
                 const date = new Date(entry.date).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
@@ -853,7 +878,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   recordLocationText: { fontSize: 12, flex: 1 },
-  recordNotes: { fontSize: 12, marginTop: 4, fontStyle: 'italic' },
 
   // FAB
   fab: {
@@ -916,6 +940,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   modalTitle: { fontSize: 18, fontWeight: '600' },
+  modalTopRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    marginBottom: 4,
+  },
+  modalLogoContainer: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  modalLogo: {
+    width: 300,
+    height: 150,
+    marginTop: -30,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: -60,
+    marginBottom: 30,
+  },
+  totalHero: {
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  totalHeroLabel: { fontSize: 12, color: '#fff', opacity: 0.85 },
+  totalHeroValue: { fontSize: 32, fontWeight: '800', color: '#fff', marginTop: 4 },
+  totalHeroSub: { fontSize: 12, color: '#fff', opacity: 0.85, marginTop: 2 },
+  statRow: { flexDirection: 'row', gap: 10, marginBottom: 4 },
+  statBox: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 12 },
+  statLabel: { fontSize: 11, marginBottom: 6 },
+  statInput: { fontSize: 18, fontWeight: '600', padding: 0 },
+  groupCard: { borderWidth: 1, borderRadius: 12, marginTop: 16, overflow: 'hidden' },
+  groupRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14 },
+  groupInput: { flex: 1, fontSize: 14, paddingVertical: 13 },
+  groupInlineAction: { fontSize: 12, fontWeight: '500' },
+  groupDivider: { height: 1, marginHorizontal: 14 },
   inputLabel: { fontSize: 12, marginBottom: 6, marginTop: 12 },
   input: {
     borderWidth: 1,

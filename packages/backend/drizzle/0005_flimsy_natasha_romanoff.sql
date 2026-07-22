@@ -1,0 +1,1 @@
+ALTER TABLE `fuel_records` DROP COLUMN `notes`;

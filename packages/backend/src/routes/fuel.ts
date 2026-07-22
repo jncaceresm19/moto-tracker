@@ -22,7 +22,6 @@ const createFuelRecordSchema = z.object({
   octane: z.enum(['93', '95', '97']).optional(),
   kilometersAtFill: z.number().positive('Kilometers must be positive').optional(),
   recordedAt: z.string().datetime('Invalid recorded date'),
-  notes: z.string().max(500).optional(),
 });
 
 const updateFuelRecordSchema = z.object({
@@ -33,7 +32,6 @@ const updateFuelRecordSchema = z.object({
   octane: z.enum(['93', '95', '97']).nullable().optional(),
   kilometersAtFill: z.number().positive().nullable().optional(),
   recordedAt: z.string().datetime().optional(),
-  notes: z.string().max(500).nullable().optional(),
 });
 
 const motorcycleIdParam = z.object({
@@ -77,7 +75,7 @@ router.post('/', validateBody(createFuelRecordSchema), async (req: Request, res:
       return;
     }
 
-    const { stationName, liters, pricePerLiter, location, octane, kilometersAtFill, recordedAt, notes } = req.body;
+    const { stationName, liters, pricePerLiter, location, octane, kilometersAtFill, recordedAt } = req.body;
     const totalCost = liters * pricePerLiter;
     const now = new Date();
     const entryId = crypto.randomUUID();
@@ -93,7 +91,6 @@ router.post('/', validateBody(createFuelRecordSchema), async (req: Request, res:
       octane: octane ?? null,
       kilometersAtFill: kilometersAtFill ?? null,
       recordedAt: new Date(recordedAt),
-      notes: notes ?? null,
       createdAt: now,
     });
 
@@ -248,7 +245,6 @@ router.put('/:entryId', validateParams(entryIdParam), validateBody(updateFuelRec
     if (req.body.octane !== undefined) updates.octane = req.body.octane;
     if (req.body.kilometersAtFill !== undefined) updates.kilometersAtFill = req.body.kilometersAtFill;
     if (req.body.recordedAt !== undefined) updates.recordedAt = new Date(req.body.recordedAt);
-    if (req.body.notes !== undefined) updates.notes = req.body.notes;
 
     // Recalculate total cost if liters or price changed
     if (req.body.liters !== undefined || req.body.pricePerLiter !== undefined) {

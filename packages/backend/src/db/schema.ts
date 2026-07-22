@@ -113,7 +113,6 @@ export const fuelRecords = sqliteTable('fuel_records', {
   octane: text('octane'),
   kilometersAtFill: real('kilometers_at_fill'),
   recordedAt: integer('recorded_at', { mode: 'timestamp' }).notNull(),
-  notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

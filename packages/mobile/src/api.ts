@@ -348,7 +348,6 @@ export interface FuelRecord {
   octane?: string;
   kilometersAtFill?: number;
   recordedAt: string;
-  notes?: string;
   createdAt: string;
 }
 
@@ -358,7 +357,7 @@ export async function listFuelRecords(motorcycleId: string): Promise<FuelRecord[
 
 export async function createFuelRecord(
   motorcycleId: string,
-  data: { stationName?: string; liters: number; pricePerLiter: number; location?: string; octane?: string; kilometersAtFill?: number; recordedAt: string; notes?: string }
+  data: { stationName?: string; liters: number; pricePerLiter: number; location?: string; octane?: string; kilometersAtFill?: number; recordedAt: string }
 ): Promise<FuelRecord> {
   return api<FuelRecord>(`/api/motorcycles/${motorcycleId}/fuel`, { method: 'POST', body: data });
 }
@@ -366,7 +365,7 @@ export async function createFuelRecord(
 export async function updateFuelRecord(
   motorcycleId: string,
   entryId: string,
-  data: { stationName?: string | null; liters?: number; pricePerLiter?: number; location?: string | null; octane?: string | null; kilometersAtFill?: number | null; recordedAt?: string; notes?: string | null }
+  data: { stationName?: string | null; liters?: number; pricePerLiter?: number; location?: string | null; octane?: string | null; kilometersAtFill?: number | null; recordedAt?: string }
 ): Promise<FuelRecord> {
   return api<FuelRecord>(`/api/motorcycles/${motorcycleId}/fuel/${entryId}`, { method: 'PUT', body: data });
 }
