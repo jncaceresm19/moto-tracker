@@ -71,6 +71,15 @@ const OCR_TYPES = ['circulation_permit', 'technical_review', 'drivers_license', 
 // Types that allow multiple documents
 const MULTI_DOC_TYPES = ['fines'];
 
+const TYPE_ENGLISH: Record<string, string> = {
+  circulation_permit: 'Circulation Permit',
+  technical_review: 'Technical Review',
+  insurance: 'Insurance',
+  padron: 'Vehicle Registration',
+  drivers_license: "Driver's License",
+  fines: 'Fines',
+};
+
 export default function DocumentsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const navigation = useNavigation();
@@ -122,6 +131,16 @@ export default function DocumentsScreen() {
   const [cropImageUri, setCropImageUri] = useState('');
   const [pendingOcrSide, setPendingOcrSide] = useState<'front' | 'back'>('front');
   const [cropMode, setCropMode] = useState<'ocr' | 'photo'>('ocr');
+
+  // Reset internal state when screen regains focus (e.g. after tab switch)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      setViewing(null);
+      setSelectedType(null);
+      setEditing(null);
+    });
+    return unsub;
+  }, [navigation]);
 
   useEffect(() => {
     navigation.setOptions({
@@ -204,6 +223,14 @@ export default function DocumentsScreen() {
     });
     setEditing(doc);
     setViewing(null);
+    // Set upload mode based on document type
+    if (doc.fileUrl?.startsWith('data:application/pdf')) {
+      setUploadMode('file');
+      setPickedFile({ uri: doc.fileUrl, name: doc.title + '.pdf', mimeType: 'application/pdf' });
+    } else {
+      setUploadMode('photo');
+      setPickedFile(null);
+    }
   };
 
   const pickImage = async (fromCamera: boolean) => {
@@ -572,7 +599,7 @@ export default function DocumentsScreen() {
           } catch { showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', colors.danger); }
         },
       },
-    ], 'warning', colors.accent);
+    ], 'warning', colors.danger);
   };
 
   const generatePDF = async (doc: Document) => {
@@ -591,7 +618,8 @@ export default function DocumentsScreen() {
       <head><meta charset="utf-8"><style>
         body { margin: 0; padding: 20px; font-family: -apple-system, sans-serif; color: #333; }
         .header { text-align: center; margin-bottom: 20px; }
-        .title { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+        .title { font-size: 18px; font-weight: bold; margin-bottom: 2px; }
+        .title-en { font-size: 13px; color: #888; margin-bottom: 4px; }
         .type { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
         .dates { font-size: 13px; color: #666; margin: 10px 0; text-align: center; }
         .img-container { text-align: center; }
@@ -600,6 +628,7 @@ export default function DocumentsScreen() {
       <body>
         <div class="header">
           <div class="title">${doc.title}</div>
+          <div class="title-en">${TYPE_ENGLISH[doc.type] || doc.type.replace(/_/g, ' ')}</div>
           <div class="type">${doc.type.replace(/_/g, ' ')}</div>
         </div>
         <div class="dates">Emitido: ${issuedStr} | Vence: ${expiresStr}</div>
@@ -618,6 +647,37 @@ export default function DocumentsScreen() {
     try {
       const uri = await generatePDF(doc);
       if (uri) await Sharing.shareAsync(uri);
+    } catch (e: any) {
+      showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    const docsWithFiles = docs.filter((d) => d.fileUrl);
+    if (docsWithFiles.length === 0) {
+      showAlert(t('noDocuments'), t('noPhotosSub'), [{ text: 'OK' }], 'document-outline', colors.textMuted);
+      return;
+    }
+    try {
+      const issuedStr = (d: Document) => d.issueDate ? parseLocalDate(d.issueDate).toLocaleDateString() : '—';
+      const expiresStr = (d: Document) => d.expiryDate ? parseLocalDate(d.expiryDate).toLocaleDateString() : '—';
+      const docHtml = docsWithFiles.map((d) => `
+        <div style="page-break-before: always; padding-top: 20px;">
+          <div style="text-align: center; margin-bottom: 16px;">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 2px;">${d.title}</div>
+            <div style="font-size: 13px; color: #888; margin-bottom: 4px;">${TYPE_ENGLISH[d.type] || d.type.replace(/_/g, ' ')}</div>
+            <div style="font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px;">${d.type.replace(/_/g, ' ')}</div>
+          </div>
+          <div style="font-size: 13px; color: #666; margin: 10px 0; text-align: center;">Emitido: ${issuedStr(d)} | Vence: ${expiresStr(d)}</div>
+          <div style="text-align: center;">
+            <img src="${d.fileUrl}" style="max-width: 100%; max-height: 85vh;" />
+          </div>
+          ${d.fileUrlBack ? `<div style="page-break-before: always; text-align: center; padding-top: 20px;"><div style="font-size: 14px; color: #666; margin-bottom: 10px;">Reverso</div><img src="${d.fileUrlBack}" style="max-width: 100%; max-height: 85vh;" /></div>` : ''}
+        </div>
+      `).join('');
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body { margin: 0; padding: 20px; font-family: -apple-system, sans-serif; color: #333; } img { max-width: 100%; max-height: 85vh; }</style></head><body>${docHtml}</body></html>`;
+      const { uri } = await Print.printToFileAsync({ html, base64: false });
+      await Sharing.shareAsync(uri);
     } catch (e: any) {
       showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
     }
@@ -697,7 +757,7 @@ export default function DocumentsScreen() {
   const modalTitle = editing ? t('editDocument') : t('newDocument');
   const modalSave = editing ? handleUpdate : handleCreate;
   const showModal = showCreate || editing !== null;
-  const closeModal = () => { setShowCreate(false); setEditing(null); };
+  const closeModal = () => { setShowCreate(false); setEditing(null); setUploadMode('photo'); setPickedFile(null); };
 
   if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
@@ -711,7 +771,7 @@ export default function DocumentsScreen() {
           data={TYPES}
           keyExtractor={(item) => item}
           contentContainerStyle={styles.categoryList}
-          scrollEnabled={false}
+          scrollEnabled
           ListHeaderComponent={
             <>
               <View style={[styles.headerCard, { backgroundColor: '#E6F1FB', borderColor: '#185FA5' }]}>
@@ -727,6 +787,16 @@ export default function DocumentsScreen() {
           }
           ListFooterComponent={
             <>
+              <TouchableOpacity
+                style={[styles.categoryBtn, { backgroundColor: colors.card }]}
+                activeOpacity={0.7}
+                onPress={handleDownloadAll}
+              >
+                <View style={[styles.categoryChip, { backgroundColor: colors.success + '20' }]}>
+                  <Ionicons name="download-outline" size={18} color={colors.success} />
+                </View>
+                <Text style={[styles.categoryCount, { color: colors.text, fontSize: 14 }]}>Descargar todos los documentos en PDF</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.linkButton}
                 onPress={() => setShowDocPortarModal(true)}
@@ -923,6 +993,9 @@ export default function DocumentsScreen() {
                 )}
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity onPress={() => handleSaveAsPDF(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
+                  <Ionicons name="arrow-down" size={18} color={colors.success} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
                   <Ionicons name="pencil" size={18} color={colors.primary} />
                 </TouchableOpacity>
@@ -1258,14 +1331,14 @@ export default function DocumentsScreen() {
               <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceSecondary }]}>
                 <TouchableOpacity
                   style={[styles.segmentedOption, uploadMode === 'photo' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
-                  onPress={() => { setUploadMode('photo'); setPickedFile(null); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+                  onPress={() => { setUploadMode('photo'); setPickedFile(null); }}
                 >
                   <Ionicons name="camera-outline" size={16} color={uploadMode === 'photo' ? colors.primary : colors.textMuted} />
                   <Text style={[styles.segmentedOptionText, { color: uploadMode === 'photo' ? colors.primary : colors.textMuted }]}>Foto</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segmentedOption, uploadMode === 'file' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
-                  onPress={() => { setUploadMode('file'); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+                  onPress={() => { setUploadMode('file'); if (!pickedFile && form.fileUrl?.startsWith('data:application/pdf')) setPickedFile({ uri: form.fileUrl, name: form.title + '.pdf', mimeType: 'application/pdf' }); }}
                 >
                   <Ionicons name="document-outline" size={16} color={uploadMode === 'file' ? colors.primary : colors.textMuted} />
                   <Text style={[styles.segmentedOptionText, { color: uploadMode === 'file' ? colors.primary : colors.textMuted }]}>Subir archivo</Text>
@@ -1274,8 +1347,8 @@ export default function DocumentsScreen() {
               {uploadMode === 'photo' && (
                 (form.type === 'drivers_license' || form.type === 'technical_review' || form.type === 'padron') ? (
                   <View style={{ gap: 10, marginBottom: 12 }}>
-                    <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
-                      {form.fileUrl ? (
+                    <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                      {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                         <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                       ) : (
                         <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
@@ -1302,8 +1375,8 @@ export default function DocumentsScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
-                    {form.fileUrl ? (
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                    {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                       <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                     ) : (
                       <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
@@ -1321,13 +1394,17 @@ export default function DocumentsScreen() {
               {uploadMode === 'file' && (
                 <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary, marginBottom: 12 }]} onPress={pickFile}>
                   {pickedFile ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
-                      <Ionicons name="document-text" size={28} color={colors.primary} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{pickedFile.name}</Text>
-                        <Text style={{ fontSize: 12, color: colors.textMuted }}>{pickedFile.mimeType === 'application/pdf' ? 'PDF' : 'Imagen'}</Text>
+                    <View style={{ flex: 1, justifyContent: 'center' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                          <Ionicons name="document-text" size={24} color={colors.primary} />
+                          <View>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }} numberOfLines={1}>{pickedFile.name}</Text>
+                            <Text style={{ fontSize: 12, color: colors.textMuted }}>{pickedFile.mimeType === 'application/pdf' ? 'PDF' : 'Imagen'}</Text>
+                          </View>
+                        </View>
                       </View>
-                      <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                      <Ionicons name="checkmark-circle" size={22} color={colors.success} style={{ position: 'absolute', top: 8, right: 8 }} />
                     </View>
                   ) : (
                     <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
@@ -1623,6 +1700,9 @@ export default function DocumentsScreen() {
               )}
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity onPress={() => handleSaveAsPDF(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
+                <Ionicons name="arrow-down" size={18} color={colors.success} />
+              </TouchableOpacity>
               <TouchableOpacity onPress={() => openEdit(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
                 <Ionicons name="pencil" size={18} color={colors.primary} />
               </TouchableOpacity>
@@ -1772,14 +1852,14 @@ export default function DocumentsScreen() {
             <View style={[styles.segmentedControl, { backgroundColor: colors.surfaceSecondary }]}>
               <TouchableOpacity
                 style={[styles.segmentedOption, uploadMode === 'photo' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
-                onPress={() => { setUploadMode('photo'); setPickedFile(null); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+                onPress={() => { setUploadMode('photo'); setPickedFile(null); }}
               >
                 <Ionicons name="camera-outline" size={16} color={uploadMode === 'photo' ? colors.primary : colors.textMuted} />
                 <Text style={[styles.segmentedOptionText, { color: uploadMode === 'photo' ? colors.primary : colors.textMuted }]}>Foto</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.segmentedOption, uploadMode === 'file' && [styles.segmentedOptionActive, { backgroundColor: colors.card, borderColor: colors.primary }]]}
-                onPress={() => { setUploadMode('file'); setForm((p) => ({ ...p, fileUrl: '', fileUrlBack: '' })); }}
+                onPress={() => { setUploadMode('file'); if (!pickedFile && form.fileUrl?.startsWith('data:application/pdf')) setPickedFile({ uri: form.fileUrl, name: form.title + '.pdf', mimeType: 'application/pdf' }); }}
               >
                 <Ionicons name="document-outline" size={16} color={uploadMode === 'file' ? colors.primary : colors.textMuted} />
                 <Text style={[styles.segmentedOptionText, { color: uploadMode === 'file' ? colors.primary : colors.textMuted }]}>Subir archivo</Text>
@@ -1788,8 +1868,8 @@ export default function DocumentsScreen() {
             {uploadMode === 'photo' && (
               (form.type === 'drivers_license' || form.type === 'technical_review' || form.type === 'padron') ? (
                 <View style={{ gap: 10, marginBottom: 12 }}>
-                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
-                    {form.fileUrl ? (
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                    {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                       <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                     ) : (
                       <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
@@ -1816,8 +1896,8 @@ export default function DocumentsScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) && !form.fileUrl ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
-                  {form.fileUrl ? (
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                  {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                     <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                   ) : (
                     <View style={[styles.photoPlaceholder, { borderColor: colors.primary, backgroundColor: colors.surfaceSecondary }]}>
