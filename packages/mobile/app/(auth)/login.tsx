@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -60,11 +60,13 @@ export default function LoginScreen() {
   // --- Forgot password flow state ---
   const [fpStep, setFpStep] = useState<'idle' | 'email' | 'code' | 'newPassword' | 'success'>('idle');
   const [fpEmail, setFpEmail] = useState('');
-  const [fpCode, setFpCode] = useState('');
+  const [fpCodeDigits, setFpCodeDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const fpCode = fpCodeDigits.join('');
   const [fpNewPassword, setFpNewPassword] = useState('');
   const [fpConfirmPassword, setFpConfirmPassword] = useState('');
   const [fpShowPassword, setFpShowPassword] = useState(false);
   const [fpLoading, setFpLoading] = useState(false);
+  const otpRefs = useRef<Array<TextInput | null>>([]);
 
   const handleLogin = async () => {
     const newErrors: { email?: string; password?: string } = {};
@@ -127,6 +129,24 @@ export default function LoginScreen() {
     setFpStep('newPassword');
   };
 
+  const handleOtpChange = (text: string, index: number) => {
+    const digit = text.replace(/[^0-9]/g, '').slice(-1);
+    setFpCodeDigits((prev) => {
+      const next = [...prev];
+      next[index] = digit;
+      return next;
+    });
+    if (digit && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !fpCodeDigits[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
   const handleResetPassword = async () => {
     const checks = getPasswordChecks(fpNewPassword);
     if (!checks.length || !checks.uppercase || !checks.number || !checks.special) {
@@ -151,7 +171,7 @@ export default function LoginScreen() {
 
   const handleFpClose = () => {
     setFpStep('idle');
-    setFpCode('');
+    setFpCodeDigits(['', '', '', '', '', '']);
     setFpNewPassword('');
     setFpConfirmPassword('');
   };
@@ -216,58 +236,92 @@ export default function LoginScreen() {
       padding: 24,
     },
     fpModal: {
-      borderRadius: 16,
+      borderRadius: 20,
       padding: 24,
       alignItems: 'center',
     },
     fpCloseBtn: {
       position: 'absolute',
-      top: 12,
-      right: 12,
-      padding: 4,
+      top: 14,
+      right: 14,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surfaceSecondary,
       zIndex: 1,
     },
+    fpIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 14,
+      backgroundColor: colors.primary + '15',
+    },
     fpModalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
+      fontSize: 19,
+      fontWeight: '700',
       marginBottom: 8,
       textAlign: 'center',
       color: colors.text,
     },
     fpModalSubtitle: {
-      fontSize: 14,
+      fontSize: 13,
+      lineHeight: 19,
       textAlign: 'center',
       marginBottom: 20,
       color: colors.textSecondary,
     },
+    fpEmailHighlight: {
+      fontWeight: '600',
+      color: colors.text,
+    },
     fpInput: {
       width: '100%',
-      borderWidth: 2,
+      borderWidth: 1,
       borderRadius: 12,
-      padding: 16,
-      fontSize: 16,
+      padding: 14,
+      fontSize: 15,
       marginBottom: 16,
       color: colors.text,
       borderColor: colors.inputBorder,
       backgroundColor: colors.inputBg,
     },
-    fpCodeInput: {
-      width: '100%',
-      borderWidth: 2,
-      borderRadius: 12,
-      padding: 16,
-      fontSize: 28,
-      fontWeight: 'bold',
+    fpInputWithIcon: {
+      paddingLeft: 40,
+    },
+    fpInputIcon: {
+      position: 'absolute',
+      left: 12,
+      top: 15,
+    },
+    otpRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 20,
+    },
+    otpBox: {
+      width: 42,
+      height: 50,
+      borderWidth: 1,
+      borderRadius: 10,
       textAlign: 'center',
-      letterSpacing: 12,
-      marginBottom: 16,
+      fontSize: 18,
+      fontWeight: '700',
       color: colors.text,
       borderColor: colors.inputBorder,
       backgroundColor: colors.inputBg,
+    },
+    otpBoxFilled: {
+      borderColor: colors.primary,
     },
     fpVerifyBtn: {
       width: '100%',
-      borderRadius: 10,
+      borderRadius: 30,
       padding: 16,
       alignItems: 'center',
       backgroundColor: colors.primary,
@@ -311,15 +365,18 @@ export default function LoginScreen() {
         </Text>
       </View>
 
-      <TextInput
-        style={[dynamicStyles.input, errors.email && { borderColor: '#FF3B30' }]}
-        placeholder={t('email')}
-        placeholderTextColor={colors.textMuted}
-        value={email}
-        onChangeText={(v) => { setEmail(v); if (errors.email) setErrors(p => ({ ...p, email: undefined })); }}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+      <View>
+        <TextInput
+          style={[dynamicStyles.input, errors.email && { borderColor: '#FF3B30' }, { paddingLeft: 44 }]}
+          placeholder={t('email')}
+          placeholderTextColor={colors.textMuted}
+          value={email}
+          onChangeText={(v) => { setEmail(v); if (errors.email) setErrors(p => ({ ...p, email: undefined })); }}
+          autoCapitalize="none"
+          keyboardType="email-address"
+        />
+        <Ionicons name="mail-outline" size={20} color={colors.textMuted} style={{ position: 'absolute', left: 12, top: 16 }} />
+      </View>
       {errors.email ? <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: -10, marginBottom: 12, marginLeft: 4 }}>{errors.email}</Text> : null}
 
       <View>
@@ -335,17 +392,18 @@ export default function LoginScreen() {
           onPress={() => setShowPassword(!showPassword)}
           style={{ position: 'absolute', left: 12, top: 12 }}
         >
-          <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+          <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} style={{ marginTop: 4 }} />
         </TouchableOpacity>
       </View>
       {errors.password ? <Text style={{ color: '#FF3B30', fontSize: 12, marginTop: -10, marginBottom: 12, marginLeft: 4 }}>{errors.password}</Text> : null}
 
-      <TouchableOpacity onPress={handleForgotPasswordOpen}>
-        <Text style={dynamicStyles.forgotLink}>¿Olvidaste tu contraseña?</Text>
+      <TouchableOpacity activeOpacity={0.7} onPress={handleForgotPasswordOpen}>
+        <Text style={dynamicStyles.forgotLink} >¿Olvidaste tu contraseña?</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={dynamicStyles.button}
+        activeOpacity={0.8}
         onPress={handleLogin}
         disabled={loading}
       >
@@ -357,7 +415,7 @@ export default function LoginScreen() {
       </TouchableOpacity>
 
       <Link href="/(auth)/register" asChild>
-        <TouchableOpacity>
+        <TouchableOpacity activeOpacity={0.7}>
           <Text style={dynamicStyles.link}>
             {t('noAccount')}
           </Text>
@@ -383,24 +441,31 @@ export default function LoginScreen() {
             <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[dynamicStyles.fpModal, { backgroundColor: colors.surface }]}>
                 <TouchableOpacity style={dynamicStyles.fpCloseBtn} onPress={handleFpClose}>
-                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                  <Ionicons name="close" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
-                <Ionicons name="key-outline" size={40} color={colors.primary} />
-                <Text style={[dynamicStyles.fpModalTitle, { marginTop: 12 }]}>Recuperar contraseña</Text>
+
+                <View style={dynamicStyles.fpIconWrap}>
+                  <Ionicons name="key-outline" size={24} color={colors.primary} />
+                </View>
+
+                <Text style={dynamicStyles.fpModalTitle}>Recuperar contraseña</Text>
                 <Text style={dynamicStyles.fpModalSubtitle}>
                   Ingresa tu correo y te enviaremos un código de verificación
                 </Text>
 
-                <TextInput
-                  style={dynamicStyles.fpInput}
-                  placeholder="Correo electrónico"
-                  placeholderTextColor={colors.textMuted}
-                  value={fpEmail}
-                  onChangeText={setFpEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  autoFocus
-                />
+                <View style={{ width: '100%' }}>
+                  <TextInput
+                    style={[dynamicStyles.fpInput, dynamicStyles.fpInputWithIcon]}
+                    placeholder="Correo electrónico"
+                    placeholderTextColor={colors.textMuted}
+                    value={fpEmail}
+                    onChangeText={setFpEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    autoFocus
+                  />
+                  <Ionicons name="mail-outline" size={18} color={colors.textMuted} style={dynamicStyles.fpInputIcon} />
+                </View>
 
                 <TouchableOpacity
                   style={dynamicStyles.fpVerifyBtn}
@@ -426,23 +491,34 @@ export default function LoginScreen() {
             <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[dynamicStyles.fpModal, { backgroundColor: colors.surface }]}>
                 <TouchableOpacity style={dynamicStyles.fpCloseBtn} onPress={handleFpClose}>
-                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                  <Ionicons name="close" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
+
+                <View style={dynamicStyles.fpIconWrap}>
+                  <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
+                </View>
+
                 <Text style={dynamicStyles.fpModalTitle}>Código de verificación</Text>
                 <Text style={dynamicStyles.fpModalSubtitle}>
-                  Ingresa el código de 6 dígitos enviado a {fpEmail}
+                  Ingresa el código de 6 dígitos enviado a{'\n'}
+                  <Text style={dynamicStyles.fpEmailHighlight}>{fpEmail}</Text>
                 </Text>
 
-                <TextInput
-                  style={dynamicStyles.fpCodeInput}
-                  placeholder="000000"
-                  placeholderTextColor={colors.textMuted}
-                  value={fpCode}
-                  onChangeText={setFpCode}
-                  keyboardType="numeric"
-                  maxLength={6}
-                  autoFocus
-                />
+                <View style={dynamicStyles.otpRow}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <TextInput
+                      key={i}
+                      ref={(el) => { otpRefs.current[i] = el; }}
+                      style={[dynamicStyles.otpBox, fpCodeDigits[i] && dynamicStyles.otpBoxFilled]}
+                      value={fpCodeDigits[i]}
+                      onChangeText={(txt) => handleOtpChange(txt, i)}
+                      onKeyPress={(e) => handleOtpKeyPress(e, i)}
+                      keyboardType="numeric"
+                      maxLength={1}
+                      autoFocus={i === 0}
+                    />
+                  ))}
+                </View>
 
                 <TouchableOpacity
                   style={dynamicStyles.fpVerifyBtn}
@@ -468,8 +544,13 @@ export default function LoginScreen() {
             <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[dynamicStyles.fpModal, { backgroundColor: colors.surface }]}>
                 <TouchableOpacity style={dynamicStyles.fpCloseBtn} onPress={handleFpClose}>
-                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                  <Ionicons name="close" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
+
+                <View style={dynamicStyles.fpIconWrap}>
+                  <Ionicons name="lock-closed-outline" size={22} color={colors.primary} />
+                </View>
+
                 <Text style={dynamicStyles.fpModalTitle}>Nueva contraseña</Text>
                 <Text style={dynamicStyles.fpModalSubtitle}>Ingresa tu nueva contraseña</Text>
 
