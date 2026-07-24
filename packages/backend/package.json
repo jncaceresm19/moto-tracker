@@ -16,10 +16,12 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "db:seed-municipalities": "tsx src/db/seed-municipalities.ts"
   },
   "dependencies": {
     "@moto-tracker/shared": "*",
+    "@napi-rs/canvas": "^1.0.2",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^11.9.1",
     "cors": "^2.8.5",
@@ -30,6 +32,7 @@
     "jsonwebtoken": "^9.0.2",
     "nodemailer": "^9.0.3",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^6.1.200",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0",
     "twilio": "^6.0.2",
