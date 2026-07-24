@@ -8,6 +8,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as Location from 'expo-location';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document, getPermitPaymentUrl, getPermitAppointmentUrl, listMunicipalities, updateMotorcycle, Municipality } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
@@ -280,20 +281,46 @@ export default function DocumentsScreen() {
     setShowPhotoModal(false);
 
     if (!result.canceled && result.assets[0]) {
+      // Resize and compress directly (crop modal available as optional edit later)
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 2400 } }],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+      if (!manipulated.base64) return;
       setCropImageUri(result.assets[0].uri);
-      // Small delay ensures React commits the photo modal close before opening crop
-      setTimeout(() => setShowCropModal(true), 100);
+      // Open crop modal for editing, or save directly
+      setShowCropModal(true);
     }
   };
 
   const handleCropConfirm = (base64: string) => {
     setShowCropModal(false);
+    savePhotoToForm(base64);
+  };
+
+  const savePhotoToForm = (base64: string) => {
     const dataUri = `data:image/jpeg;base64,${base64}`;
     if (photoSide === 'back') {
       setForm((p) => ({ ...p, fileUrlBack: dataUri }));
     } else {
       setForm((p) => ({ ...p, fileUrl: dataUri }));
       setErrors((p) => ({ ...p, fileUrl: '' }));
+    }
+  };
+
+  // Fallback: save original photo if crop modal is dismissed without confirming
+  const handleCropCancel = () => {
+    setShowCropModal(false);
+    if (cropImageUri) {
+      // Read and save the original photo as fallback
+      ImageManipulator.manipulateAsync(
+        cropImageUri,
+        [{ resize: { width: 2400 } }],
+        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      ).then(manipulated => {
+        if (manipulated.base64) savePhotoToForm(manipulated.base64);
+      }).catch(() => {});
     }
   };
 
@@ -2243,7 +2270,7 @@ export default function DocumentsScreen() {
         visible={showCropModal}
         imageUri={cropImageUri}
         onConfirm={handleCropConfirm}
-        onCancel={() => setShowCropModal(false)}
+        onCancel={handleCropCancel}
       />
 
       {/* Modal: Licencia presencial */}
