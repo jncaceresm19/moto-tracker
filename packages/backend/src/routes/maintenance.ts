@@ -64,7 +64,8 @@ const motorcycleIdParam = z.object({
 });
 
 const recordIdParam = z.object({
-  id: z.string().uuid('Invalid motorcycle ID'),
+  recordId: z.string().uuid('Invalid record ID'),
+});
 
 // ── Notification helpers ───────────────────────────────────────────
 async function scheduleMaintenanceNotifications(
@@ -111,9 +112,8 @@ async function clearMaintenanceNotifications(
     )
   );
 }
-  recordId: z.string().uuid('Invalid record ID'),
-});
 
+// ── Helper types & fns ────────────────────────────────────────────
 interface MaintenanceParams {
   id: string;
   recordId?: string;
