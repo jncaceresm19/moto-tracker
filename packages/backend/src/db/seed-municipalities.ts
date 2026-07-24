@@ -354,6 +354,10 @@ const now = new Date();
 async function seed() {
   console.log(`🌱 Seeding ${MUNICIPALITIES.length} municipalities...`);
 
+  // Clear existing data so re-runs are idempotent
+  await db.delete(municipalities);
+  console.log('  🧹 Cleared existing municipalities');
+
   for (const m of MUNICIPALITIES) {
     const id = crypto.randomUUID();
 
