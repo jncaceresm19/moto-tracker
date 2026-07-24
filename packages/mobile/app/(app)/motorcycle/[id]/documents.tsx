@@ -17,7 +17,6 @@ import { useAuth } from '../../../../src/auth-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
 import { extractPdfData, OcrResult } from '../../../../src/services/ocrService';
 import { OcrReviewModal, buildOcrFields, OcrField } from '../../../../src/components/OcrReviewModal';
-import { ImageCropModal } from '../../../../src/components/ImageCropModal';
 
 
 // Parse date as LOCAL (avoids UTC midnight shifting the day back)
@@ -140,11 +139,6 @@ export default function DocumentsScreen() {
   const [ocrRawResult, setOcrRawResult] = useState<Record<string, string | undefined>>({});
   const [ocrComuna, setOcrComuna] = useState<string | undefined>();
   const [ocrPhotoUri, setOcrPhotoUri] = useState<string | null>(null);
-  // Crop modal state
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [cropImageUri, setCropImageUri] = useState('');
-  const [pendingOcrSide, setPendingOcrSide] = useState<'front' | 'back'>('front');
-  const [cropMode, setCropMode] = useState<'ocr' | 'photo'>('ocr');
   // Municipality picker state (for circulation_permit + license appointment)
   const [muniSearch, setMuniSearch] = useState('');
   const [muniResults, setMuniResults] = useState<Municipality[]>([]);
@@ -164,7 +158,6 @@ export default function DocumentsScreen() {
       setMuniResults([]);
       setMuniPickerMode('permit');
       setShowPhotoModal(false);
-      setShowCropModal(false);
     });
     return unsub;
   }, [navigation]);
@@ -281,46 +274,19 @@ export default function DocumentsScreen() {
     setShowPhotoModal(false);
 
     if (!result.canceled && result.assets[0]) {
-      // Resize and compress directly (crop modal available as optional edit later)
       const manipulated = await ImageManipulator.manipulateAsync(
         result.assets[0].uri,
         [{ resize: { width: 2400 } }],
         { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
       if (!manipulated.base64) return;
-      setCropImageUri(result.assets[0].uri);
-      // Open crop modal for editing, or save directly
-      setShowCropModal(true);
-    }
-  };
-
-  const handleCropConfirm = (base64: string) => {
-    setShowCropModal(false);
-    savePhotoToForm(base64);
-  };
-
-  const savePhotoToForm = (base64: string) => {
-    const dataUri = `data:image/jpeg;base64,${base64}`;
-    if (photoSide === 'back') {
-      setForm((p) => ({ ...p, fileUrlBack: dataUri }));
-    } else {
-      setForm((p) => ({ ...p, fileUrl: dataUri }));
-      setErrors((p) => ({ ...p, fileUrl: '' }));
-    }
-  };
-
-  // Fallback: save original photo if crop modal is dismissed without confirming
-  const handleCropCancel = () => {
-    setShowCropModal(false);
-    if (cropImageUri) {
-      // Read and save the original photo as fallback
-      ImageManipulator.manipulateAsync(
-        cropImageUri,
-        [{ resize: { width: 2400 } }],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      ).then(manipulated => {
-        if (manipulated.base64) savePhotoToForm(manipulated.base64);
-      }).catch(() => {});
+      const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+      if (photoSide === 'back') {
+        setForm((p) => ({ ...p, fileUrlBack: dataUri }));
+      } else {
+        setForm((p) => ({ ...p, fileUrl: dataUri }));
+        setErrors((p) => ({ ...p, fileUrl: '' }));
+      }
     }
   };
 
@@ -2265,13 +2231,6 @@ export default function DocumentsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-
-      <ImageCropModal
-        visible={showCropModal}
-        imageUri={cropImageUri}
-        onConfirm={handleCropConfirm}
-        onCancel={handleCropCancel}
-      />
 
       {/* Modal: Licencia presencial */}
       <Modal visible={showLicensePresencialModal} transparent animationType="fade">
