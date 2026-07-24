@@ -428,8 +428,15 @@ export default function DocumentsScreen() {
     setShowOcrReview(false);
     const docType = ocrDocumentType;
 
-    // Store comuna for Google Maps actions
-    if (ocrRawResult.comuna) setOcrComuna(ocrRawResult.comuna);
+    // Store comuna for Google Maps actions and auto-fill municipality field
+    if (ocrRawResult.comuna) {
+      setOcrComuna(ocrRawResult.comuna);
+      // Auto-fill selMuni so the Comuna field shows the detected municipality
+      listMunicipalities(ocrRawResult.comuna).then((results) => {
+        const exact = results.find((m) => m.commune.toLowerCase() === ocrRawResult.comuna!.toLowerCase());
+        if (exact) setSelMuni(exact);
+      }).catch(() => {});
+    }
 
     // Set form directly — do NOT call openCreate() (it resets everything)
     // OCR photo goes to the correct side depending on document type
@@ -1493,25 +1500,26 @@ export default function DocumentsScreen() {
               {form.type !== 'padron' && showExpiryDatePicker && (
                 <DateTimePicker value={form.expiryDate ? parseLocalDate(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, expiryDate: toLocalDateStr(date) })); if (form.issueDate && toLocalDateStr(date) < form.issueDate) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
               )}
-              {/* Municipalidad (solo permiso de circulación) */}
+              {/* Comuna (solo permiso de circulación) */}
               {form.type === 'circulation_permit' && (
                 <>
                   <View style={{ marginTop: 12, marginBottom: 4 }}>
-                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Municipalidad</Text>
+                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Comuna</Text>
                     <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowMuniPicker(true)} activeOpacity={0.7}>
                       <Ionicons name="business-outline" size={16} color={colors.textMuted} />
                       <Text style={[styles.fieldInputText, { color: selMuni ? colors.text : colors.textMuted }]} numberOfLines={1}>
-                        {selMuni ? `${selMuni.commune} — ${selMuni.name}` : 'Seleccionar municipalidad...'}
+                        {selMuni ? `${selMuni.commune} — ${selMuni.name}` : 'Seleccionar comuna...'}
                       </Text>
                     </TouchableOpacity>
                   </View>
                   <Modal visible={showMuniPicker} transparent animationType="fade">
-                    <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-                      <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 20, width: '90%', maxWidth: 400, maxHeight: '60%' }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>Buscar municipalidad</Text>
+                    <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
+                      <View style={[styles.docPortarModal, { backgroundColor: colors.surface, width: '90%', maxWidth: 400, maxHeight: '60%' }]}> 
+                        <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                          <Ionicons name="business-outline" size={18} color={colors.primary} />
+                          <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Buscar comuna</Text>
                           <TouchableOpacity onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
-                            <Ionicons name="close" size={24} color={colors.text} />
+                            <Ionicons name="close" size={22} color={colors.textMuted} />
                           </TouchableOpacity>
                         </View>
                         <TextInput
@@ -1522,7 +1530,7 @@ export default function DocumentsScreen() {
                           onChangeText={searchMunis}
                           autoFocus
                         />
-                        <ScrollView style={{ maxHeight: 300 }}>
+                        <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
                           {muniResults.length === 0 && muniSearch.length >= 2 ? (
                             <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
                           ) : muniSearch.length < 2 ? (
@@ -1541,7 +1549,7 @@ export default function DocumentsScreen() {
                           )}
                         </ScrollView>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   </Modal>
                 </>
               )}
