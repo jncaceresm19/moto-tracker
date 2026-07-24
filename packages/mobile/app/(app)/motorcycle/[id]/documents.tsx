@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as Location from 'expo-location';
 import { File, Paths } from 'expo-file-system';
 import { listDocuments, createDocument, updateDocument, deleteDocument, Document, getPermitPaymentUrl, getPermitAppointmentUrl, listMunicipalities, updateMotorcycle, Municipality } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
@@ -549,14 +550,39 @@ export default function DocumentsScreen() {
 
   const handleLicenseAppointment = async () => {
     try {
+      // 1. Try saved municipality on motorcycle
       const result = await getPermitAppointmentUrl(id);
       if (result?.url) {
         await Linking.openURL(result.url);
         return;
       }
-      // No municipality set or no appointment URL → mostrar modal presencial
+
+      // 2. Fallback: use device location to find nearest municipality with appointment URL
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({});
+          const [geo] = await Location.reverseGeocodeAsync({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
+          const communeName = geo?.city || geo?.subregion || geo?.region;
+          if (communeName) {
+            const munis = await listMunicipalities(communeName);
+            const match = munis.find(m =>
+              m.commune.toLowerCase() === communeName.toLowerCase() && m.appointmentUrl
+            );
+            if (match?.appointmentUrl) {
+              await Linking.openURL(match.appointmentUrl);
+              return;
+            }
+          }
+        }
+      } catch { /* location unavailable, fall through */ }
+
+      // 3. Show appropriate message
       if (!result?.municipality) {
-        showAlert('Sin municipalidad', 'Asigná una comuna en tu permiso de circulación para agendar hora.', [{ text: 'OK' }], 'information-circle', colors.accent);
+        setShowLicensePresencialModal(true);
       } else {
         setShowLicensePresencialModal(true);
       }
