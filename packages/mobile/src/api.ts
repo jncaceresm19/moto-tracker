@@ -188,6 +188,7 @@ export interface Motorcycle {
   engineNumber?: string;
   chassisNumber?: string;
   serialNumber?: string;
+  permitMunicipalityId?: string;
   verificada?: boolean;
   verificadaEn?: string;
   verificadaPor?: string;
@@ -217,19 +218,60 @@ export async function createMotorcycle(data: {
   engineNumber?: string;
   chassisNumber?: string;
   serialNumber?: string;
+  permitMunicipalityId?: string | null;
 }): Promise<Motorcycle> {
   return api<Motorcycle>('/api/motorcycles', { method: 'POST', body: data });
 }
 
 export async function updateMotorcycle(
   id: string,
-  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string; color?: string; engineNumber?: string; chassisNumber?: string; serialNumber?: string }
+  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string; color?: string; engineNumber?: string; chassisNumber?: string; serialNumber?: string; permitMunicipalityId?: string | null }
 ): Promise<Motorcycle> {
   return api<Motorcycle>(`/api/motorcycles/${id}`, { method: 'PUT', body: data });
 }
 
 export async function deleteMotorcycle(id: string): Promise<void> {
   await api(`/api/motorcycles/${id}`, { method: 'DELETE' });
+}
+
+// Municipalities
+export interface Municipality {
+  id: string;
+  name: string;
+  commune: string;
+  region: string;
+  paymentUrl: string;
+  appointmentUrl: string;
+  active: boolean;
+}
+
+export async function listMunicipalities(search?: string): Promise<Municipality[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : '';
+  return api<Municipality[]>(`/api/municipalities${query}`);
+}
+
+export async function getMunicipality(id: string): Promise<Municipality> {
+  return api<Municipality>(`/api/municipalities/${id}`);
+}
+
+export async function setPermitMunicipality(motorcycleId: string, municipalityId: string | null): Promise<Motorcycle> {
+  return api<Motorcycle>(`/api/motorcycles/${motorcycleId}/permit-municipality`, {
+    method: 'PUT',
+    body: { permitMunicipalityId: municipalityId },
+  });
+}
+
+export interface PermitPaymentResult {
+  url: string;
+  municipality: { id: string; name: string; commune: string; region: string };
+}
+
+export async function getPermitPaymentUrl(motorcycleId: string): Promise<PermitPaymentResult | null> {
+  return api<PermitPaymentResult | null>(`/api/motorcycles/${motorcycleId}/permit-payment-url`);
+}
+
+export async function getPermitAppointmentUrl(motorcycleId: string): Promise<PermitPaymentResult | null> {
+  return api<PermitPaymentResult | null>(`/api/motorcycles/${motorcycleId}/permit-appointment-url`);
 }
 
 // Maintenance Records

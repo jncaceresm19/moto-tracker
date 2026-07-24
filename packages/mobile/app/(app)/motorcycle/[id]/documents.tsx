@@ -9,7 +9,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
-import { listDocuments, createDocument, updateDocument, deleteDocument, Document } from '../../../../src/api';
+import { listDocuments, createDocument, updateDocument, deleteDocument, Document, getPermitPaymentUrl, getPermitAppointmentUrl, listMunicipalities, setPermitMunicipality, Municipality } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
 import { useTheme } from '../../../../src/theme-context';
 import { useAuth } from '../../../../src/auth-context';
@@ -126,6 +126,11 @@ export default function DocumentsScreen() {
   const [ocrRawResult, setOcrRawResult] = useState<Record<string, string | undefined>>({});
   const [ocrComuna, setOcrComuna] = useState<string | undefined>();
   const [ocrPhotoUri, setOcrPhotoUri] = useState<string | null>(null);
+  // Municipality picker for create/edit form
+  const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(null);
+  const [formMunicipalitySearch, setFormMunicipalitySearch] = useState('');
+  const [formMunicipalities, setFormMunicipalities] = useState<Municipality[]>([]);
+  const [showFormMunicipalityPicker, setShowFormMunicipalityPicker] = useState(false);
   // Crop modal state
   const [showCropModal, setShowCropModal] = useState(false);
   const [cropImageUri, setCropImageUri] = useState('');
@@ -312,9 +317,14 @@ export default function DocumentsScreen() {
         issueDate: form.issueDate ? new Date(form.issueDate).toISOString() : undefined,
         expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : undefined,
       });
+      // Auto-assign municipality for circulation permits
+      if (form.type === 'circulation_permit' && selectedMunicipality) {
+        try { await setPermitMunicipality(id!, selectedMunicipality.id); } catch { /* ignore */ }
+      }
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
       resetForm();
+      setSelectedMunicipality(null);
       // Single-doc types: show detail directly after save
       if (!MULTI_DOC_TYPES.includes(form.type)) {
         setViewing(created);
@@ -504,8 +514,17 @@ export default function DocumentsScreen() {
     setShowOcrReview(false);
     const docType = ocrDocumentType;
 
-    // Store comuna for Google Maps actions
-    if (ocrRawResult.comuna) setOcrComuna(ocrRawResult.comuna);
+    // Store comuna and auto-assign municipality
+    if (ocrRawResult.comuna) {
+      setOcrComuna(ocrRawResult.comuna);
+      if (docType === 'circulation_permit') {
+        try {
+          const results = await listMunicipalities(ocrRawResult.comuna);
+          const match = results.find(m => m.commune.toLowerCase() === ocrRawResult.comuna!.toLowerCase());
+          if (match) setSelectedMunicipality(match);
+        } catch { /* ignore */ }
+      }
+    }
 
     // Set form directly — do NOT call openCreate() (it resets everything)
     // OCR photo goes to the correct side depending on document type
@@ -530,14 +549,41 @@ export default function DocumentsScreen() {
     handleScanDocument();
   };
 
-  // ── Google Maps Actions ───────────────────────────────────────────────────
-  const handlePayPermit = (comuna?: string) => {
-    if (!comuna) {
-      showAlert('Sin comuna', 'Escanea el permiso de circulación para detectar la comuna.', [{ text: 'OK' }], 'alert-circle', colors.accent);
-      return;
+  // ── Municipality Actions ──────────────────────────────────────────────────
+  const [showMunicipalityPicker, setShowMunicipalityPicker] = useState(false);
+  const [municipalitySearch, setMunicipalitySearch] = useState('');
+  const [municipalities, setMunicipalitiesList] = useState<Municipality[]>([]);
+  const [municipalityLoading, setMunicipalityLoading] = useState(false);
+
+  const searchMunicipalities = async (query: string) => {
+    setMunicipalityLoading(true);
+    try {
+      const results = await listMunicipalities(query);
+      setMunicipalitiesList(results);
+    } catch { /* ignore */ }
+    setMunicipalityLoading(false);
+  };
+
+  const searchFormMunicipalities = async (query: string) => {
+    try {
+      const results = await listMunicipalities(query);
+      setFormMunicipalities(results);
+    } catch { /* ignore */ }
+  };
+
+  const handlePayPermit = async () => {
+    if (!id) return;
+    try {
+      const result = await getPermitPaymentUrl(id);
+      if (result?.url) {
+        Linking.openURL(result.url);
+      } else {
+        setShowMunicipalityPicker(true);
+        searchMunicipalities('');
+      }
+    } catch {
+      showAlert('Error', 'No se pudo obtener la URL de pago', [{ text: 'OK' }], 'close-circle', colors.danger);
     }
-    const url = `https://www.google.com/maps/search/?api=1&query=municipalidad+de+${encodeURIComponent(comuna)}+Chile`;
-    Linking.openURL(url);
   };
 
   const handleFindTechPlants = () => {
@@ -545,10 +591,32 @@ export default function DocumentsScreen() {
     Linking.openURL(url);
   };
 
-  const handleGoToMunicipality = (comuna?: string) => {
-    const query = comuna ? `municipalidad+de+${encodeURIComponent(comuna)}+Chile` : 'municipalidad+cercana';
-    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
-    Linking.openURL(url);
+  const handleGoToMunicipality = async () => {
+    if (!id) return;
+    try {
+      const result = await getPermitAppointmentUrl(id);
+      if (result?.url) {
+        Linking.openURL(result.url);
+      } else {
+        setShowMunicipalityPicker(true);
+        searchMunicipalities('');
+      }
+    } catch {
+      showAlert('Error', 'No se pudo obtener la URL de agendar', [{ text: 'OK' }], 'close-circle', colors.danger);
+    }
+  };
+
+  const handleSelectMunicipality = async (municipality: Municipality) => {
+    if (!id) return;
+    try {
+      await setPermitMunicipality(id, municipality.id);
+      setShowMunicipalityPicker(false);
+      if (municipality.paymentUrl) {
+        Linking.openURL(municipality.paymentUrl);
+      }
+    } catch {
+      showAlert('Error', 'No se pudo guardar la municipalidad', [{ text: 'OK' }], 'close-circle', colors.danger);
+    }
   };
 
   const handleUpdate = async () => {
@@ -570,8 +638,13 @@ export default function DocumentsScreen() {
         issueDate: form.issueDate ? new Date(form.issueDate).toISOString() : null,
         expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
       });
+      // Save municipality for circulation permits
+      if (form.type === 'circulation_permit' && selectedMunicipality) {
+        try { await setPermitMunicipality(id!, selectedMunicipality.id); } catch { /* ignore */ }
+      }
       setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
       setEditing(null);
+      setSelectedMunicipality(null);
       // Single-doc types: show detail directly after save
       if (!MULTI_DOC_TYPES.includes(form.type)) {
         setViewing(updated);
@@ -1050,14 +1123,13 @@ export default function DocumentsScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: isCirculationPermitOpen() ? colors.success : colors.textMuted + '40', marginTop: 12 }]}
-                  activeOpacity={isCirculationPermitOpen() ? 0.8 : 1}
-                  disabled={!isCirculationPermitOpen()}
-                  onPress={() => handlePayPermit(ocrComuna)}>
-                  <Ionicons name="wallet-outline" size={20} color={isCirculationPermitOpen() ? '#fff' : colors.textMuted} />
-                  <Text style={[styles.submitBtnText, { color: isCirculationPermitOpen() ? '#fff' : colors.textMuted }]}>Paga tu permiso</Text>
+                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]}
+                  activeOpacity={0.8}
+                  onPress={handlePayPermit}>
+                  <Ionicons name="wallet-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Paga tu permiso</Text>
                 </TouchableOpacity>
-                <Text style={[styles.payHint, { color: colors.textMuted }]}>Opción hábil entre el 1 de febrero y el 31 de marzo</Text>
+                <Text style={[styles.payHint, { color: colors.textMuted }]}>Redirige al portal de pago de tu municipalidad</Text>
               </>
             )}
 
@@ -1196,7 +1268,7 @@ export default function DocumentsScreen() {
                 <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
                 <TouchableOpacity
                   style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
-                  onPress={() => handleGoToMunicipality(ocrComuna)}>
+                  onPress={handleGoToMunicipality}>
                   <Ionicons name="map-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
                 </TouchableOpacity>
@@ -1454,6 +1526,20 @@ export default function DocumentsScreen() {
               )}
               {showExpiryDatePicker && (
                 <DateTimePicker value={form.expiryDate ? new Date(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, expiryDate: iso })); if (form.issueDate && date < new Date(form.issueDate)) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
+              )}
+              {form.type === 'circulation_permit' && (
+                <View style={{ marginTop: 12 }}>
+                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Municipalidad</Text>
+                  <TouchableOpacity
+                    style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]}
+                    onPress={() => { setShowFormMunicipalityPicker(true); searchFormMunicipalities(''); }}>
+                    <Ionicons name="business-outline" size={16} color={colors.textMuted} />
+                    <Text style={[styles.fieldInputText, { color: selectedMunicipality ? colors.text : colors.textMuted }]} numberOfLines={1}>
+                      {selectedMunicipality ? selectedMunicipality.commune : 'Seleccionar municipalidad'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
               )}
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
                 {saving ? <ActivityIndicator color={colors.primaryText} /> : (
@@ -2001,6 +2087,85 @@ export default function DocumentsScreen() {
         onConfirm={handleCropConfirm}
         onCancel={() => setShowCropModal(false)}
       />
+
+      {/* Form Municipality Picker Modal */}
+      <Modal visible={showFormMunicipalityPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowFormMunicipalityPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.docPortarModal, { backgroundColor: colors.surface, maxHeight: '70%' }]}>
+            <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+              <Ionicons name="business-outline" size={20} color={colors.brandBlue} />
+              <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Seleccionar municipalidad</Text>
+              <TouchableOpacity onPress={() => setShowFormMunicipalityPicker(false)}>
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={{ backgroundColor: colors.background, borderRadius: 8, padding: 10, marginTop: 12, color: colors.text, borderWidth: 1, borderColor: colors.border }}
+              placeholder="Buscar comuna..."
+              placeholderTextColor={colors.textMuted}
+              value={formMunicipalitySearch}
+              onChangeText={(text) => { setFormMunicipalitySearch(text); searchFormMunicipalities(text); }}
+            />
+            <FlatList
+              data={formMunicipalities}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40' }}
+                  onPress={() => { setSelectedMunicipality(item); setShowFormMunicipalityPicker(false); setFormMunicipalitySearch(''); }}>
+                  <Text style={{ color: colors.text, fontWeight: '600' }}>{item.commune}</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 20 }}>No se encontraron municipalidades</Text>}
+            />
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Municipality Picker Modal */}
+      <Modal visible={showMunicipalityPicker} transparent animationType="fade">
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowMunicipalityPicker(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.docPortarModal, { backgroundColor: colors.surface, maxHeight: '70%' }]}>
+            <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+              <Ionicons name="business-outline" size={20} color={colors.brandBlue} />
+              <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Seleccionar municipalidad</Text>
+              <TouchableOpacity onPress={() => setShowMunicipalityPicker(false)}>
+                <Ionicons name="close" size={22} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={{ backgroundColor: colors.background, borderRadius: 8, padding: 10, marginTop: 12, color: colors.text, borderWidth: 1, borderColor: colors.border }}
+              placeholder="Buscar comuna..."
+              placeholderTextColor={colors.textMuted}
+              value={municipalitySearch}
+              onChangeText={(text) => { setMunicipalitySearch(text); searchMunicipalities(text); }}
+            />
+            {municipalityLoading ? (
+              <ActivityIndicator style={{ marginTop: 20 }} color={colors.brandBlue} />
+            ) : (
+              <FlatList
+                data={municipalities}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40' }}
+                    onPress={() => handleSelectMunicipality(item)}>
+                    <Text style={{ color: colors.text, fontWeight: '600' }}>{item.commune}</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>{item.name}</Text>
+                    {item.paymentUrl ? (
+                      <Text style={{ color: colors.success, fontSize: 11, marginTop: 2 }}>✓ Portal de pago disponible</Text>
+                    ) : (
+                      <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Sin portal de pago verificado</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 20 }}>No se encontraron municipalidades</Text>}
+              />
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
 
