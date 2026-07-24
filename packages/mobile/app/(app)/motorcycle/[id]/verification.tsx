@@ -215,7 +215,7 @@ export default function VerificationScreen() {
                     </Text>
                   </View>
                   <Ionicons
-                    name={isPending ? 'chevron-forward' : doc.status.icon}
+                    name={isPending ? 'alert-circle-outline' : doc.status.icon}
                     size={18}
                     color={isPending ? colors.primary : doc.status.color}
                   />
