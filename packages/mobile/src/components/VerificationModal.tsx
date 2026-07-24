@@ -85,10 +85,12 @@ export function VerificationModal({
 
   // Shared post-pick processing so camera and gallery don't duplicate the
   // resize/compress logic.
+  // OCR necesita al menos 2400px de ancho para que Tesseract pueda leer texto
+  // pequeño como fechas en licencias de conducir.
   const processAndApply = async (uri: string) => {
     const manipulated = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: { width: 1200 } }],
+      [{ resize: { width: 2400 } }],
       { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
     );
     activePhotoField?.(manipulated.uri);

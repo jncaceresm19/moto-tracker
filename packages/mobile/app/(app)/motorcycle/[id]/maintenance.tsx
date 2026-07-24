@@ -227,6 +227,15 @@ export default function MaintenanceScreen() {
     await AsyncStorage.setItem(`${CUSTOM_TYPES_KEY}_${id}`, JSON.stringify(types));
   };
 
+  // Reset internal state when screen regains focus (e.g. after tab switch)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      setSelectedType(null);
+      setEditing(null);
+    });
+    return unsub;
+  }, [navigation]);
+
   // Navigation header
   useEffect(() => {
     const label = getLabel(selectedType);
@@ -435,7 +444,7 @@ export default function MaintenanceScreen() {
           } catch { showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', colors.danger); }
         },
       },
-    ], 'warning', colors.accent);
+    ], 'warning', colors.danger);
   };
 
   const handleRenew = async (record: MaintenanceRecord) => {
@@ -496,7 +505,7 @@ export default function MaintenanceScreen() {
         },
       ],
       'warning',
-      colors.accent
+      colors.danger
     );
   };
 

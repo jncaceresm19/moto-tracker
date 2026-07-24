@@ -110,8 +110,18 @@ function getWeatherIconColor(mood: WeatherMood, primary: string, secondary: stri
       return lightenColor(primary, 0.45); // primary más suave
     case 'storm':
     default:
-      return primary; // sin cambios por ahora
+      return primary;
   }
+}
+
+// Color del texto según el clima:
+// - clear/sol → estacional (coordina con el icono y degradado)
+// - lluvia, nublado, tormenta, etc → primary
+function getWeatherTextColor(mood: WeatherMood, primary: string): string {
+  if (mood === 'clear') {
+    return getSunColor(getCurrentSeason());
+  }
+  return primary;
 }
 
 function getWeatherGradient(mood: WeatherMood, surfaceColor: string): [string, string] {
@@ -143,6 +153,7 @@ export function WeatherCard({
   const { mood, icon } = getWeatherInfo(weatherCondition);
   const [gradientStart, gradientEnd] = getWeatherGradient(mood, colors.surface);
   const iconColor = getWeatherIconColor(mood, colors.primary, colors.textSecondary);
+  const textColor = getWeatherTextColor(mood, colors.primary);
 
   const hasRain = rainProbability != null && rainProbability > 0;
 
@@ -164,14 +175,14 @@ export function WeatherCard({
         </View>
 
         <View style={styles.content}>
-          <Text style={[styles.title, { color: colors.ink }]}>
+          <Text style={[styles.title, { color: textColor }]}>
             {currentTemp != null ? `${Math.round(currentTemp)}°C` : '--°C'}
           </Text>
-          <Text style={[styles.subtitle, { color: colors.headerBg }]}>
+          <Text style={[styles.subtitle, { color: textColor }]}>
             {weatherCondition}{zoneName ? ` · ${zoneName}` : ''}
           </Text>
           {hasRain && (
-            <Text style={[styles.rainInfo, { color: colors.textSecondary }]}>
+            <Text style={[styles.rainInfo, { color: textColor }]}>
               Lluvia {minutesUntilRain != null ? `en ~${minutesUntilRain} min · ` : ''}{rainProbability}%
             </Text>
           )}

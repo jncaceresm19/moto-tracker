@@ -7,7 +7,7 @@ import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { TheftAlert, getMyPublications, closeAlert } from '../../src/services/theftAlertService';
 import { CustomAlert } from '../../src/components/CustomAlert';
-import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
+import { formatPlate } from '../../../backend/src/services/plateValidation';
 import { getCurrentLocation } from '../../src/services/gasStations';
 import { reverseGeocode } from '../../src/services/geocoding';
 
@@ -125,11 +125,6 @@ export default function MyPublicationsScreen() {
     if (hours < 24) return `hace ${hours}h`;
     return `hace ${days}d`;
   };
-  const formatPlate = (raw: string) => {
-    const { letters, numbers } = getDisplayPlateParts(raw);
-    return numbers ? `${letters}-${numbers}` : letters;
-  };
-
   const renderItem = ({ item }: { item: TheftAlert }) => (
     <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.cardHeader}>
