@@ -384,6 +384,19 @@ export default function DocumentsScreen() {
     }
   }, [form.type, form.issueDate, user?.birthDate]);
 
+  // Auto-calculate expiry for circulation permit: March 31 of the following year
+  useEffect(() => {
+    if (form.type === 'circulation_permit' && form.issueDate) {
+      const issue = parseLocalDate(form.issueDate);
+      // If issued before April, expires March 31 of current year + 1
+      // If issued April or later, expires March 31 of current year + 1 (same rule: next year)
+      const expiryYear = issue.getFullYear() + 1;
+      const expiry = new Date(expiryYear, 2, 31); // March = month 2 (0-indexed)
+      const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
+      setForm((p) => ({ ...p, expiryDate: iso }));
+    }
+  }, [form.type, form.issueDate]);
+
   // PDF OCR: extract text from PDF and run through parser
   const handlePdfOcr = async (pdfBase64: string, docType: string) => {
     setOcrDocumentType(docType);
