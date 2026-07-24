@@ -1434,7 +1434,7 @@ export default function DocumentsScreen() {
         {/* Create/Edit Modal */}
         <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-            <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+            <View style={[styles.modal, { backgroundColor: colors.background }]}>
               <View style={styles.modalTopRow}>
                 <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
