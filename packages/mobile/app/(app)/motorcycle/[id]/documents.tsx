@@ -137,11 +137,12 @@ export default function DocumentsScreen() {
   const [ocrRawResult, setOcrRawResult] = useState<Record<string, string | undefined>>({});
   const [ocrComuna, setOcrComuna] = useState<string | undefined>();
   const [ocrPhotoUri, setOcrPhotoUri] = useState<string | null>(null);
-  // Municipality picker state (for circulation_permit)
+  // Municipality picker state (for circulation_permit + license appointment)
   const [muniSearch, setMuniSearch] = useState('');
   const [muniResults, setMuniResults] = useState<Municipality[]>([]);
   const [showMuniPicker, setShowMuniPicker] = useState(false);
   const [selMuni, setSelMuni] = useState<Municipality | null>(null);
+  const [muniPickerMode, setMuniPickerMode] = useState<'permit' | 'license'>('permit');
 
   // Reset internal state when screen regains focus (e.g. after tab switch)
   useEffect(() => {
@@ -153,6 +154,7 @@ export default function DocumentsScreen() {
       setSelMuni(null);
       setMuniSearch('');
       setMuniResults([]);
+      setMuniPickerMode('permit');
     });
     return unsub;
   }, [navigation]);
@@ -476,11 +478,23 @@ export default function DocumentsScreen() {
   };
 
   const selectMuni = async (m: Municipality) => {
-    setSelMuni(m);
-    setMuniSearch(m.commune);
     setShowMuniPicker(false);
     setMuniResults([]);
-    // Persist immediately so "Paga tu permiso" can find the payment URL
+    setMuniSearch('');
+
+    if (muniPickerMode === 'license') {
+      // License appointment: open municipality appointment URL or fallback
+      if (m.appointmentUrl) {
+        Linking.openURL(m.appointmentUrl);
+      } else {
+        Linking.openURL('https://www.agendarhoras.cl');
+      }
+      return;
+    }
+
+    // Permit mode: save to motorcycle + show in form
+    setSelMuni(m);
+    setMuniSearch(m.commune);
     try { await updateMotorcycle(id!, { permitMunicipalityId: m.id }); } catch { /* silencioso */ }
   };
 
@@ -1098,12 +1112,11 @@ export default function DocumentsScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: isCirculationPermitOpen() ? colors.success : colors.textMuted + '40', marginTop: 12 }]}
-                  activeOpacity={isCirculationPermitOpen() ? 0.8 : 1}
-                  disabled={!isCirculationPermitOpen()}
-                   onPress={handlePayPermit}>
-                  <Ionicons name="wallet-outline" size={20} color={isCirculationPermitOpen() ? '#fff' : colors.textMuted} />
-                  <Text style={[styles.submitBtnText, { color: isCirculationPermitOpen() ? '#fff' : colors.textMuted }]}>Paga tu permiso</Text>
+                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]}
+                  activeOpacity={0.8}
+                  onPress={handlePayPermit}>
+                  <Ionicons name="wallet-outline" size={20} color="#fff" />
+                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Paga tu permiso</Text>
                 </TouchableOpacity>
                 <Text style={[styles.payHint, { color: colors.textMuted }]}>Opción hábil entre el 1 de febrero y el 31 de marzo</Text>
               </>
@@ -1244,7 +1257,7 @@ export default function DocumentsScreen() {
                 <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
                 <TouchableOpacity
                   style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
-                  onPress={() => Linking.openURL('https://www.agendarhoras.cl')}>
+                  onPress={() => { setMuniPickerMode('license'); setShowMuniPicker(true); }}>
                   <Ionicons name="calendar-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
                 </TouchableOpacity>
@@ -1510,7 +1523,7 @@ export default function DocumentsScreen() {
                 <>
                   <View style={{ marginTop: 12, marginBottom: 4 }}>
                     <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Comuna</Text>
-                    <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowMuniPicker(true)} activeOpacity={0.7}>
+                    <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => { setMuniPickerMode('permit'); setShowMuniPicker(true); }} activeOpacity={0.7}>
                       <Ionicons name="business-outline" size={16} color={colors.textMuted} />
                       <Text style={[styles.fieldInputText, { color: selMuni ? colors.text : colors.textMuted }]} numberOfLines={1}>
                         {selMuni ? `${selMuni.commune} — ${selMuni.name}` : 'Seleccionar comuna...'}
@@ -1522,7 +1535,7 @@ export default function DocumentsScreen() {
                       <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%' }]}> 
                         <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
                           <Ionicons name="business-outline" size={18} color={colors.primary} />
-                          <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Buscar comuna</Text>
+                          <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>{muniPickerMode === 'license' ? 'Agendar hora — Buscar comuna' : 'Buscar comuna'}</Text>
                           <TouchableOpacity onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
                             <Ionicons name="close" size={22} color={colors.textMuted} />
                           </TouchableOpacity>
