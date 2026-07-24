@@ -1581,17 +1581,59 @@ export default function DocumentsScreen() {
               ) : null}
               {/* Comuna (solo permiso de circulación) */}
               {form.type === 'circulation_permit' && (
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Comuna</Text>
-                    <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => { setMuniPickerMode('permit'); setShowMuniPicker(true); }} activeOpacity={0.7}>
-                      <Ionicons name="business-outline" size={16} color={colors.textMuted} />
-                      <Text style={[styles.fieldInputText, { color: selMuni ? colors.text : colors.textMuted }]} numberOfLines={1}>
-                        {selMuni ? `${selMuni.commune} — ${selMuni.name}` : 'Seleccionar comuna...'}
-                      </Text>
-                    </TouchableOpacity>
+                <View style={{ marginTop: 8, marginBottom: 4 }}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Comuna</Text>
+                  <TouchableOpacity
+                    style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder, minHeight: 44 }]}
+                    onPress={() => { setMuniPickerMode('permit'); setShowMuniPicker(true); }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="business-outline" size={16} color={colors.textMuted} />
+                    <Text style={[styles.fieldInputText, { color: selMuni ? colors.text : colors.textMuted }]} numberOfLines={1}>
+                      {selMuni ? `${selMuni.commune} — ${selMuni.name}` : 'Seleccionar comuna...'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {/* Picker overlay — inside form modal so it renders above pageSheet */}
+              {showMuniPicker && (
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                  <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }} />
+                  <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%', zIndex: 10000 }]}> 
+                    <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
+                      <Ionicons name="business-outline" size={18} color={colors.primary} />
+                      <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>{muniPickerMode === 'license' ? 'Agendar hora — Buscar comuna' : 'Buscar comuna'}</Text>
+                      <TouchableOpacity onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
+                        <Ionicons name="close" size={22} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={{ borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 10, fontSize: 15, marginVertical: 12, backgroundColor: colors.inputBg || colors.surfaceSecondary, color: colors.text }}
+                      placeholder="Escribe el nombre de la comuna..."
+                      placeholderTextColor={colors.textMuted}
+                      value={muniSearch}
+                      onChangeText={searchMunis}
+                      autoFocus
+                    />
+                    <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                      {muniResults.length === 0 && muniSearch.length >= 2 ? (
+                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
+                      ) : muniSearch.length < 2 ? (
+                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
+                      ) : (
+                        muniResults.map((m) => (
+                          <TouchableOpacity
+                            key={m.id}
+                            style={{ paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                            onPress={() => selectMuni(m)}
+                          >
+                            <Text style={{ color: colors.text, fontWeight: '500' }}>{m.commune}</Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.region}{m.paymentUrl ? ' · Portal disponible' : ''}</Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
                   </View>
-                  <View style={{ flex: 1 }} />
                 </View>
               )}
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
@@ -2204,48 +2246,6 @@ export default function DocumentsScreen() {
         onCancel={() => setShowOcrReview(false)}
         onRetry={handleOcrRetry}
       />
-
-      {/* Municipality picker — absolute overlay (no Modal to avoid nesting issues) */}
-      {showMuniPicker && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }} />
-          <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%', zIndex: 10000 }]}> 
-            <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
-              <Ionicons name="business-outline" size={18} color={colors.primary} />
-              <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>{muniPickerMode === 'license' ? 'Agendar hora — Buscar comuna' : 'Buscar comuna'}</Text>
-              <TouchableOpacity onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={{ borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 10, fontSize: 15, marginVertical: 12, backgroundColor: colors.inputBg || colors.surfaceSecondary, color: colors.text }}
-              placeholder="Escribe el nombre de la comuna..."
-              placeholderTextColor={colors.textMuted}
-              value={muniSearch}
-              onChangeText={searchMunis}
-              autoFocus
-            />
-            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {muniResults.length === 0 && muniSearch.length >= 2 ? (
-                <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
-              ) : muniSearch.length < 2 ? (
-                <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
-              ) : (
-                muniResults.map((m) => (
-                  <TouchableOpacity
-                    key={m.id}
-                    style={{ paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}
-                    onPress={() => selectMuni(m)}
-                  >
-                    <Text style={{ color: colors.text, fontWeight: '500' }}>{m.commune}</Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.region}{m.paymentUrl ? ' · Portal disponible' : ''}</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      )}
 
       {/* Modal: Licencia presencial */}
       <Modal visible={showLicensePresencialModal} transparent animationType="fade">
