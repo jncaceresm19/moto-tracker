@@ -468,7 +468,15 @@ router.post('/:id/report', validateParams(alertIdParam), async (req: Request, re
       return;
     }
 
-    // Notify admins (users with role 'admin')
+    // Increment report count and auto-close if threshold reached (3)
+    const newCount = (alert.reportCount ?? 0) + 1;
+    const now = new Date();
+    await db.update(theftAlerts).set({
+      reportCount: newCount,
+      ...(newCount >= 3 ? { status: 'closed', closedAt: now } : {}),
+    }).where(eq(theftAlerts.id, id));
+
+    // Notify admins
     const admins = await db
       .select({ id: users.id })
       .from(users)
@@ -479,11 +487,21 @@ router.post('/:id/report', validateParams(alertIdParam), async (req: Request, re
         userId: admin.id,
         type: 'alert_reported',
         title: 'Alerta reportada',
-        message: `La alerta de ${alert.brand} ${alert.model} (${alert.licensePlate}) fue reportada por un usuario`,
+        message: `${alert.brand} ${alert.model} (${alert.licensePlate}) — ${newCount}/3 reportes${newCount >= 3 ? ' (CERRADA)' : ''}`,
       }).catch(() => {});
     }
 
-    res.json({ success: true, message: 'Report received' });
+    // Notify alert owner if closed
+    if (newCount >= 3) {
+      createNotification({
+        userId: alert.userId,
+        type: 'alert_closed_reports',
+        title: 'Publicación cerrada',
+        message: `Tu alerta de ${alert.brand} ${alert.model} fue cerrada por múltiples reportes.`,
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: 'Report received', reportCount: newCount });
   } catch (err) {
     console.error('Report theft alert error:', err);
     res.status(500).json(createErrorResponse('INTERNAL_ERROR', 'Failed to report alert'));

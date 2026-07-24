@@ -186,6 +186,7 @@ export const theftAlerts = sqliteTable('theft_alerts', {
   lastLocationName: text('last_location_name'),
   notes: text('notes'),
   status: text('status').notNull().default('active'), // 'active', 'closed', 'recovered'
+  reportCount: integer('report_count').default(0),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   closedAt: integer('closed_at', { mode: 'timestamp' }),
   recoveredAt: integer('recovered_at', { mode: 'timestamp' }), // when owner marked as found (card stays green until end of day)
