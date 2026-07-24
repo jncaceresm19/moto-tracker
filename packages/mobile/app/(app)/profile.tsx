@@ -11,6 +11,7 @@ import { changePassword, updateProfile, listMotorcycles, deleteAccount } from '.
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
 import { hasBiometricHardware, isBiometricEnrolled, isBiometricEnabled, enableBiometric, disableBiometric, resetBiometricPreference, authenticateWithBiometrics } from '../../src/services/biometric';
+import { getGpsTrackers } from '../../src/services/gpsTrackerStorage';
 
 export default function ProfileScreen() {
   const { user, signOut, refreshUser } = useAuth();
@@ -44,6 +45,7 @@ export default function ProfileScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [motorcyclesCount, setMotorcyclesCount] = useState<number | null>(null);
   const [motorcyclesVerifiedCount, setMotorcyclesVerifiedCount] = useState<number | null>(null);
+  const [gpsCount, setGpsCount] = useState(0);
   const [showAdminCodeModal, setShowAdminCodeModal] = useState(false);
   const [adminCode, setAdminCode] = useState('');
   const [adminCodeError, setAdminCodeError] = useState('');
@@ -119,6 +121,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadBiometricStatus();
     loadMotorcyclesCount();
+    loadGpsCount();
   }, []);
 
   const loadBiometricStatus = async () => {
@@ -137,6 +140,15 @@ export default function ProfileScreen() {
     } catch {
       setMotorcyclesCount(null);
       setMotorcyclesVerifiedCount(null);
+    }
+  };
+
+  const loadGpsCount = async () => {
+    try {
+      const trackers = await getGpsTrackers();
+      setGpsCount(trackers.length);
+    } catch {
+      setGpsCount(null);
     }
   };
 
@@ -242,7 +254,7 @@ export default function ProfileScreen() {
   const handleForgotCurrentPassword = () => {
     showAlert(
       'Olvidaste tu contraseña',
-      'Cierra sesión y usa la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión para restablecerla por correo o numero telefónico.',
+      'Cierra sesión y usa la opción "¿Olvidaste tu contraseña?" en la pantalla de inicio de sesión para restablecerla por correo.',
       [{ text: 'OK' }],
       'help-circle',
       '#007AFF'
@@ -697,28 +709,6 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={dynamicStyles.row} activeOpacity={0.6}
-          onPress={() =>
-            showAlert(
-              t('protocolTraker'),
-              t('protocolTrakerInfo'),
-              [
-                { text: t('cancel'), style: 'cancel' },
-                { text: t('viewExample'), onPress: () => Linking.openURL('https://es.aliexpress.com/item/1005006121921125.html') },
-              ],
-              'locate',
-              colors.primary
-            )
-          }
-        >
-          <View style={styles.rowLeft}>
-            <Ionicons name="locate-outline" size={20} color={colors.text} />
-            <Text style={dynamicStyles.rowText}>{t('protocolTraker')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-        </TouchableOpacity>
-
         <TouchableOpacity style={dynamicStyles.row} activeOpacity={0.6} onPress={openAdminCodeModal}>
           <View style={styles.rowLeft}>
             <Ionicons name="people-outline" size={20} color={colors.text} />
@@ -986,7 +976,7 @@ export default function ProfileScreen() {
               <View style={[dynamicStyles.accountInfoRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
                 <Ionicons name="locate-outline" size={16} color={colors.textMuted} />
                 <Text style={dynamicStyles.accountInfoLabel}>GPS registrados</Text>
-                <Text style={dynamicStyles.accountInfoValue}>-</Text>
+                <Text style={dynamicStyles.accountInfoValue}>{gpsCount}</Text>
               </View>
               <View style={[dynamicStyles.accountInfoRow, { borderBottomWidth: 0 }]}>
                 <Ionicons name="shield-checkmark-outline" size={16} color={colors.textMuted} />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,8 +67,10 @@ export default function RegisterScreen() {
   // OTP flow state
   const [otpStep, setOtpStep] = useState<'idle' | 'choose' | 'code' | 'success'>('idle');
   const [otpMethod, setOtpMethod] = useState<'email' | 'phone'>('email');
-  const [otpCode, setOtpCode] = useState('');
+  const [otpCodeDigits, setOtpCodeDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const otpCode = otpCodeDigits.join('');
   const [otpLoading, setOtpLoading] = useState(false);
+  const otpRefs = useRef<Array<TextInput | null>>([]);
 
   // CustomAlert state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -168,7 +170,7 @@ export default function RegisterScreen() {
     }
   };
 
-  // --- OTP handlers (unchanged from original) ---
+  // --- OTP handlers ---
   const handleChooseMethod = async (method: 'email' | 'phone') => {
     setOtpMethod(method);
     setOtpLoading(true);
@@ -179,6 +181,24 @@ export default function RegisterScreen() {
       showAlert(t('error'), 'No se pudo enviar el código', [{ text: 'OK' }], 'close-circle', '#FF3B30');
     } finally {
       setOtpLoading(false);
+    }
+  };
+
+  const handleOtpChange = (text: string, index: number) => {
+    const digit = text.replace(/[^0-9]/g, '').slice(-1);
+    setOtpCodeDigits((prev) => {
+      const next = [...prev];
+      next[index] = digit;
+      return next;
+    });
+    if (digit && index < 5) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyPress = (e: any, index: number) => {
+    if (e.nativeEvent.key === 'Backspace' && !otpCodeDigits[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
     }
   };
 
@@ -212,7 +232,7 @@ export default function RegisterScreen() {
 
   const handleSuccessClose = () => {
     setOtpStep('idle');
-    setOtpCode('');
+    setOtpCodeDigits(['', '', '', '', '', '']);
     router.replace('/(app)');
   };
 
@@ -314,7 +334,7 @@ export default function RegisterScreen() {
     },
     button: {
       backgroundColor: colors.primary,
-      borderRadius: 8,
+      borderRadius: 30,
       padding: 16,
       alignItems: 'center',
       marginTop: 8,
@@ -361,6 +381,37 @@ export default function RegisterScreen() {
     },
     ruleText: {
       fontSize: 12,
+    },
+    // OTP modal — icon wrap + otp boxes (matches login screen)
+    otpIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 14,
+      backgroundColor: colors.primary + '15',
+    },
+    otpRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 8,
+      marginBottom: 20,
+    },
+    otpBox: {
+      width: 42,
+      height: 50,
+      borderWidth: 1,
+      borderRadius: 10,
+      textAlign: 'center',
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      borderColor: colors.inputBorder,
+      backgroundColor: colors.inputBg,
+    },
+    otpBoxFilled: {
+      borderColor: colors.primary,
     },
   });
 
@@ -416,33 +467,9 @@ export default function RegisterScreen() {
             {errors.rut ? <Text style={dynamicStyles.errorText}>{errors.rut}</Text> : <View style={{ marginBottom: 12 }} />}
           </View>
 
-          {/* Phone */}
-          <View style={dynamicStyles.inputWrapper}>
-            <View style={[dynamicStyles.phoneContainer, errors.phone && dynamicStyles.inputError]}>
-              <View style={dynamicStyles.phonePrefix}>
-                <Text style={dynamicStyles.phoneFlag}>🇨🇱</Text>
-                <Text style={dynamicStyles.phoneCode}>+569</Text>
-              </View>
-              <TextInput
-                style={dynamicStyles.phoneInput}
-                placeholder="12345678"
-                placeholderTextColor={colors.textMuted}
-                value={phone}
-                onChangeText={(v) => { setPhone(v.replace(/[^0-9]/g, '').slice(0, 8)); if (errors.phone) setErrors(prev => ({ ...prev, phone: '' })); }}
-                keyboardType="phone-pad"
-                maxLength={8}
-              />
-            </View>
-            {errors.phone ? (
-              <Text style={dynamicStyles.errorText}>{errors.phone}</Text>
-            ) : (
-              <View style={{ marginBottom: 12 }} />
-            )}
-          </View>
-
           {/* Birth Date */}
           <View style={dynamicStyles.inputWrapper}>
-            <TouchableOpacity
+            <TouchableOpacity activeOpacity={0.9}
               style={[dynamicStyles.input, errors.birthDate && dynamicStyles.inputError, { justifyContent: 'center' }]}
               onPress={() => setShowDatePicker(true)}
             >
@@ -474,7 +501,31 @@ export default function RegisterScreen() {
             )}
           </View>
 
-          <TouchableOpacity style={dynamicStyles.button} onPress={handleNext}>
+          {/* Phone */}
+          <View style={dynamicStyles.inputWrapper}>
+            <View style={[dynamicStyles.phoneContainer, errors.phone && dynamicStyles.inputError]}>
+              <View style={dynamicStyles.phonePrefix}>
+                <Text style={dynamicStyles.phoneFlag}>🇨🇱</Text>
+                <Text style={dynamicStyles.phoneCode}>+569</Text>
+              </View>
+              <TextInput
+                style={dynamicStyles.phoneInput}
+                placeholder="12345678"
+                placeholderTextColor={colors.textMuted}
+                value={phone}
+                onChangeText={(v) => { setPhone(v.replace(/[^0-9]/g, '').slice(0, 8)); if (errors.phone) setErrors(prev => ({ ...prev, phone: '' })); }}
+                keyboardType="phone-pad"
+                maxLength={8}
+              />
+            </View>
+            {errors.phone ? (
+              <Text style={dynamicStyles.errorText}>{errors.phone}</Text>
+            ) : (
+              <View style={{ marginBottom: 12 }} />
+            )}
+          </View>
+
+          <TouchableOpacity activeOpacity={0.8} style={dynamicStyles.button} onPress={handleNext}>
             <Text style={dynamicStyles.buttonText}>Siguiente</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -573,6 +624,7 @@ export default function RegisterScreen() {
           style={[dynamicStyles.button, loading && dynamicStyles.buttonDisabled]}
           onPress={handleRegister}
           disabled={loading}
+          activeOpacity={0.8}
         >
           <Text style={dynamicStyles.buttonText}>{loading ? t('signUpLoading') : t('signUpButton')}</Text>
         </TouchableOpacity>
@@ -593,7 +645,7 @@ export default function RegisterScreen() {
         onClose={() => setAlertVisible(false)}
       />
 
-      {/* ===== OTP MODALS (unchanged from original) ===== */}
+      {/* ===== OTP MODALS ===== */}
 
       {/* MODAL: Choose OTP Method — Email only */}
       <Modal visible={otpStep === 'choose'} transparent animationType="fade">
@@ -602,8 +654,13 @@ export default function RegisterScreen() {
             <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[styles.otpModal, { backgroundColor: colors.surface }]}>
                 <TouchableOpacity style={styles.otpCloseBtn} onPress={() => setOtpStep('idle')}>
-                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                  <Ionicons name="close" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
+
+                <View style={dynamicStyles.otpIconWrap}>
+                  <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
+                </View>
+
                 <Text style={[styles.otpModalTitle, { color: colors.text }]}>Validar cuenta</Text>
                 <Text style={[styles.otpModalSubtitle, { color: colors.textSecondary }]}>Te enviaremos un código de verificación a tu correo electrónico</Text>
 
@@ -631,24 +688,35 @@ export default function RegisterScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <TouchableOpacity activeOpacity={1} onPress={() => { }}>
               <View style={[styles.otpModal, { backgroundColor: colors.surface }]}>
-                <TouchableOpacity style={styles.otpCloseBtn} onPress={() => { setOtpStep('idle'); setOtpCode(''); }}>
-                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                <TouchableOpacity style={styles.otpCloseBtn} onPress={() => { setOtpStep('idle'); setOtpCodeDigits(['', '', '', '', '', '']); }}>
+                  <Ionicons name="close" size={16} color={colors.textSecondary} />
                 </TouchableOpacity>
+
+                <View style={dynamicStyles.otpIconWrap}>
+                  <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
+                </View>
+
                 <Text style={[styles.otpModalTitle, { color: colors.text }]}>Código de verificación</Text>
                 <Text style={[styles.otpModalSubtitle, { color: colors.textSecondary }]}>
-                  Ingresa el código de 6 dígitos enviado a tu correo
+                  Ingresa el código de 6 dígitos enviado a{'\n'}
+                  <Text style={{ fontWeight: '600', color: colors.text }}>{email}</Text>
                 </Text>
 
-                <TextInput
-                  style={[styles.otpCodeInput, { color: colors.text, borderColor: colors.inputBorder, backgroundColor: colors.inputBg }]}
-                  placeholder="000000"
-                  placeholderTextColor={colors.textMuted}
-                  value={otpCode}
-                  onChangeText={setOtpCode}
-                  keyboardType="numeric"
-                  maxLength={6}
-                  autoFocus
-                />
+                <View style={dynamicStyles.otpRow}>
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <TextInput
+                      key={i}
+                      ref={(el) => { otpRefs.current[i] = el; }}
+                      style={[dynamicStyles.otpBox, otpCodeDigits[i] && dynamicStyles.otpBoxFilled]}
+                      value={otpCodeDigits[i]}
+                      onChangeText={(txt) => handleOtpChange(txt, i)}
+                      onKeyPress={(e) => handleOtpKeyPress(e, i)}
+                      keyboardType="numeric"
+                      maxLength={1}
+                      autoFocus={i === 0}
+                    />
+                  ))}
+                </View>
 
                 <TouchableOpacity
                   style={[styles.otpVerifyBtn, { backgroundColor: colors.primary }]}
@@ -720,25 +788,31 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   otpModal: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     alignItems: 'center',
   },
   otpCloseBtn: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    padding: 4,
+    top: 14,
+    right: 14,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(120,120,120,0.12)',
     zIndex: 1,
   },
   otpModalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 19,
+    fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',
   },
   otpModalSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -773,7 +847,7 @@ const styles = StyleSheet.create({
   },
   otpVerifyBtn: {
     width: '100%',
-    borderRadius: 10,
+    borderRadius: 30,
     padding: 16,
     alignItems: 'center',
   },

@@ -27,6 +27,8 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
 }
 
+const PROFILE_CACHE_KEY = 'cachedProfile';
+
 function decodeToken(token: string): { id: string; email: string } | null {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
@@ -51,10 +53,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const profile = await getProfile();
-      setUser(prev => prev ? { ...prev, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, email: profile.email, role: (profile as any)?.role, birthDate: (profile as any)?.birthDate, createdAt: (profile as any)?.createdAt } : prev);
+      const updated = { id: user?.id || profile.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, role: (profile as any)?.role, birthDate: (profile as any)?.birthDate, createdAt: (profile as any)?.createdAt };
+      setUser(updated);
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updated));
     } catch (e: any) {
       if (e?.message === 'SESSION_EXPIRED') {
-        await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', PROFILE_CACHE_KEY]);
         setUser(null);
       }
       // Keep current user data for other errors
@@ -67,20 +71,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         const decoded = decodeToken(token);
         if (decoded) {
-          setUser(decoded);
-          // Fetch full profile in background
+          // Show cached profile immediately
+          const cached = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+          if (cached) {
+            try { setUser(JSON.parse(cached)); } catch {}
+          } else {
+            setUser(decoded);
+          }
+
+          // Fetch fresh profile in background
+          setIsLoading(false);
           try {
             const profile = await getProfile();
-              setUser({ id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, role: (profile as any)?.role, birthDate: (profile as any)?.birthDate, createdAt: (profile as any)?.createdAt });
+            const full = { id: decoded.id, email: profile.email, name: profile.name, phone: (profile as any)?.phone, avatarUrl: profile.avatarUrl, role: (profile as any)?.role, birthDate: (profile as any)?.birthDate, createdAt: (profile as any)?.createdAt };
+            setUser(full);
+            await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(full));
           } catch (e: any) {
             if (e?.message === 'SESSION_EXPIRED') {
-              await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+              await AsyncStorage.multiRemove(['accessToken', 'refreshToken', PROFILE_CACHE_KEY]);
               setUser(null);
             }
-            // Keep decoded token data for other errors
+            // Keep cached data for other errors
           }
+          return;
         } else {
-          await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+          await AsyncStorage.multiRemove(['accessToken', 'refreshToken', PROFILE_CACHE_KEY]);
         }
       }
       setIsLoading(false);
@@ -93,7 +108,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch full profile
     try {
       const profile = await getProfile();
-      setUser({ ...data.user, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl, role: (profile as any).role, birthDate: (profile as any).birthDate, createdAt: (profile as any).createdAt });
+      const full = { ...data.user, email: profile.email, name: profile.name, phone: (profile as any).phone, avatarUrl: profile.avatarUrl, role: (profile as any).role, birthDate: (profile as any).birthDate, createdAt: (profile as any).createdAt };
+      setUser(full);
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(full));
     } catch {
       // Keep login data (includes createdAt from login response)
     }
