@@ -1597,9 +1597,9 @@ export default function DocumentsScreen() {
               )}
               {/* Picker overlay — inside form modal so it renders above pageSheet */}
               {showMuniPicker && (
-                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+                <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'stretch', zIndex: 9999 }}>
                   <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }} />
-                  <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%', zIndex: 10000 }]}> 
+                  <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxHeight: '60%', zIndex: 10000 }]}> 
                     <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
                       <Ionicons name="business-outline" size={18} color={colors.primary} />
                       <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>{muniPickerMode === 'license' ? 'Agendar hora — Buscar comuna' : 'Buscar comuna'}</Text>
