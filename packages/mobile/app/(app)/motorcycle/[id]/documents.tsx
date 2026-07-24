@@ -162,6 +162,8 @@ export default function DocumentsScreen() {
       setMuniSearch('');
       setMuniResults([]);
       setMuniPickerMode('permit');
+      setShowPhotoModal(false);
+      setShowCropModal(false);
     });
     return unsub;
   }, [navigation]);

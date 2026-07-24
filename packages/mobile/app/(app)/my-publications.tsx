@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useNavigation } from 'expo-router';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
 import { TheftAlert, getMyPublications, closeAlert } from '../../src/services/theftAlertService';
@@ -15,6 +15,7 @@ export default function MyPublicationsScreen() {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const router = useRouter();
+  const navigation = useNavigation();
   const [publications, setPublications] = useState<TheftAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,6 +43,14 @@ export default function MyPublicationsScreen() {
   useEffect(() => {
     loadPublications();
   }, [loadPublications]);
+
+  // Reload when screen regains focus (e.g., after marking as found from home)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      loadPublications();
+    });
+    return unsub;
+  }, [navigation, loadPublications]);
 
   const onRefresh = async () => {
     setRefreshing(true);

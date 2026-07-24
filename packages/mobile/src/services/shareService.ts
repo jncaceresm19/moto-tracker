@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import { TheftAlert } from './theftAlertService';
+import { formatPlate } from '../../../backend/src/services/plateValidation';
 
 function formatTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
@@ -14,7 +15,7 @@ function generateShareText(alert: TheftAlert): string {
   return `🚨 ALERTA DE ROBO 🚨
 
 ${alert.brand} ${alert.model}
-Patente: ${alert.licensePlate}
+Patente: ${formatPlate(alert.licensePlate)}
 Ultima ubicacion: ${alert.lastLocationName || 'Desconocida'}
 Hora: ${formatTime(alert.createdAt)}
 
