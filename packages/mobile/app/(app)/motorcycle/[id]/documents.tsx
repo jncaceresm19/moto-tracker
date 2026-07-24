@@ -1012,21 +1012,21 @@ export default function DocumentsScreen() {
               <View style={[styles.datesCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {doc.issueDate && (
                   <View style={styles.datesCardCol}>
-                    <Ionicons name="calendar-outline" size={16} color={colors.success} />
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="calendar-outline" size={16} color={colors.success} />
                       <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{t('issued')}</Text>
-                      <Text style={[styles.datesCardValue, { color: colors.text }]}>{formatDateEs(doc.issueDate)}</Text>
                     </View>
+                    <Text style={[styles.datesCardValue, { color: colors.text }]}>{formatDateEs(doc.issueDate)}</Text>
                   </View>
                 )}
                 {doc.issueDate && doc.expiryDate && <View style={[styles.datesCardDivider, { backgroundColor: colors.border }]} />}
                 {doc.expiryDate && (
                   <View style={styles.datesCardCol}>
-                    <Ionicons name="calendar-outline" size={16} color={colors.danger} />
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Ionicons name="calendar-outline" size={16} color={colors.danger} />
                       <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{doc.type === 'padron' ? 'Vencimiento' : t('expires')}</Text>
-                      <Text style={[styles.datesCardValue, { color: colors.text }]} numberOfLines={1}>{doc.type === 'padron' ? 'No tiene vencimiento' : formatDateEs(doc.expiryDate)}</Text>
                     </View>
+                    <Text style={[styles.datesCardValue, { color: colors.text }]} numberOfLines={1}>{doc.type === 'padron' ? 'No tiene vencimiento' : formatDateEs(doc.expiryDate)}</Text>
                   </View>
                 )}
               </View>
@@ -1815,21 +1815,21 @@ export default function DocumentsScreen() {
             <View style={[styles.datesCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {viewing.issueDate && (
                 <View style={styles.datesCardCol}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.success} />
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.success} />
                     <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{t('issued')}</Text>
-                    <Text style={[styles.datesCardValue, { color: colors.text }]}>{formatDateEs(viewing.issueDate)}</Text>
                   </View>
+                  <Text style={[styles.datesCardValue, { color: colors.text }]}>{formatDateEs(viewing.issueDate)}</Text>
                 </View>
               )}
               {viewing.issueDate && viewing.expiryDate && <View style={[styles.datesCardDivider, { backgroundColor: colors.border }]} />}
               {viewing.expiryDate && (
                 <View style={styles.datesCardCol}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.danger} />
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.danger} />
                     <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{viewing.type === 'padron' ? 'Vencimiento' : t('expires')}</Text>
-                    <Text style={[styles.datesCardValue, { color: colors.text }]} numberOfLines={1}>{viewing.type === 'padron' ? 'No tiene vencimiento' : formatDateEs(viewing.expiryDate)}</Text>
                   </View>
+                  <Text style={[styles.datesCardValue, { color: colors.text }]} numberOfLines={1}>{viewing.type === 'padron' ? 'No tiene vencimiento' : formatDateEs(viewing.expiryDate)}</Text>
                 </View>
               )}
             </View>
@@ -2213,9 +2213,8 @@ const styles = StyleSheet.create({
   },
   datesCardCol: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
+    flexDirection: 'column',
+    gap: 2,
   },
   datesCardDivider: {
     width: 1,
