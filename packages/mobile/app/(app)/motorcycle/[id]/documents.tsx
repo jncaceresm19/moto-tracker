@@ -9,14 +9,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
-import { listDocuments, createDocument, updateDocument, deleteDocument, Document, getPermitPaymentUrl, getPermitAppointmentUrl, listMunicipalities, setPermitMunicipality, Municipality } from '../../../../src/api';
+import { listDocuments, createDocument, updateDocument, deleteDocument, Document, getPermitPaymentUrl, getPermitAppointmentUrl, listMunicipalities, updateMotorcycle, Municipality } from '../../../../src/api';
 import { useLanguage } from '../../../../src/language-context';
 import { useTheme } from '../../../../src/theme-context';
 import { useAuth } from '../../../../src/auth-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
-import { extractDocumentData, extractPdfData, OcrResult } from '../../../../src/services/ocrService';
+import { extractPdfData, OcrResult } from '../../../../src/services/ocrService';
 import { OcrReviewModal, buildOcrFields, OcrField } from '../../../../src/components/OcrReviewModal';
-import { ImageCropModal } from '../../../../src/components/ImageCropModal';
+
 
 // Parse date as LOCAL (avoids UTC midnight shifting the day back)
 // Handles both "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss.sssZ"
@@ -34,6 +34,14 @@ function formatDateEs(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+/** Format a Date as YYYY-MM-DD using LOCAL getters (safe across timezones). */
+function toLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 const TYPES = ['circulation_permit', 'technical_review', 'insurance', 'padron', 'drivers_license', 'fines'];
@@ -104,6 +112,9 @@ export default function DocumentsScreen() {
   const [showExpiryDatePicker, setShowExpiryDatePicker] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
+  const [showFileNamePrompt, setShowFileNamePrompt] = useState(false);
+  const [downloadFileName, setDownloadFileName] = useState('');
+  const [downloadDocs, setDownloadDocs] = useState<Document[]>([]);
   const [alertMessage, setAlertMessage] = useState('');
   const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
@@ -126,16 +137,11 @@ export default function DocumentsScreen() {
   const [ocrRawResult, setOcrRawResult] = useState<Record<string, string | undefined>>({});
   const [ocrComuna, setOcrComuna] = useState<string | undefined>();
   const [ocrPhotoUri, setOcrPhotoUri] = useState<string | null>(null);
-  // Municipality picker for create/edit form
-  const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(null);
-  const [formMunicipalitySearch, setFormMunicipalitySearch] = useState('');
-  const [formMunicipalities, setFormMunicipalities] = useState<Municipality[]>([]);
-  const [showFormMunicipalityPicker, setShowFormMunicipalityPicker] = useState(false);
-  // Crop modal state
-  const [showCropModal, setShowCropModal] = useState(false);
-  const [cropImageUri, setCropImageUri] = useState('');
-  const [pendingOcrSide, setPendingOcrSide] = useState<'front' | 'back'>('front');
-  const [cropMode, setCropMode] = useState<'ocr' | 'photo'>('ocr');
+  // Municipality picker state (for circulation_permit)
+  const [muniSearch, setMuniSearch] = useState('');
+  const [muniResults, setMuniResults] = useState<Municipality[]>([]);
+  const [showMuniPicker, setShowMuniPicker] = useState(false);
+  const [selMuni, setSelMuni] = useState<Municipality | null>(null);
 
   // Reset internal state when screen regains focus (e.g. after tab switch)
   useEffect(() => {
@@ -212,6 +218,9 @@ export default function DocumentsScreen() {
     setUploadMode('photo');
     setPickedFile(null);
     setOcrPhotoUri(null);
+    setSelMuni(null);
+    setMuniSearch('');
+    setMuniResults([]);
   };
 
   const openCreate = () => { resetForm(selectedType || 'other'); setErrors({}); setShowCreate(true); };
@@ -260,11 +269,13 @@ export default function DocumentsScreen() {
         { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
       );
       if (!manipulated.base64) return;
-      // Show crop modal for all photo types
-      setPendingOcrSide(photoSide);
-      setCropImageUri(manipulated.uri);
-      setCropMode('photo');
-      setShowCropModal(true);
+      const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
+      if (photoSide === 'back') {
+        setForm((p) => ({ ...p, fileUrlBack: dataUri }));
+      } else {
+        setForm((p) => ({ ...p, fileUrl: dataUri }));
+        setErrors((p) => ({ ...p, fileUrl: '' }));
+      }
     }
   };
 
@@ -281,28 +292,30 @@ export default function DocumentsScreen() {
     if (!result.canceled && result.assets[0]) {
       const file = result.assets[0];
       setPickedFile({ uri: file.uri, name: file.name, mimeType: file.mimeType || 'application/pdf' });
-      const response = await fetch(file.uri);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        setForm((p) => ({ ...p, fileUrl: base64 }));
+      try {
+        const ef = new File(file.uri);
+        const b64 = await ef.base64();
+        const mimeType = file.mimeType || 'image/jpeg';
+        const dataUri = `data:${mimeType};base64,${b64}`;
+        setForm((p) => ({ ...p, fileUrl: dataUri }));
         setErrors((p) => ({ ...p, fileUrl: '' }));
 
         // Auto-OCR for PDFs on OCR-supported types
         const docType = selectedType || form.type;
         if (file.mimeType === 'application/pdf' && OCR_TYPES.includes(docType)) {
-          await handlePdfOcr(base64, docType);
+          await handlePdfOcr(dataUri, docType);
         }
-      };
-      reader.readAsDataURL(blob);
+      } catch (e: any) {
+        console.error('[pickFile] error:', e?.message || e);
+        showAlert('Error', 'No se pudo leer el archivo: ' + (e?.message || 'error desconocido'), [{ text: 'OK' }], 'close-circle', colors.danger);
+      }
     }
   };
 
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
     if (!form.fileUrl) newErrors.fileUrl = t('required');
-    if (form.issueDate && form.expiryDate && new Date(form.expiryDate) < new Date(form.issueDate)) {
+    if (form.issueDate && form.expiryDate && form.expiryDate < form.issueDate) {
       newErrors.expiryDate = t('expiryBeforeIssue');
     }
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
@@ -314,17 +327,26 @@ export default function DocumentsScreen() {
         title: form.title,
         fileUrl: form.fileUrl,
         fileUrlBack: form.fileUrlBack || undefined,
-        issueDate: form.issueDate ? new Date(form.issueDate).toISOString() : undefined,
-        expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : undefined,
+        issueDate: form.issueDate ? form.issueDate + 'T00:00:00.000Z' : undefined,
+        expiryDate: form.expiryDate ? form.expiryDate + 'T00:00:00.000Z' : undefined,
       });
-      // Auto-assign municipality for circulation permits
-      if (form.type === 'circulation_permit' && selectedMunicipality) {
-        try { await setPermitMunicipality(id!, selectedMunicipality.id); } catch { /* ignore */ }
-      }
       setDocs((prev) => [created, ...prev]);
       setShowCreate(false);
+      // Asignar municipalidad: picker manual tiene prioridad, después OCR
+      const muniId = selMuni?.id
+        || (ocrComuna && (form.type === 'circulation_permit' || form.type === 'padron')
+          ? await (async () => {
+              try {
+                const matches = await listMunicipalities(ocrComuna);
+                const exact = matches.find((m) => m.commune.toLowerCase() === ocrComuna.toLowerCase());
+                return exact?.id;
+              } catch { return undefined; }
+            })()
+          : undefined);
+      if (muniId) {
+        try { await updateMotorcycle(id!, { permitMunicipalityId: muniId }); } catch { /* silencioso */ }
+      }
       resetForm();
-      setSelectedMunicipality(null);
       // Single-doc types: show detail directly after save
       if (!MULTI_DOC_TYPES.includes(form.type)) {
         setViewing(created);
@@ -338,132 +360,18 @@ export default function DocumentsScreen() {
     }
   };
 
-  // ── OCR Handlers ──────────────────────────────────────────────────────────
-  // Process OCR with a base64 image
-  const processOcr = async (dataUri: string, docType: string, ocrSide: 'front' | 'back') => {
-    setOcrDocumentType(docType);
-    setOcrLoading(true);
-    setOcrError(undefined);
-    setShowOcrReview(true);
-    setOcrPhotoUri(dataUri);
-
-    try {
-      const ocrResult = await extractDocumentData(dataUri, docType);
-
-      if (ocrResult.error) {
-        setOcrError(ocrResult.error);
-        setOcrConfidence((ocrResult as any).confidence);
-      } else {
-        setOcrConfidence((ocrResult as any).confidence);
-        const rawResult: Record<string, string | undefined> = {};
-        let fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
-
-        // Drivers license: expiry = issueDate + 6 years, day = user's birth day
-        if (docType === 'drivers_license' && (ocrResult as any).issueDate && user?.birthDate) {
-          const birthDay = parseLocalDate(user.birthDate).getDate();
-          const issue = parseLocalDate((ocrResult as any).issueDate);
-          const expiry = new Date(issue.getFullYear() + 6, issue.getMonth(), birthDay);
-          const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
-          (ocrResult as any).expiryDate = iso;
-          fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
-        }
-
-        fields.forEach(f => { rawResult[f.key] = f.value; });
-        setOcrRawResult(rawResult);
-        setOcrFields(fields);
-      }
-    } catch (err) {
-      console.error('[OCR] Scan error:', err);
-      setOcrError('Error al conectar con el servicio de OCR. Intenta de nuevo.');
-      setOcrConfidence(0);
-    } finally {
-      setOcrLoading(false);
+  // Auto-calculate expiry for drivers license photo: issueDate + 6 years, birth day/month
+  useEffect(() => {
+    if (form.type === 'drivers_license' && form.issueDate && user?.birthDate) {
+      const birthDate = parseLocalDate(user.birthDate);
+      const birthDay = birthDate.getDate();
+      const birthMonth = birthDate.getMonth();
+      const issue = parseLocalDate(form.issueDate);
+      const expiry = new Date(issue.getFullYear() + 6, birthMonth, birthDay);
+      const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
+      setForm((p) => ({ ...p, expiryDate: iso }));
     }
-  };
-
-  // Handle crop confirm: run OCR or just store the image
-  const handleCropConfirm = async (base64: string) => {
-    setShowCropModal(false);
-    const dataUri = `data:image/jpeg;base64,${base64}`;
-
-    if (cropMode === 'ocr') {
-      const docType = selectedType || form.type;
-      await processOcr(dataUri, docType, pendingOcrSide);
-    } else {
-      // Just store the image (non-OCR flow)
-      if (pendingOcrSide === 'back') {
-        setForm((p) => ({ ...p, fileUrlBack: dataUri }));
-      } else {
-        setForm((p) => ({ ...p, fileUrl: dataUri }));
-        setErrors((p) => ({ ...p, fileUrl: '' }));
-      }
-    }
-  };
-
-  // Open camera for OCR scan
-  const handleScanDocument = async () => {
-    setShowPhotoModal(false);
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      showAlert(t('permissionNeeded'), t('permissionMessage'), [{ text: 'OK' }], 'lock-closed', colors.accent);
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false });
-    if (result.canceled || !result.assets[0]) return;
-
-    const manipulated = await ImageManipulator.manipulateAsync(
-      result.assets[0].uri,
-      [{ resize: { width: 2400 } }],
-      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-    );
-
-    if (!manipulated.base64) return;
-
-    const docType = selectedType || form.type;
-    const isPadron = docType === 'padron';
-
-    // For padron: OCR runs on the BACK photo (where issue date is)
-    // For all other 2-photo docs: OCR runs only on the FRONT
-    const runOcr = isPadron ? photoSide === 'back' : photoSide === 'front';
-
-    // Use photoSide (the actual side tapped) — NOT a calculated ocrSide
-    setPendingOcrSide(photoSide);
-    setCropImageUri(manipulated.uri);
-    setCropMode(runOcr ? 'ocr' : 'photo');
-    setShowCropModal(true);
-  };
-
-  // Auto-scan: open camera directly, then crop → OCR
-  const handleAutoScan = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      showAlert(t('permissionNeeded'), t('permissionMessage'), [{ text: 'OK' }], 'lock-closed', colors.accent);
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false });
-    if (result.canceled || !result.assets[0]) return;
-
-    const manipulated = await ImageManipulator.manipulateAsync(
-      result.assets[0].uri,
-      [{ resize: { width: 2400 } }],
-      { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-    );
-
-    if (!manipulated.base64) return;
-
-    const docType = selectedType || form.type;
-    const isPadron = docType === 'padron';
-
-    // Auto-scan from front placeholder:
-    // For padron: save front photo only (no OCR — issue date is on back)
-    // For others: run OCR on front
-    setPendingOcrSide('front');
-    setCropImageUri(manipulated.uri);
-    setCropMode(isPadron ? 'photo' : 'ocr');
-    setShowCropModal(true);
-  };
+  }, [form.type, form.issueDate, user?.birthDate]);
 
   // PDF OCR: extract text from PDF and run through parser
   const handlePdfOcr = async (pdfBase64: string, docType: string) => {
@@ -484,9 +392,11 @@ export default function DocumentsScreen() {
         let fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
 
         if (docType === 'drivers_license' && (ocrResult as any).issueDate && user?.birthDate) {
-          const birthDay = parseLocalDate(user.birthDate).getDate();
+          const birthDate = parseLocalDate(user.birthDate);
+          const birthDay = birthDate.getDate();
+          const birthMonth = birthDate.getMonth();
           const issue = parseLocalDate((ocrResult as any).issueDate);
-          const expiry = new Date(issue.getFullYear() + 6, issue.getMonth(), birthDay);
+          const expiry = new Date(issue.getFullYear() + 6, birthMonth, birthDay);
           const iso = `${expiry.getFullYear()}-${String(expiry.getMonth() + 1).padStart(2, '0')}-${String(expiry.getDate()).padStart(2, '0')}`;
           (ocrResult as any).expiryDate = iso;
           fields = buildOcrFields(docType, ocrResult as Record<string, string | undefined>);
@@ -514,17 +424,8 @@ export default function DocumentsScreen() {
     setShowOcrReview(false);
     const docType = ocrDocumentType;
 
-    // Store comuna and auto-assign municipality
-    if (ocrRawResult.comuna) {
-      setOcrComuna(ocrRawResult.comuna);
-      if (docType === 'circulation_permit') {
-        try {
-          const results = await listMunicipalities(ocrRawResult.comuna);
-          const match = results.find(m => m.commune.toLowerCase() === ocrRawResult.comuna!.toLowerCase());
-          if (match) setSelectedMunicipality(match);
-        } catch { /* ignore */ }
-      }
-    }
+    // Store comuna for Google Maps actions
+    if (ocrRawResult.comuna) setOcrComuna(ocrRawResult.comuna);
 
     // Set form directly — do NOT call openCreate() (it resets everything)
     // OCR photo goes to the correct side depending on document type
@@ -546,43 +447,42 @@ export default function DocumentsScreen() {
     setOcrError(undefined);
     setOcrFields([]);
     setShowOcrReview(false);
-    handleScanDocument();
+    // OCR is only available via file upload — open file picker
+    pickFile();
   };
 
-  // ── Municipality Actions ──────────────────────────────────────────────────
-  const [showMunicipalityPicker, setShowMunicipalityPicker] = useState(false);
-  const [municipalitySearch, setMunicipalitySearch] = useState('');
-  const [municipalities, setMunicipalitiesList] = useState<Municipality[]>([]);
-  const [municipalityLoading, setMunicipalityLoading] = useState(false);
-
-  const searchMunicipalities = async (query: string) => {
-    setMunicipalityLoading(true);
+  // ── Municipality Picker ──────────────────────────────────────────────────
+  const searchMunis = async (query: string) => {
+    setMuniSearch(query);
+    if (query.length < 2) { setMuniResults([]); return; }
     try {
       const results = await listMunicipalities(query);
-      setMunicipalitiesList(results);
-    } catch { /* ignore */ }
-    setMunicipalityLoading(false);
+      setMuniResults(results);
+    } catch { setMuniResults([]); }
   };
 
-  const searchFormMunicipalities = async (query: string) => {
-    try {
-      const results = await listMunicipalities(query);
-      setFormMunicipalities(results);
-    } catch { /* ignore */ }
+  const selectMuni = (m: Municipality) => {
+    setSelMuni(m);
+    setMuniSearch(m.commune);
+    setShowMuniPicker(false);
+    setMuniResults([]);
   };
 
+  // ── Municipal Portal Actions ─────────────────────────────────────────────
   const handlePayPermit = async () => {
-    if (!id) return;
     try {
       const result = await getPermitPaymentUrl(id);
-      if (result?.url) {
-        Linking.openURL(result.url);
-      } else {
-        setShowMunicipalityPicker(true);
-        searchMunicipalities('');
+      if (!result?.municipality) {
+        showAlert('Sin municipalidad', 'Asigná una municipalidad editando la moto o escaneando el padrón.', [{ text: 'OK' }], 'information-circle', colors.accent);
+        return;
       }
+      if (!result?.url) {
+        showAlert('No disponible', `${result.municipality.commune} aún no tiene portal de pago registrado.`, [{ text: 'OK' }], 'information-circle', colors.accent);
+        return;
+      }
+      await Linking.openURL(result.url);
     } catch {
-      showAlert('Error', 'No se pudo obtener la URL de pago', [{ text: 'OK' }], 'close-circle', colors.danger);
+      showAlert('Error', 'No se pudo obtener el enlace de pago.', [{ text: 'OK' }], 'close-circle', '#FF3B30');
     }
   };
 
@@ -592,37 +492,26 @@ export default function DocumentsScreen() {
   };
 
   const handleGoToMunicipality = async () => {
-    if (!id) return;
     try {
       const result = await getPermitAppointmentUrl(id);
-      if (result?.url) {
-        Linking.openURL(result.url);
-      } else {
-        setShowMunicipalityPicker(true);
-        searchMunicipalities('');
+      if (!result?.municipality) {
+        showAlert('Sin municipalidad', 'Asigná una municipalidad editando la moto o escaneando el padrón.', [{ text: 'OK' }], 'information-circle', colors.accent);
+        return;
       }
-    } catch {
-      showAlert('Error', 'No se pudo obtener la URL de agendar', [{ text: 'OK' }], 'close-circle', colors.danger);
-    }
-  };
-
-  const handleSelectMunicipality = async (municipality: Municipality) => {
-    if (!id) return;
-    try {
-      await setPermitMunicipality(id, municipality.id);
-      setShowMunicipalityPicker(false);
-      if (municipality.paymentUrl) {
-        Linking.openURL(municipality.paymentUrl);
+      if (!result?.url) {
+        showAlert('No disponible', `${result.municipality.commune} aún no tiene portal web registrado.`, [{ text: 'OK' }], 'information-circle', colors.accent);
+        return;
       }
+      await Linking.openURL(result.url);
     } catch {
-      showAlert('Error', 'No se pudo guardar la municipalidad', [{ text: 'OK' }], 'close-circle', colors.danger);
+      showAlert('Error', 'No se pudo obtener el enlace.', [{ text: 'OK' }], 'close-circle', '#FF3B30');
     }
   };
 
   const handleUpdate = async () => {
     const newErrors: Record<string, string> = {};
     if (!form.fileUrl) newErrors.fileUrl = t('required');
-    if (form.issueDate && form.expiryDate && new Date(form.expiryDate) < new Date(form.issueDate)) {
+    if (form.issueDate && form.expiryDate && form.expiryDate < form.issueDate) {
       newErrors.expiryDate = t('expiryBeforeIssue');
     }
     if (Object.keys(newErrors).length > 0) { setErrors(newErrors); return; }
@@ -635,16 +524,15 @@ export default function DocumentsScreen() {
         title: form.title,
         fileUrl: form.fileUrl,
         fileUrlBack: form.fileUrlBack || null,
-        issueDate: form.issueDate ? new Date(form.issueDate).toISOString() : null,
-        expiryDate: form.expiryDate ? new Date(form.expiryDate).toISOString() : null,
+        issueDate: form.issueDate ? form.issueDate + 'T00:00:00.000Z' : null,
+        expiryDate: form.expiryDate ? form.expiryDate + 'T00:00:00.000Z' : null,
       });
-      // Save municipality for circulation permits
-      if (form.type === 'circulation_permit' && selectedMunicipality) {
-        try { await setPermitMunicipality(id!, selectedMunicipality.id); } catch { /* ignore */ }
-      }
       setDocs((prev) => prev.map((d) => d.id === updated.id ? updated : d));
       setEditing(null);
-      setSelectedMunicipality(null);
+      // Asignar municipalidad desde el picker manual (solo permiso de circulación)
+      if (selMuni && form.type === 'circulation_permit') {
+        try { await updateMotorcycle(id!, { permitMunicipalityId: selMuni.id }); } catch { /* silencioso */ }
+      }
       // Single-doc types: show detail directly after save
       if (!MULTI_DOC_TYPES.includes(form.type)) {
         setViewing(updated);
@@ -675,14 +563,39 @@ export default function DocumentsScreen() {
     ], 'warning', colors.danger);
   };
 
+  /** Resolve the display image for a document:
+   *  - For non-PDF docs: use fileUrl directly
+   *  - For PDF docs with a pre-converted JPEG: use fileUrlGenerated
+   *  - For PDF docs without a pre-converted JPEG: return null (show fallback text) */
+  const resolveDocImage = (doc: Document, side: 'front' | 'back'): string | null => {
+    const url = side === 'front' ? doc.fileUrl : doc.fileUrlBack;
+    const generated = side === 'front' ? doc.fileUrlGenerated : doc.fileUrlBackGenerated;
+    if (!url) return null;
+    if (!url.startsWith('data:application/pdf')) return url;     // regular image → use directly
+    if (generated && generated.startsWith('data:image/jpeg;base64,')) return generated; // pre-converted JPEG
+    return null; // PDF without conversion → show fallback text
+  };
+
   const generatePDF = async (doc: Document) => {
     if (!doc.fileUrl) return null;
+    const isPdf = doc.fileUrl.startsWith('data:application/pdf');
+    const mainImg = resolveDocImage(doc, 'front');
+    const backImg = resolveDocImage(doc, 'back');
     const issuedStr = doc.issueDate ? parseLocalDate(doc.issueDate).toLocaleDateString() : '—';
     const expiresStr = doc.expiryDate ? parseLocalDate(doc.expiryDate).toLocaleDateString() : '—';
-    const backSection = doc.fileUrlBack
+    const showExpiry = doc.expiryDate && doc.type !== 'padron';
+    const datesHtml = showExpiry
+      ? `<div style="font-size: 13px; color: #666; margin: 10px 0; text-align: center;">Emitido: ${issuedStr} | Vence: ${expiresStr}</div>`
+      : `<div style="font-size: 13px; color: #666; margin: 10px 0; text-align: center;">Emitido: ${issuedStr}</div>`;
+    const imgHtml = mainImg
+      ? `<div style="text-align: center;"><img src="${mainImg}" style="max-width: 100%; max-height: 85vh;" /></div>`
+      : isPdf
+        ? `<div style="text-align: center; padding: 30px; color: #999; font-size: 14px;">Documento PDF adjunto (no se pudo convertir a imagen)</div>`
+        : '';
+    const backSection = backImg
       ? `<div style="page-break-before: always; text-align: center; padding-top: 20px;">
            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">Reverso</div>
-           <img src="${doc.fileUrlBack}" style="max-width: 100%; max-height: 85vh;" />
+           <img src="${backImg}" style="max-width: 100%; max-height: 85vh;" />
          </div>`
       : '';
     const html = `
@@ -692,22 +605,15 @@ export default function DocumentsScreen() {
         body { margin: 0; padding: 20px; font-family: -apple-system, sans-serif; color: #333; }
         .header { text-align: center; margin-bottom: 20px; }
         .title { font-size: 18px; font-weight: bold; margin-bottom: 2px; }
-        .title-en { font-size: 13px; color: #888; margin-bottom: 4px; }
-        .type { font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px; }
         .dates { font-size: 13px; color: #666; margin: 10px 0; text-align: center; }
-        .img-container { text-align: center; }
         img { max-width: 100%; max-height: 85vh; }
       </style></head>
       <body>
         <div class="header">
           <div class="title">${doc.title}</div>
-          <div class="title-en">${TYPE_ENGLISH[doc.type] || doc.type.replace(/_/g, ' ')}</div>
-          <div class="type">${doc.type.replace(/_/g, ' ')}</div>
         </div>
-        <div class="dates">Emitido: ${issuedStr} | Vence: ${expiresStr}</div>
-        <div class="img-container">
-          <img src="${doc.fileUrl}" />
-        </div>
+        ${datesHtml}
+        ${imgHtml}
         ${backSection}
       </body>
       </html>
@@ -719,40 +625,71 @@ export default function DocumentsScreen() {
   const handleSaveAsPDF = async (doc: Document) => {
     try {
       const uri = await generatePDF(doc);
-      if (uri) await Sharing.shareAsync(uri);
+      if (uri) {
+        const src = new File(uri);
+        const docName = doc.title || t('document');
+        const out = new File(Paths.cache, docName + '.pdf');
+        src.move(out);
+        await Sharing.shareAsync(out.uri);
+      }
     } catch (e: any) {
       showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
     }
   };
 
   const handleDownloadAll = async () => {
-    const docsWithFiles = docs.filter((d) => d.fileUrl);
+    const docsWithFiles = docs.filter((d) => d.fileUrl && d.type !== 'fines');
     if (docsWithFiles.length === 0) {
       showAlert(t('noDocuments'), t('noPhotosSub'), [{ text: 'OK' }], 'document-outline', colors.textMuted);
       return;
     }
+    setDownloadDocs(docsWithFiles);
+    setShowFileNamePrompt(true);
+  };
+
+  const doDownloadAll = async (fileName: string) => {
+    setShowFileNamePrompt(false);
+    const docsWithFiles = downloadDocs;
     try {
       const issuedStr = (d: Document) => d.issueDate ? parseLocalDate(d.issueDate).toLocaleDateString() : '—';
       const expiresStr = (d: Document) => d.expiryDate ? parseLocalDate(d.expiryDate).toLocaleDateString() : '—';
-      const docHtml = docsWithFiles.map((d) => `
+      const docSections = docsWithFiles.map((d) => {
+        const mainImg = resolveDocImage(d, 'front');
+        const backImg = resolveDocImage(d, 'back');
+        const showExpiry = d.expiryDate && d.type !== 'padron';
+        const datesLine = showExpiry
+          ? `Emitido: ${issuedStr(d)} | Vence: ${expiresStr(d)}`
+          : `Emitido: ${issuedStr(d)}`;
+        const isPdf = d.fileUrl.startsWith('data:application/pdf');
+        const imgHtml = mainImg
+          ? `<img src="${mainImg}" style="max-width: 100%; max-height: 85vh;" />`
+          : isPdf
+            ? `<div style="text-align: center; padding: 30px; color: #999; font-size: 14px;">Documento PDF adjunto (no se pudo convertir a imagen)</div>`
+            : '';
+        const backSection = backImg
+          ? `<div style="page-break-before: always; text-align: center; padding-top: 20px;"><div style="font-size: 14px; color: #666; margin-bottom: 10px;">Reverso</div><img src="${backImg}" style="max-width: 100%; max-height: 85vh;" /></div>`
+          : '';
+        return `
         <div style="page-break-before: always; padding-top: 20px;">
           <div style="text-align: center; margin-bottom: 16px;">
             <div style="font-size: 18px; font-weight: bold; margin-bottom: 2px;">${d.title}</div>
-            <div style="font-size: 13px; color: #888; margin-bottom: 4px;">${TYPE_ENGLISH[d.type] || d.type.replace(/_/g, ' ')}</div>
-            <div style="font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px;">${d.type.replace(/_/g, ' ')}</div>
           </div>
-          <div style="font-size: 13px; color: #666; margin: 10px 0; text-align: center;">Emitido: ${issuedStr(d)} | Vence: ${expiresStr(d)}</div>
-          <div style="text-align: center;">
-            <img src="${d.fileUrl}" style="max-width: 100%; max-height: 85vh;" />
-          </div>
-          ${d.fileUrlBack ? `<div style="page-break-before: always; text-align: center; padding-top: 20px;"><div style="font-size: 14px; color: #666; margin-bottom: 10px;">Reverso</div><img src="${d.fileUrlBack}" style="max-width: 100%; max-height: 85vh;" /></div>` : ''}
-        </div>
-      `).join('');
+          <div style="font-size: 13px; color: #666; margin: 10px 0; text-align: center;">${datesLine}</div>
+          <div style="text-align: center;">${imgHtml}</div>
+          ${backSection}
+        </div>`;
+      });
+      const docHtml = docSections.join('');
       const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body { margin: 0; padding: 20px; font-family: -apple-system, sans-serif; color: #333; } img { max-width: 100%; max-height: 85vh; }</style></head><body>${docHtml}</body></html>`;
       const { uri } = await Print.printToFileAsync({ html, base64: false });
-      await Sharing.shareAsync(uri);
+      const src = new File(uri);
+      const out = new File(Paths.cache, fileName.endsWith('.pdf') ? fileName : fileName + '.pdf');
+      src.move(out);
+      await Sharing.shareAsync(out.uri);
     } catch (e: any) {
       showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
+    } finally {
+      setDownloadFileName('');
     }
   };
 
@@ -780,48 +717,26 @@ export default function DocumentsScreen() {
   };
 
   const handleBulkSaveAsPDF = async () => {
-    const photos = filteredDocs.filter((d) => d.fileUrl);
+    const photos = filteredDocs.filter((d) => d.fileUrl && d.type !== 'fines');
     if (photos.length === 0) {
       showAlert(t('noPhotos'), t('noPhotosSub'), [{ text: 'OK' }], 'information-circle', colors.primary);
       return;
     }
-
-    const pages = photos.map((doc) => {
-      const issuedStr = doc.issueDate ? parseLocalDate(doc.issueDate).toLocaleDateString() : '—';
-      const expiresStr = doc.expiryDate ? parseLocalDate(doc.expiryDate).toLocaleDateString() : '—';
-      return `
-        <div style="page-break-after: always; padding: 20px; text-align: center;">
-          <div style="font-size: 18px; font-weight: bold; margin-bottom: 4px;">${doc.title}</div>
-          <div style="font-size: 13px; color: #666; text-transform: uppercase; letter-spacing: 1px;">${doc.type.replace(/_/g, ' ')}</div>
-          <div style="font-size: 13px; color: #666; margin: 10px 0;">Emitido: ${issuedStr} | Vence: ${expiresStr}</div>
-          <img src="${doc.fileUrl}" style="max-width: 100%; max-height: 80vh;" />
-        </div>
-      `;
-    }).join('');
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head><meta charset="utf-8"><style>
-        body { margin: 0; padding: 0; font-family: -apple-system, sans-serif; color: #333; }
-      </style></head>
-      <body>${pages}</body>
-      </html>
-    `;
-
-    try {
-      const { uri } = await Print.printToFileAsync({ html, base64: false });
-      await Sharing.shareAsync(uri);
-    } catch (e: any) {
-      showAlert(t('error'), t('failedToSave'), [{ text: 'OK' }], 'close-circle', colors.danger);
-    }
+    setDownloadDocs(photos);
+    setShowFileNamePrompt(true);
   };
 
   const handleShare = async (doc: Document) => {
     if (!doc.fileUrl) return;
     try {
       const uri = await generatePDF(doc);
-      if (uri) await Sharing.shareAsync(uri);
+      if (uri) {
+        const src = new File(uri);
+        const docName = doc.title || t('document');
+        const out = new File(Paths.cache, docName + '.pdf');
+        src.move(out);
+        await Sharing.shareAsync(out.uri);
+      }
     } catch (e: any) {
       showAlert(t('error'), t('failedToShare'), [{ text: 'OK' }], 'close-circle', colors.danger);
     }
@@ -830,7 +745,7 @@ export default function DocumentsScreen() {
   const modalTitle = editing ? t('editDocument') : t('newDocument');
   const modalSave = editing ? handleUpdate : handleCreate;
   const showModal = showCreate || editing !== null;
-  const closeModal = () => { setShowCreate(false); setEditing(null); setUploadMode('photo'); setPickedFile(null); };
+  const closeModal = () => { setShowCreate(false); setEditing(null); setUploadMode('photo'); setPickedFile(null); setSelMuni(null); setMuniSearch(''); setMuniResults([]); };
 
   if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
@@ -975,6 +890,42 @@ export default function DocumentsScreen() {
             </KeyboardAvoidingView>
           </TouchableOpacity>
         </Modal>
+        {/* File name prompt for bulk PDF download */}
+        <Modal visible={showFileNamePrompt} animationType="fade" transparent onRequestClose={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface, alignItems: 'center', paddingTop: 28, position: 'relative' }]}>
+                  <TouchableOpacity style={{ position: 'absolute', top: 12, right: 12, zIndex: 1 }} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+                    <Ionicons name="close" size={22} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.success + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                    <Ionicons name="download-outline" size={28} color={colors.success} />
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 16, textAlign: 'center' }}>Descargar documentos</Text>
+                  <View style={{ width: '100%' }}>
+                    <TextInput
+                      style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder, color: colors.text, fontSize: 16, padding: 12, borderRadius: 10 }]}
+                      placeholder="documentos.pdf"
+                      placeholderTextColor={colors.textMuted}
+                      value={downloadFileName}
+                      onChangeText={setDownloadFileName}
+                      autoFocus
+                    />
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                      <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.surfaceSecondary, flex: 1, marginTop: 0 }]} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+                        <Text style={[styles.saveBtnText, { color: colors.text }]}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary, flex: 1, marginTop: 0 }]} onPress={() => doDownloadAll(downloadFileName || 'documentos.pdf')}>
+                        <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>Descargar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
       </View>
     );
   }
@@ -1045,37 +996,45 @@ export default function DocumentsScreen() {
               )}
             </View>
 
-            {/* Edit + Delete buttons */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-              <View>
+            {/* Dates card */}
+            {(doc.issueDate || doc.expiryDate) && (
+              <View style={[styles.datesCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 {doc.issueDate && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 0 }}>
+                  <View style={styles.datesCardCol}>
                     <Ionicons name="calendar-outline" size={16} color={colors.success} />
-                    <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                      {t('issued')}: {formatDateEs(doc.issueDate)}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{t('issued')}</Text>
+                      <Text style={[styles.datesCardValue, { color: colors.text }]}>{formatDateEs(doc.issueDate)}</Text>
+                    </View>
                   </View>
                 )}
+                {doc.issueDate && doc.expiryDate && <View style={[styles.datesCardDivider, { backgroundColor: colors.border }]} />}
                 {doc.expiryDate && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <View style={styles.datesCardCol}>
                     <Ionicons name="calendar-outline" size={16} color={colors.danger} />
-                    <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                      {t('expires')}: {formatDateEs(doc.expiryDate)}
-                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{doc.type === 'padron' ? 'Vencimiento' : t('expires')}</Text>
+                      <Text style={[styles.datesCardValue, { color: colors.text }]} numberOfLines={1}>{doc.type === 'padron' ? 'No tiene vencimiento' : formatDateEs(doc.expiryDate)}</Text>
+                    </View>
                   </View>
                 )}
               </View>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <TouchableOpacity onPress={() => handleSaveAsPDF(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
-                  <Ionicons name="arrow-down" size={18} color={colors.success} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-                  <Ionicons name="pencil" size={18} color={colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(doc)} style={[styles.iconActionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
-                  <Ionicons name="trash" size={18} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
+            )}
+
+            {/* Actions card */}
+            <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity onPress={() => handleSaveAsPDF(doc)} style={[styles.actionsCardBtn, { borderColor: colors.success }]}>
+                <Ionicons name="download-outline" size={18} color={colors.success} />
+                <Text style={[styles.actionsCardBtnText, { color: colors.success }]}>{t('download')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => openEdit(doc)} style={[styles.actionsCardBtn, { borderColor: colors.primary }]}>
+                <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+                <Text style={[styles.actionsCardBtnText, { color: colors.primary }]}>Editar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleDelete(doc)} style={[styles.actionsCardBtn, { borderColor: colors.danger }]}>
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                <Text style={[styles.actionsCardBtnText, { color: colors.danger }]}>{t('delete')}</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Requisitos Permiso de Circulación */}
@@ -1123,13 +1082,14 @@ export default function DocumentsScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]}
-                  activeOpacity={0.8}
-                  onPress={handlePayPermit}>
-                  <Ionicons name="wallet-outline" size={20} color="#fff" />
-                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Paga tu permiso</Text>
+                  style={[styles.submitBtn, { backgroundColor: isCirculationPermitOpen() ? colors.success : colors.textMuted + '40', marginTop: 12 }]}
+                  activeOpacity={isCirculationPermitOpen() ? 0.8 : 1}
+                  disabled={!isCirculationPermitOpen()}
+                   onPress={handlePayPermit}>
+                  <Ionicons name="wallet-outline" size={20} color={isCirculationPermitOpen() ? '#fff' : colors.textMuted} />
+                  <Text style={[styles.submitBtnText, { color: isCirculationPermitOpen() ? '#fff' : colors.textMuted }]}>Paga tu permiso</Text>
                 </TouchableOpacity>
-                <Text style={[styles.payHint, { color: colors.textMuted }]}>Redirige al portal de pago de tu municipalidad</Text>
+                <Text style={[styles.payHint, { color: colors.textMuted }]}>Opción hábil entre el 1 de febrero y el 31 de marzo</Text>
               </>
             )}
 
@@ -1269,7 +1229,7 @@ export default function DocumentsScreen() {
                 <TouchableOpacity
                   style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
                   onPress={handleGoToMunicipality}>
-                  <Ionicons name="map-outline" size={20} color="#fff" />
+                  <Ionicons name="calendar-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
                 </TouchableOpacity>
               </>
@@ -1419,7 +1379,7 @@ export default function DocumentsScreen() {
               {uploadMode === 'photo' && (
                 (form.type === 'drivers_license' || form.type === 'technical_review' || form.type === 'padron') ? (
                   <View style={{ gap: 10, marginBottom: 12 }}>
-                    <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                    <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => { setPhotoSide('front'); showImageOptions('front'); }}>
                       {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                         <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                       ) : (
@@ -1447,7 +1407,7 @@ export default function DocumentsScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => { setPhotoSide('front'); showImageOptions('front'); }}>
                     {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                       <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                     ) : (
@@ -1512,34 +1472,74 @@ export default function DocumentsScreen() {
                     <Text style={[styles.fieldInputText, { color: form.issueDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.issueDate ? formatDateEs(form.issueDate) : 'Selecciona'}</Text>
                   </TouchableOpacity>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('expiryDate')}</Text>
-                  <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
-                    <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
-                    <Text style={[styles.fieldInputText, { color: form.expiryDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.expiryDate ? formatDateEs(form.expiryDate) : 'Selecciona'}</Text>
-                  </TouchableOpacity>
-                </View>
+                {form.type !== 'padron' && (
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('expiryDate')}</Text>
+                    <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
+                      <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                      <Text style={[styles.fieldInputText, { color: form.expiryDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.expiryDate ? formatDateEs(form.expiryDate) : 'Selecciona'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
-              {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
+              {form.type !== 'padron' && errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
               {showIssueDatePicker && (
-                <DateTimePicker value={form.issueDate ? new Date(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, issueDate: iso })); if (form.expiryDate && new Date(form.expiryDate) >= date) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
+                <DateTimePicker value={form.issueDate ? parseLocalDate(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, issueDate: toLocalDateStr(date) })); if (form.expiryDate && form.expiryDate >= toLocalDateStr(date)) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
               )}
-              {showExpiryDatePicker && (
-                <DateTimePicker value={form.expiryDate ? new Date(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, expiryDate: iso })); if (form.issueDate && date < new Date(form.issueDate)) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
+              {form.type !== 'padron' && showExpiryDatePicker && (
+                <DateTimePicker value={form.expiryDate ? parseLocalDate(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, expiryDate: toLocalDateStr(date) })); if (form.issueDate && toLocalDateStr(date) < form.issueDate) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
               )}
+              {/* Municipalidad (solo permiso de circulación) */}
               {form.type === 'circulation_permit' && (
-                <View style={{ marginTop: 12 }}>
-                  <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>Municipalidad</Text>
-                  <TouchableOpacity
-                    style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]}
-                    onPress={() => { setShowFormMunicipalityPicker(true); searchFormMunicipalities(''); }}>
-                    <Ionicons name="business-outline" size={16} color={colors.textMuted} />
-                    <Text style={[styles.fieldInputText, { color: selectedMunicipality ? colors.text : colors.textMuted }]} numberOfLines={1}>
-                      {selectedMunicipality ? selectedMunicipality.commune : 'Seleccionar municipalidad'}
-                    </Text>
-                    <Ionicons name="chevron-down" size={16} color={colors.textMuted} />
-                  </TouchableOpacity>
-                </View>
+                <>
+                  <View style={{ marginTop: 12, marginBottom: 4 }}>
+                    <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Municipalidad</Text>
+                    <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowMuniPicker(true)} activeOpacity={0.7}>
+                      <Ionicons name="business-outline" size={16} color={colors.textMuted} />
+                      <Text style={[styles.fieldInputText, { color: selMuni ? colors.text : colors.textMuted }]} numberOfLines={1}>
+                        {selMuni ? `${selMuni.commune} — ${selMuni.name}` : 'Seleccionar municipalidad...'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Modal visible={showMuniPicker} transparent animationType="fade">
+                    <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                      <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 20, width: '90%', maxWidth: 400, maxHeight: '60%' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <Text style={{ color: colors.text, fontSize: 16, fontWeight: '600' }}>Buscar municipalidad</Text>
+                          <TouchableOpacity onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
+                            <Ionicons name="close" size={24} color={colors.text} />
+                          </TouchableOpacity>
+                        </View>
+                        <TextInput
+                          style={{ borderWidth: 1, borderColor: colors.inputBorder, borderRadius: 8, padding: 10, fontSize: 15, marginVertical: 12, backgroundColor: colors.inputBg || colors.surfaceSecondary, color: colors.text }}
+                          placeholder="Escribe el nombre de la comuna..."
+                          placeholderTextColor={colors.textMuted}
+                          value={muniSearch}
+                          onChangeText={searchMunis}
+                          autoFocus
+                        />
+                        <ScrollView style={{ maxHeight: 300 }}>
+                          {muniResults.length === 0 && muniSearch.length >= 2 ? (
+                            <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
+                          ) : muniSearch.length < 2 ? (
+                            <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
+                          ) : (
+                            muniResults.map((m) => (
+                              <TouchableOpacity
+                                key={m.id}
+                                style={{ paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}
+                                onPress={() => selectMuni(m)}
+                              >
+                                <Text style={{ color: colors.text, fontWeight: '500' }}>{m.commune}</Text>
+                                <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.region}{m.paymentUrl ? ' · Portal disponible' : ''}</Text>
+                              </TouchableOpacity>
+                            ))
+                          )}
+                        </ScrollView>
+                      </View>
+                    </View>
+                  </Modal>
+                </>
               )}
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
                 {saving ? <ActivityIndicator color={colors.primaryText} /> : (
@@ -1554,9 +1554,12 @@ export default function DocumentsScreen() {
                   <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
                   <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
                     <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
+                    <View style={[styles.photoOverlayIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                      <Ionicons name="camera" size={28} color={colors.primary} />
+                    </View>
                     <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
-                    <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}><Ionicons name="images" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('chooseFromGallery')}</Text></TouchableOpacity>
-                    <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.success }]} onPress={handleScanDocument}><Ionicons name="scan-outline" size={20} color="#fff" /><Text style={[styles.photoOverlayBtnText, { color: '#fff' }]}>Escanear documento</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}><Ionicons name="camera" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>Abrir cámara</Text></TouchableOpacity>
+                    <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderWidth: 1 }]} onPress={() => pickImage(false)}><Ionicons name="images" size={20} color={colors.text} /><Text style={[styles.photoOverlayBtnText, { color: colors.text }]}>Elegir de galería</Text></TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -1577,13 +1580,6 @@ export default function DocumentsScreen() {
           onSave={handleOcrSave}
           onCancel={() => setShowOcrReview(false)}
           onRetry={handleOcrRetry}
-        />
-
-        <ImageCropModal
-          visible={showCropModal}
-          imageUri={cropImageUri}
-          onConfirm={handleCropConfirm}
-          onCancel={() => setShowCropModal(false)}
         />
 
         {/* Modal: Instructivo Revisión Técnica */}
@@ -1655,7 +1651,7 @@ export default function DocumentsScreen() {
                         <TouchableOpacity
                           style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 10 }]}
                           activeOpacity={0.8}
-                          onPress={() => Linking.openURL('https://www.registrocivil.cl')}>
+                          onPress={() => Linking.openURL('https://www.registrocivil.cl/principal/servicios-en-linea/bloqueo-temporal-licencia-de-conducir')}>
                           <Ionicons name="open-outline" size={18} color="#fff" />
                           <Text style={[styles.submitBtnText, { color: '#fff', fontSize: 14 }]}>Ir a Registro Civil</Text>
                         </TouchableOpacity>
@@ -1718,11 +1714,48 @@ export default function DocumentsScreen() {
                     <TouchableOpacity
                       style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 16 }]}
                       activeOpacity={0.8}
-                      onPress={() => Linking.openURL('https://www.registrocivil.cl')}>
+                      onPress={() => Linking.openURL('https://www.registrocivil.cl/principal/servicios-en-linea/')}>
                       <Ionicons name="open-outline" size={18} color="#fff" />
                       <Text style={[styles.submitBtnText, { color: '#fff', fontSize: 14 }]}>Ir a Registro Civil</Text>
                     </TouchableOpacity>
                   </ScrollView>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* File name prompt for bulk PDF download */}
+        <Modal visible={showFileNamePrompt} animationType="fade" transparent onRequestClose={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+          <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+              <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+                <View style={[styles.docPortarModal, { backgroundColor: colors.surface, alignItems: 'center', paddingTop: 28, position: 'relative' }]}>
+                  <TouchableOpacity style={{ position: 'absolute', top: 12, right: 12, zIndex: 1 }} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+                    <Ionicons name="close" size={22} color={colors.textMuted} />
+                  </TouchableOpacity>
+                  <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.success + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                    <Ionicons name="download-outline" size={28} color={colors.success} />
+                  </View>
+                  <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 16, textAlign: 'center' }}>Descargar documentos</Text>
+                  <View style={{ width: '100%' }}>
+                    <TextInput
+                      style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder, color: colors.text, fontSize: 16, padding: 12, borderRadius: 10 }]}
+                      placeholder="documentos.pdf"
+                      placeholderTextColor={colors.textMuted}
+                      value={downloadFileName}
+                      onChangeText={setDownloadFileName}
+                      autoFocus
+                    />
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                      <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.surfaceSecondary, flex: 1, marginTop: 0 }]} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+                        <Text style={[styles.saveBtnText, { color: colors.text }]}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary, flex: 1, marginTop: 0 }]} onPress={() => doDownloadAll(downloadFileName || 'documentos.pdf')}>
+                        <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>Descargar</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
               </TouchableOpacity>
             </KeyboardAvoidingView>
@@ -1765,58 +1798,46 @@ export default function DocumentsScreen() {
             )}
           </View>
 
-          {/* Edit + Delete — same layout as single-doc */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-            <View>
+          {/* Dates card — same layout as single-doc */}
+          {(viewing.issueDate || viewing.expiryDate) && (
+            <View style={[styles.datesCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {viewing.issueDate && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 0 }}>
+                <View style={styles.datesCardCol}>
                   <Ionicons name="calendar-outline" size={16} color={colors.success} />
-                  <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                    {t('issued')}: {formatDateEs(viewing.issueDate)}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{t('issued')}</Text>
+                    <Text style={[styles.datesCardValue, { color: colors.text }]}>{formatDateEs(viewing.issueDate)}</Text>
+                  </View>
                 </View>
               )}
+              {viewing.issueDate && viewing.expiryDate && <View style={[styles.datesCardDivider, { backgroundColor: colors.border }]} />}
               {viewing.expiryDate && (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <View style={styles.datesCardCol}>
                   <Ionicons name="calendar-outline" size={16} color={colors.danger} />
-                  <Text style={[styles.detailDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                    {t('expires')}: {formatDateEs(viewing.expiryDate)}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.datesCardLabel, { color: colors.textMuted }]}>{viewing.type === 'padron' ? 'Vencimiento' : t('expires')}</Text>
+                    <Text style={[styles.datesCardValue, { color: colors.text }]} numberOfLines={1}>{viewing.type === 'padron' ? 'No tiene vencimiento' : formatDateEs(viewing.expiryDate)}</Text>
+                  </View>
                 </View>
               )}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity onPress={() => handleSaveAsPDF(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
-                <Ionicons name="arrow-down" size={18} color={colors.success} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => openEdit(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-                <Ionicons name="pencil" size={18} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(viewing)} style={[styles.iconActionBtn, { backgroundColor: colors.danger + '15', borderColor: colors.danger }]}>
-                <Ionicons name="trash" size={18} color={colors.danger} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Download + Share — same as single-doc */}
-          {viewing.fileUrl && (
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flex: 1 }]}
-                onPress={() => handleSaveAsPDF(viewing)}
-              >
-                <Ionicons name="download-outline" size={18} color={colors.text} />
-                <Text style={[styles.actionBtnText, { color: colors.text }]}>{t('download')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, flex: 1 }]}
-                onPress={() => handleShare(viewing)}
-              >
-                <Ionicons name="share-outline" size={18} color={colors.text} />
-                <Text style={[styles.actionBtnText, { color: colors.text }]}>↗ {t('share')}</Text>
-              </TouchableOpacity>
             </View>
           )}
+
+          {/* Actions card — same layout as single-doc */}
+          <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity onPress={() => handleSaveAsPDF(viewing)} style={[styles.actionsCardBtn, { borderColor: colors.success }]}>
+              <Ionicons name="download-outline" size={18} color={colors.success} />
+              <Text style={[styles.actionsCardBtnText, { color: colors.success }]}>{t('download')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openEdit(viewing)} style={[styles.actionsCardBtn, { borderColor: colors.primary }]}>
+              <Ionicons name="pencil-outline" size={18} color={colors.primary} />
+              <Text style={[styles.actionsCardBtnText, { color: colors.primary }]}>Editar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDelete(viewing)} style={[styles.actionsCardBtn, { borderColor: colors.danger }]}>
+              <Ionicons name="trash-outline" size={18} color={colors.danger} />
+              <Text style={[styles.actionsCardBtnText, { color: colors.danger }]}>{t('delete')}</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       ) : (
         <>
@@ -1862,7 +1883,7 @@ export default function DocumentsScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
                     <Ionicons name="calendar-outline" size={13} color={colors.danger} />
                     <Text style={[styles.cardDate, { color: colors.textSecondary, marginTop: 0 }]}>
-                      {t('expires')}: {formatDateEs(item.expiryDate)}
+                      {item.type === 'padron' ? 'No tiene vencimiento' : `${t('expires')}: ${formatDateEs(item.expiryDate)}`}
                     </Text>
                   </View>
                 )}
@@ -1878,7 +1899,7 @@ export default function DocumentsScreen() {
           {selectedType === 'fines' && (
             <TouchableOpacity
               style={[styles.bulkFab, { backgroundColor: colors.primary, bottom: 148 }]}
-              onPress={() => Linking.openURL('https://www.registrocivil.cl/consultas/multas')}>
+              onPress={() => Linking.openURL('https://rrvv.fiscalizacion.cl/MTTVias2019/')}>
               <Ionicons name="search-outline" size={22} color={colors.primaryText} />
             </TouchableOpacity>
           )}
@@ -1954,7 +1975,7 @@ export default function DocumentsScreen() {
             {uploadMode === 'photo' && (
               (form.type === 'drivers_license' || form.type === 'technical_review' || form.type === 'padron') ? (
                 <View style={{ gap: 10, marginBottom: 12 }}>
-                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                  <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => { setPhotoSide('front'); showImageOptions('front'); }}>
                     {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                       <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                     ) : (
@@ -1982,7 +2003,7 @@ export default function DocumentsScreen() {
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={OCR_TYPES.includes(form.type) ? () => { setPhotoSide('front'); handleAutoScan(); } : () => showImageOptions('front')}>
+                <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={() => { setPhotoSide('front'); showImageOptions('front'); }}>
                   {form.fileUrl && !form.fileUrl?.startsWith('data:application/pdf') ? (
                     <Image source={{ uri: form.fileUrl }} style={styles.photoPreview} resizeMode="cover" />
                   ) : (
@@ -2043,20 +2064,22 @@ export default function DocumentsScreen() {
                   <Text style={[styles.fieldInputText, { color: form.issueDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.issueDate ? formatDateEs(form.issueDate) : 'Selecciona'}</Text>
                 </TouchableOpacity>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('expiryDate')}</Text>
-                <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
-                  <Text style={[styles.fieldInputText, { color: form.expiryDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.expiryDate ? formatDateEs(form.expiryDate) : 'Selecciona'}</Text>
-                </TouchableOpacity>
-              </View>
+              {form.type !== 'padron' && (
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{t('expiryDate')}</Text>
+                  <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => setShowExpiryDatePicker(true)}>
+                    <Ionicons name="calendar-outline" size={16} color={colors.textMuted} />
+                    <Text style={[styles.fieldInputText, { color: form.expiryDate ? colors.text : colors.textMuted }]} numberOfLines={1}>{form.expiryDate ? formatDateEs(form.expiryDate) : 'Selecciona'}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            {errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
+            {form.type !== 'padron' && errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
             {showIssueDatePicker && (
-              <DateTimePicker value={form.issueDate ? new Date(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, issueDate: iso })); if (form.expiryDate && new Date(form.expiryDate) >= date) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
+              <DateTimePicker value={form.issueDate ? parseLocalDate(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, issueDate: toLocalDateStr(date) })); if (form.expiryDate && form.expiryDate >= toLocalDateStr(date)) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
             )}
-            {showExpiryDatePicker && (
-              <DateTimePicker value={form.expiryDate ? new Date(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { const iso = date.toISOString().split('T')[0]; setForm((p) => ({ ...p, expiryDate: iso })); if (form.issueDate && date < new Date(form.issueDate)) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
+            {form.type !== 'padron' && showExpiryDatePicker && (
+              <DateTimePicker value={form.expiryDate ? parseLocalDate(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, expiryDate: toLocalDateStr(date) })); if (form.issueDate && toLocalDateStr(date) < form.issueDate) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
             )}
             <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
               {saving ? <ActivityIndicator color={colors.primaryText} /> : (
@@ -2071,9 +2094,12 @@ export default function DocumentsScreen() {
                 <TouchableOpacity style={styles.photoOverlayBg} onPress={() => setShowPhotoModal(false)} activeOpacity={1} />
                 <View style={[styles.photoOverlayContent, { backgroundColor: colors.surface }]}>
                   <TouchableOpacity style={styles.photoOverlayClose} onPress={() => setShowPhotoModal(false)}><Ionicons name="close" size={24} color={colors.text} /></TouchableOpacity>
+                  <View style={[styles.photoOverlayIconCircle, { backgroundColor: colors.primary + '15' }]}>
+                    <Ionicons name="camera" size={28} color={colors.primary} />
+                  </View>
                   <Text style={[styles.photoOverlayTitle, { color: colors.text }]}>{t('changePhoto')}</Text>
-                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(false)}><Ionicons name="images" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>{t('chooseFromGallery')}</Text></TouchableOpacity>
-                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.success }]} onPress={handleScanDocument}><Ionicons name="scan-outline" size={20} color="#fff" /><Text style={[styles.photoOverlayBtnText, { color: '#fff' }]}>Escanear documento</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.primary }]} onPress={() => pickImage(true)}><Ionicons name="camera" size={20} color={colors.primaryText} /><Text style={[styles.photoOverlayBtnText, { color: colors.primaryText }]}>Abrir cámara</Text></TouchableOpacity>
+                  <TouchableOpacity style={[styles.photoOverlayBtn, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border, borderWidth: 1 }]} onPress={() => pickImage(false)}><Ionicons name="images" size={20} color={colors.text} /><Text style={[styles.photoOverlayBtnText, { color: colors.text }]}>Elegir de galería</Text></TouchableOpacity>
                 </View>
               </View>
             )}
@@ -2081,93 +2107,44 @@ export default function DocumentsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <ImageCropModal
-        visible={showCropModal}
-        imageUri={cropImageUri}
-        onConfirm={handleCropConfirm}
-        onCancel={() => setShowCropModal(false)}
-      />
-
-      {/* Form Municipality Picker Modal */}
-      <Modal visible={showFormMunicipalityPicker} transparent animationType="fade">
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowFormMunicipalityPicker(false)}>
-          <TouchableOpacity activeOpacity={1} style={[styles.docPortarModal, { backgroundColor: colors.surface, maxHeight: '70%' }]}>
-            <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
-              <Ionicons name="business-outline" size={20} color={colors.brandBlue} />
-              <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Seleccionar municipalidad</Text>
-              <TouchableOpacity onPress={() => setShowFormMunicipalityPicker(false)}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={{ backgroundColor: colors.background, borderRadius: 8, padding: 10, marginTop: 12, color: colors.text, borderWidth: 1, borderColor: colors.border }}
-              placeholder="Buscar comuna..."
-              placeholderTextColor={colors.textMuted}
-              value={formMunicipalitySearch}
-              onChangeText={(text) => { setFormMunicipalitySearch(text); searchFormMunicipalities(text); }}
-            />
-            <FlatList
-              data={formMunicipalities}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40' }}
-                  onPress={() => { setSelectedMunicipality(item); setShowFormMunicipalityPicker(false); setFormMunicipalitySearch(''); }}>
-                  <Text style={{ color: colors.text, fontWeight: '600' }}>{item.commune}</Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>{item.name}</Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 20 }}>No se encontraron municipalidades</Text>}
-            />
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Municipality Picker Modal */}
-      <Modal visible={showMunicipalityPicker} transparent animationType="fade">
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowMunicipalityPicker(false)}>
-          <TouchableOpacity activeOpacity={1} style={[styles.docPortarModal, { backgroundColor: colors.surface, maxHeight: '70%' }]}>
-            <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
-              <Ionicons name="business-outline" size={20} color={colors.brandBlue} />
-              <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Seleccionar municipalidad</Text>
-              <TouchableOpacity onPress={() => setShowMunicipalityPicker(false)}>
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={{ backgroundColor: colors.background, borderRadius: 8, padding: 10, marginTop: 12, color: colors.text, borderWidth: 1, borderColor: colors.border }}
-              placeholder="Buscar comuna..."
-              placeholderTextColor={colors.textMuted}
-              value={municipalitySearch}
-              onChangeText={(text) => { setMunicipalitySearch(text); searchMunicipalities(text); }}
-            />
-            {municipalityLoading ? (
-              <ActivityIndicator style={{ marginTop: 20 }} color={colors.brandBlue} />
-            ) : (
-              <FlatList
-                data={municipalities}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={{ paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40' }}
-                    onPress={() => handleSelectMunicipality(item)}>
-                    <Text style={{ color: colors.text, fontWeight: '600' }}>{item.commune}</Text>
-                    <Text style={{ color: colors.textMuted, fontSize: 12 }}>{item.name}</Text>
-                    {item.paymentUrl ? (
-                      <Text style={{ color: colors.success, fontSize: 11, marginTop: 2 }}>✓ Portal de pago disponible</Text>
-                    ) : (
-                      <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Sin portal de pago verificado</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={<Text style={{ color: colors.textMuted, textAlign: 'center', marginTop: 20 }}>No se encontraron municipalidades</Text>}
-              />
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
       <CustomAlert visible={alertVisible} title={alertTitle} message={alertMessage} buttons={alertButtons} icon={alertIcon} iconColor={alertIconColor} onClose={() => setAlertVisible(false)} />
+
+      {/* File name prompt for bulk PDF download */}
+      <Modal visible={showFileNamePrompt} animationType="fade" transparent onRequestClose={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+            <TouchableOpacity activeOpacity={1} onPress={() => Keyboard.dismiss()}>
+              <View style={[styles.docPortarModal, { backgroundColor: colors.surface, alignItems: 'center', paddingTop: 28, position: 'relative' }]}>
+                <TouchableOpacity style={{ position: 'absolute', top: 12, right: 12, zIndex: 1 }} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+                  <Ionicons name="close" size={22} color={colors.textMuted} />
+                </TouchableOpacity>
+                <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.success + '20', justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
+                  <Ionicons name="download-outline" size={28} color={colors.success} />
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 16, textAlign: 'center' }}>Descargar documentos</Text>
+                <View style={{ width: '100%' }}>
+                  <TextInput
+                    style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder, color: colors.text, fontSize: 16, padding: 12, borderRadius: 10 }]}
+                    placeholder="documentos.pdf"
+                    placeholderTextColor={colors.textMuted}
+                    value={downloadFileName}
+                    onChangeText={setDownloadFileName}
+                    autoFocus
+                  />
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.surfaceSecondary, flex: 1, marginTop: 0 }]} onPress={() => { setShowFileNamePrompt(false); setDownloadFileName(''); }}>
+                      <Text style={[styles.saveBtnText, { color: colors.text }]}>Cancelar</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary, flex: 1, marginTop: 0 }]} onPress={() => doDownloadAll(downloadFileName || 'documentos.pdf')}>
+                      <Text style={[styles.saveBtnText, { color: colors.primaryText }]}>Descargar</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
 
       <OcrReviewModal
         visible={showOcrReview}
@@ -2210,6 +2187,60 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Dates card (Emitido / Vence) — two columns side by side
+  datesCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 12,
+    gap: 12,
+  },
+  datesCardCol: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  datesCardDivider: {
+    width: 1,
+    alignSelf: 'stretch',
+  },
+  datesCardLabel: {
+    fontSize: 11,
+    marginBottom: 1,
+  },
+  datesCardValue: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  // Actions card (Descargar / Editar / Eliminar) — outline buttons in a row
+  actionsCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    marginTop: 12,
+  },
+  actionsCardBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  actionsCardBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   categoryBtn: {
     flexDirection: 'row',
@@ -2453,11 +2484,18 @@ const styles = StyleSheet.create({
     top: 12,
     right: 12,
   },
+  photoOverlayIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   photoOverlayTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 24,
-    marginTop: 8,
+    marginBottom: 20,
   },
   photoOverlayBtn: {
     flexDirection: 'row',
