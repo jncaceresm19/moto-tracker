@@ -149,6 +149,10 @@ export default function DocumentsScreen() {
       setViewing(null);
       setSelectedType(null);
       setEditing(null);
+      setShowMuniPicker(false);
+      setSelMuni(null);
+      setMuniSearch('');
+      setMuniResults([]);
     });
     return unsub;
   }, [navigation]);
@@ -1228,7 +1232,7 @@ export default function DocumentsScreen() {
                 <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
                 <TouchableOpacity
                   style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
-                  onPress={handleGoToMunicipality}>
+                  onPress={() => Linking.openURL('https://www.agendarhoras.cl')}>
                   <Ionicons name="calendar-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
                 </TouchableOpacity>
