@@ -1436,7 +1436,7 @@ export default function DocumentsScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
             <View style={[styles.modal, { backgroundColor: colors.background }]}>
               <View style={styles.modalTopRow}>
-                <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
+                <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto', padding: 8 }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
                 </TouchableOpacity>
               </View>
@@ -2028,9 +2028,9 @@ export default function DocumentsScreen() {
       {/* Create/Edit Modal (multi-doc types: fines) */}
       <Modal visible={showModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <View style={[styles.modal, { backgroundColor: colors.background }]} onStartShouldSetResponder={() => { Keyboard.dismiss(); return false; }}>
+          <View style={[styles.modal, { backgroundColor: colors.background }]}>
             <View style={styles.modalTopRow}>
-              <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto' }}>
+              <TouchableOpacity onPress={closeModal} style={{ marginLeft: 'auto', padding: 8 }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={{ color: colors.textSecondary, fontSize: 16 }}>{t('cancel')}</Text>
               </TouchableOpacity>
             </View>
