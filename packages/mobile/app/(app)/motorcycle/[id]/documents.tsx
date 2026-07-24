@@ -1514,7 +1514,7 @@ export default function DocumentsScreen() {
                   </View>
                   <Modal visible={showMuniPicker} transparent animationType="fade">
                     <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
-                      <View style={[styles.docPortarModal, { backgroundColor: colors.surface, width: '90%', maxWidth: 400, maxHeight: '60%' }]}> 
+                      <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%' }]}> 
                         <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
                           <Ionicons name="business-outline" size={18} color={colors.primary} />
                           <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>Buscar comuna</Text>
