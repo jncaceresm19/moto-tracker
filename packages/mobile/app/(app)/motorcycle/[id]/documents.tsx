@@ -1582,7 +1582,7 @@ export default function DocumentsScreen() {
               {/* Comuna (solo permiso de circulación) */}
               {form.type === 'circulation_permit' && (
                 <>
-                  <View style={{ marginTop: 12, marginBottom: 4 }}>
+                  <View style={{ marginTop: 8, marginBottom: 4 }}>
                     <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Comuna</Text>
                     <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => { setMuniPickerMode('permit'); setShowMuniPicker(true); }} activeOpacity={0.7}>
                       <Ionicons name="business-outline" size={16} color={colors.textMuted} />
