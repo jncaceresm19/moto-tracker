@@ -836,7 +836,7 @@ export default function DocumentsScreen() {
   const modalTitle = editing ? t('editDocument') : t('newDocument');
   const modalSave = editing ? handleUpdate : handleCreate;
   const showModal = showCreate || editing !== null;
-  const closeModal = () => { setShowCreate(false); setEditing(null); setUploadMode('photo'); setPickedFile(null); setSelMuni(null); setMuniSearch(''); setMuniResults([]); };
+  const closeModal = () => { setShowCreate(false); setEditing(null); setShowPhotoModal(false); setUploadMode('photo'); setPickedFile(null); setSelMuni(null); setMuniSearch(''); setMuniResults([]); };
 
   if (loading) return <View style={[styles.center, { backgroundColor: colors.background }]}><ActivityIndicator size="large" color={colors.primary} /></View>;
 
