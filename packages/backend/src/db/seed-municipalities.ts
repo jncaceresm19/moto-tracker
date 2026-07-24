@@ -1,5 +1,5 @@
 import { db } from './index';
-import { municipalities } from './schema';
+import { municipalities, motorcycles } from './schema';
 
 // ── Official payment portal URLs for each commune ─────────────────────────
 // Only includes URLs that have been manually verified from official sources.
@@ -354,7 +354,9 @@ const now = new Date();
 async function seed() {
   console.log(`🌱 Seeding ${MUNICIPALITIES.length} municipalities...`);
 
-  // Clear existing data so re-runs are idempotent
+  // Null out FK references so we can clear the table
+  await db.update(motorcycles).set({ permitMunicipalityId: null });
+  console.log('  🧹 Cleared permitMunicipalityId on motorcycles');
   await db.delete(municipalities);
   console.log('  🧹 Cleared existing municipalities');
 
