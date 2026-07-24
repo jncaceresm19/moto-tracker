@@ -174,7 +174,7 @@ export default function NotificationsScreen() {
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.background }]} edges={[]}>
       {/* Custom header matching app style — siempre visible, cargando o no */}
       <View style={[styles.header, { backgroundColor: colors.headerBg }]}>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => router.back()} style={styles.headerBtn}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => router.replace('/(app)/profile')} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={26} color={colors.headerTintColor} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.headerTintColor }]}>{t('notifications')}</Text>

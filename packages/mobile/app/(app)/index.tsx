@@ -26,7 +26,7 @@ import { CustomAlert } from '../../src/components/CustomAlert';
 import { WeatherCard } from '../../src/components/WeatherCard';
 import { RainAlertData, fetchRainAlert } from '../../src/services/weatherApi';
 import { isRainAlertDismissed, dismissRainAlert } from '../../src/services/rainAlertDismiss';
-import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
+import { formatPlate } from '../../../backend/src/services/plateValidation';
 
 
 export default function HomeScreen() {
@@ -488,7 +488,7 @@ export default function HomeScreen() {
         motorcycleId: moto.id,
         lastLatitude: activeMoto.activationLat || 0,
         lastLongitude: activeMoto.activationLon || 0,
-        lastLocationName: activationAddress || `Estacionada en ${activeMoto.activationLat?.toFixed(4)}, ${activeMoto.activationLon?.toFixed(4)}`,
+        lastLocationName: activationAddress || (activeMoto.activationLat && activeMoto.activationLon ? `Estacionada en ${activeMoto.activationLat.toFixed(4)}, ${activeMoto.activationLon.toFixed(4)}` : 'Sin ubicación seleccionada'),
         photoUrl: activationPhotoUrl || undefined,
       });
 
@@ -519,11 +519,6 @@ export default function HomeScreen() {
       </SafeAreaView>
     );
   }
-
-  const formatPlate = (raw: string) => {
-    const { letters, numbers } = getDisplayPlateParts(raw);
-    return numbers ? `${letters}-${numbers}` : letters;
-  };
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: colors.headerBg }]} edges={['top']}>

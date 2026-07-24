@@ -21,7 +21,7 @@ import { Motorcycle, listMotorcycles } from '../../src/api';
 import { createManualPublication } from '../../src/services/theftAlertService';
 import { CustomAlert } from '../../src/components/CustomAlert';
 import { PhotoPickerModal } from '../../src/components/PhotoPickerModal';
-import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
+import { formatPlate } from '../../../backend/src/services/plateValidation';
 
 export default function ManualPublicationScreen() {
   const { colors } = useTheme();
@@ -186,12 +186,6 @@ export default function ManualPublicationScreen() {
       </SafeAreaView>
     );
   }
-  const formatPlate = (raw: string) => {
-    const { letters, numbers } = getDisplayPlateParts(raw);
-    return numbers ? `${letters}-${numbers}` : letters;
-  };
-
-
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[]}>
       <KeyboardAvoidingView

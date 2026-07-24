@@ -40,6 +40,11 @@ export function getDisplayPlateParts(rawPlate: string): PlateParts {
   return { letters: normalized, numbers: '' };
 }
 
+export function formatPlate(raw: string): string {
+  const { letters, numbers } = getDisplayPlateParts(raw);
+  return numbers ? `${letters}-${numbers}` : letters;
+}
+
 export function validatePlate(rawPlate: string): PlateValidationResult {
   const { plate, checkDigit } = stripCheckDigit(rawPlate);
   const normalized = normalizeLeadingZeros(plate.replace(/[\s\-]/g, ''));

@@ -124,7 +124,7 @@ router.get('/:id', validateParams(motorcycleIdParam), async (req: Request, res: 
 router.post('/', validateBody(createMotorcycleSchema), async (req: Request, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const { brand, model, year, licensePlate, brandId, modelId, currentKilometers, imageUrl, gpsTracker, color, engineNumber, chassisNumber, serialNumber } = req.body;
+    const { brand, model, year, licensePlate, brandId, modelId, currentKilometers, imageUrl, gpsTracker, color, engineNumber, chassisNumber, serialNumber, permitMunicipalityId } = req.body;
 
     // Check for duplicate license plate
     const existing = await db
@@ -158,6 +158,7 @@ router.post('/', validateBody(createMotorcycleSchema), async (req: Request, res:
       engineNumber: engineNumber ?? null,
       chassisNumber: chassisNumber ?? null,
       serialNumber: serialNumber ?? null,
+      permitMunicipalityId: permitMunicipalityId ?? null,
       createdAt: now,
       updatedAt: now,
     });
@@ -272,6 +273,193 @@ router.delete('/:id', validateParams(motorcycleIdParam), async (req: Request, re
   } catch (err) {
     console.error('Delete motorcycle error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to delete motorcycle');
+    res.status(500).json(error);
+  }
+});
+
+// --- GET /api/motorcycles/:id/permit-payment-url ---
+// Resolve the official payment portal URL for this motorcycle's municipality
+router.get('/:id/permit-payment-url', validateParams(motorcycleIdParam), async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const id = getMotorcycleId(req);
+
+    const moto = await db
+      .select()
+      .from(motorcycles)
+      .where(and(eq(motorcycles.id, id), eq(motorcycles.userId, userId)))
+      .get();
+
+    if (!moto) {
+      const error = createErrorResponse('NOT_FOUND', 'Motorcycle not found');
+      res.status(404).json(error);
+      return;
+    }
+
+    if (!moto.permitMunicipalityId) {
+      res.json({ success: true, data: null });
+      return;
+    }
+
+    const municipality = await db
+      .select()
+      .from(municipalities)
+      .where(eq(municipalities.id, moto.permitMunicipalityId))
+      .get();
+
+    if (!municipality || !municipality.active) {
+      res.json({ success: true, data: null });
+      return;
+    }
+
+    const url = municipality.paymentUrl || municipality.appointmentUrl || '';
+
+    res.json({
+      success: true,
+      data: {
+        url,
+        municipality: {
+          id: municipality.id,
+          name: municipality.name,
+          commune: municipality.commune,
+          region: municipality.region,
+          paymentUrl: municipality.paymentUrl,
+          appointmentUrl: municipality.appointmentUrl,
+          active: municipality.active,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Get permit payment URL error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to resolve payment URL');
+    res.status(500).json(error);
+  }
+});
+
+// --- GET /api/motorcycles/:id/permit-appointment-url ---
+// Resolve the official appointment URL for this motorcycle's municipality
+router.get('/:id/permit-appointment-url', validateParams(motorcycleIdParam), async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const id = getMotorcycleId(req);
+
+    const moto = await db
+      .select()
+      .from(motorcycles)
+      .where(and(eq(motorcycles.id, id), eq(motorcycles.userId, userId)))
+      .get();
+
+    if (!moto) {
+      const error = createErrorResponse('NOT_FOUND', 'Motorcycle not found');
+      res.status(404).json(error);
+      return;
+    }
+
+    if (!moto.permitMunicipalityId) {
+      res.json({ success: true, data: null });
+      return;
+    }
+
+    const municipality = await db
+      .select()
+      .from(municipalities)
+      .where(eq(municipalities.id, moto.permitMunicipalityId))
+      .get();
+
+    if (!municipality || !municipality.active) {
+      res.json({ success: true, data: null });
+      return;
+    }
+
+    const url = municipality.appointmentUrl || municipality.paymentUrl || '';
+
+    res.json({
+      success: true,
+      data: {
+        url,
+        municipality: {
+          id: municipality.id,
+          name: municipality.name,
+          commune: municipality.commune,
+          region: municipality.region,
+          paymentUrl: municipality.paymentUrl,
+          appointmentUrl: municipality.appointmentUrl,
+          active: municipality.active,
+        },
+      },
+    });
+  } catch (err) {
+    console.error('Get permit appointment URL error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to resolve appointment URL');
+    res.status(500).json(error);
+  }
+});
+
+// --- PUT /api/motorcycles/:id/permit-municipality ---
+// Set or clear the permit municipality for a motorcycle
+const setPermitMunicipalitySchema = z.object({
+  permitMunicipalityId: z.string().uuid().nullable(),
+});
+
+router.put('/:id/permit-municipality', validateParams(motorcycleIdParam), validateBody(setPermitMunicipalitySchema), async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const id = getMotorcycleId(req);
+
+    const existing = await db
+      .select()
+      .from(motorcycles)
+      .where(and(eq(motorcycles.id, id), eq(motorcycles.userId, userId)))
+      .get();
+
+    if (!existing) {
+      const error = createErrorResponse('NOT_FOUND', 'Motorcycle not found');
+      res.status(404).json(error);
+      return;
+    }
+
+    const { permitMunicipalityId } = req.body;
+
+    // If setting a value, verify the municipality exists and is active
+    if (permitMunicipalityId) {
+      const municipality = await db
+        .select()
+        .from(municipalities)
+        .where(eq(municipalities.id, permitMunicipalityId))
+        .get();
+
+      if (!municipality || !municipality.active) {
+        const error = createErrorResponse('BAD_REQUEST', 'Municipality not found or inactive');
+        res.status(400).json(error);
+        return;
+      }
+    }
+
+    await db
+      .update(motorcycles)
+      .set({
+        permitMunicipalityId,
+        updatedAt: new Date(),
+      })
+      .where(eq(motorcycles.id, id));
+
+    const updated = await db
+      .select()
+      .from(motorcycles)
+      .where(eq(motorcycles.id, id))
+      .get();
+
+    res.json({
+      success: true,
+      data: {
+        ...updated!,
+        createdAt: new Date(updated!.createdAt),
+        updatedAt: new Date(updated!.updatedAt),
+      },
+    });
+  } catch (err) {
+    console.error('Set permit municipality error:', err);
+    const error = createErrorResponse('INTERNAL_ERROR', 'Failed to set permit municipality');
     res.status(500).json(error);
   }
 });

@@ -38,6 +38,14 @@ export default function KilometersScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
+  // Reset internal state when screen regains focus (e.g. after tab switch)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      setEditing(null);
+    });
+    return unsub;
+  }, [navigation]);
+
   const showAlert = (title: string, message?: string, buttons: {text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive'}[] = [{text: 'OK'}], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
     setAlertTitle(title);
     setAlertMessage(message || '');
@@ -137,7 +145,7 @@ export default function KilometersScreen() {
           } catch { showAlert(t('error'), t('failedToDelete'), [{text: 'OK'}], 'close-circle', '#FF3B30'); }
         },
       },
-    ], 'warning', '#FF9500');
+    ], 'warning', '#FF3B30');
   };
 
   const modalTitle = editing ? t('editReading') : t('newReading');

@@ -47,6 +47,14 @@ export default function FuelScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
 
+  // Reset internal state when screen regains focus (e.g. after tab switch)
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      setSelectedSection(null);
+    });
+    return unsub;
+  }, [navigation]);
+
   useEffect(() => {
     const titles: Record<string, string> = {
       records: 'Registro de Cargas',
@@ -191,7 +199,7 @@ export default function FuelScreen() {
           }
         },
       },
-    ], 'warning', '#FF9500');
+    ], 'warning', '#FF3B30');
   };
 
   const formatDate = (dateStr: string) => {

@@ -7,7 +7,7 @@ import { useTheme } from '../theme-context';
 import { useLanguage } from '../language-context';
 import { Motorcycle } from '../api';
 import { ActiveMoto, formatActivationTime } from '../services/activeMoto';
-import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
+import { formatPlate } from '../../../backend/src/services/plateValidation';
 
 interface ActiveMotoModalProps {
   visible: boolean;
@@ -40,11 +40,6 @@ export function ActiveMotoModal({
   const activeMotorcycle = activeMoto
     ? motorcycles.find(m => m.id === activeMoto.motorcycleId)
     : null;
-
-  const formatPlate = (raw: string) => {
-    const { letters, numbers } = getDisplayPlateParts(raw);
-    return numbers ? `${letters}-${numbers}` : letters;
-  };
 
   const handleSelectMoto = (moto: Motorcycle) => {
     setSelectedMoto(moto);
