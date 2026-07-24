@@ -10,7 +10,6 @@ import { useLanguage } from '../../../src/language-context';
 import { CustomAlert } from '../../../src/components/CustomAlert';
 import { getDueRemindersByKm, getReminderMessage, dismissReminder, getOilInterval, OilType } from '../../../src/services/reminderService';
 import { getDisplayPlateParts } from '../../../../backend/src/services/plateValidation';
-import { GpsRegistrationModal } from '../../../src/components/GpsRegistrationModal';
 
 export default function MotorcycleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -29,7 +28,6 @@ export default function MotorcycleDetailScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState(colors.primary);
   const [gpsEnabled, setGpsEnabled] = useState(false);
-  const [showGpsRegistrationModal, setShowGpsRegistrationModal] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -479,7 +477,7 @@ export default function MotorcycleDetailScreen() {
             )}
           </>
         ) : (
-          <TouchableOpacity style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary }]} activeOpacity={0.7} onPress={() => setShowGpsRegistrationModal(true)}>
+          <View style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary, opacity: 0.6 }]}>
             <View style={[styles.sectionChip, { backgroundColor: '#F1EFE8' }]}>
               <Ionicons name="location-outline" size={18} color="#888780" />
             </View>
@@ -487,8 +485,13 @@ export default function MotorcycleDetailScreen() {
               <Text style={[styles.sectionText, { color: colors.text }]}>{t('gpsTracking')}</Text>
               <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{t('noGpsRegistered')}</Text>
             </View>
-            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-          </TouchableOpacity>
+            <Switch
+              value={false}
+              disabled={true}
+              trackColor={{ false: '#E1E5EC', true: '#1F9D63' }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
         )}
       </View>
 
@@ -627,17 +630,6 @@ export default function MotorcycleDetailScreen() {
         icon={alertIcon}
         iconColor={alertIconColor}
         onClose={() => setAlertVisible(false)}
-      />
-
-      <GpsRegistrationModal
-        visible={showGpsRegistrationModal}
-        onClose={() => setShowGpsRegistrationModal(false)}
-        motorcycleId={id!}
-        onSaved={(gpsTracker) => {
-          setMotorcycle(prev => prev ? { ...prev, gpsTracker } : prev);
-          setGpsEnabled(true);
-          setShowGpsRegistrationModal(false);
-        }}
       />
     </ScrollView>
   );
