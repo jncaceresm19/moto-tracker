@@ -1573,16 +1573,16 @@ export default function DocumentsScreen() {
                 )}
               </View>
               {form.type !== 'padron' && errors.expiryDate ? <Text style={[styles.errorText, { color: colors.danger, marginTop: 6 }]}>{errors.expiryDate}</Text> : null}
-              {showIssueDatePicker && (
+              {showIssueDatePicker ? (
                 <DateTimePicker value={form.issueDate ? parseLocalDate(form.issueDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowIssueDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, issueDate: toLocalDateStr(date) })); if (form.expiryDate && form.expiryDate >= toLocalDateStr(date)) setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
-              )}
-              {form.type !== 'padron' && showExpiryDatePicker && (
+              ) : null}
+              {form.type !== 'padron' && showExpiryDatePicker ? (
                 <DateTimePicker value={form.expiryDate ? parseLocalDate(form.expiryDate) : new Date()} mode="date" display="default" onChange={(event: DateTimePickerEvent, date?: Date) => { setShowExpiryDatePicker(false); if (event.type === 'set' && date) { setForm((p) => ({ ...p, expiryDate: toLocalDateStr(date) })); if (form.issueDate && toLocalDateStr(date) < form.issueDate) setErrors((p) => ({ ...p, expiryDate: t('expiryBeforeIssue') })); else setErrors((p) => ({ ...p, expiryDate: '' })); } }} />
-              )}
+              ) : null}
               {/* Comuna (solo permiso de circulación) */}
               {form.type === 'circulation_permit' && (
-                <>
-                  <View style={{ marginTop: 8, marginBottom: 4 }}>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
+                  <View style={{ flex: 1 }}>
                     <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Comuna</Text>
                     <TouchableOpacity style={[styles.fieldBox, { backgroundColor: colors.surfaceSecondary, borderColor: colors.inputBorder }]} onPress={() => { setMuniPickerMode('permit'); setShowMuniPicker(true); }} activeOpacity={0.7}>
                       <Ionicons name="business-outline" size={16} color={colors.textMuted} />
@@ -1591,7 +1591,8 @@ export default function DocumentsScreen() {
                       </Text>
                     </TouchableOpacity>
                   </View>
-                </>
+                  <View style={{ flex: 1 }} />
+                </View>
               )}
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={modalSave} disabled={saving}>
                 {saving ? <ActivityIndicator color={colors.primaryText} /> : (
