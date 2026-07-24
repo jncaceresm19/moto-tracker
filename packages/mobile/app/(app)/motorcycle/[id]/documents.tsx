@@ -259,12 +259,12 @@ export default function DocumentsScreen() {
   };
 
   const pickImage = async (fromCamera: boolean) => {
-    setShowPhotoModal(false);
     const permission = fromCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
+      setShowPhotoModal(false);
       showAlert(t('permissionNeeded'), t('permissionMessage'), [{ text: 'OK' }], 'lock-closed', colors.accent);
       return;
     }
@@ -273,9 +273,12 @@ export default function DocumentsScreen() {
       ? await ImagePicker.launchCameraAsync({ quality: 1.0, allowsEditing: false })
       : await ImagePicker.launchImageLibraryAsync({ quality: 1.0, allowsEditing: false });
 
+    setShowPhotoModal(false);
+
     if (!result.canceled && result.assets[0]) {
       setCropImageUri(result.assets[0].uri);
-      setShowCropModal(true);
+      // Small delay ensures React commits the photo modal close before opening crop
+      setTimeout(() => setShowCropModal(true), 100);
     }
   };
 
