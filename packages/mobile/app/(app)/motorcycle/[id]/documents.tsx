@@ -1254,13 +1254,6 @@ export default function DocumentsScreen() {
                   <Ionicons name="book-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Ver instructivo</Text>
                 </TouchableOpacity>
-                <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
-                <TouchableOpacity
-                  style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
-                  onPress={() => { setMuniPickerMode('license'); setShowMuniPicker(true); }}>
-                  <Ionicons name="calendar-outline" size={20} color="#fff" />
-                  <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
-                </TouchableOpacity>
               </>
             )}
             {/* Requisitos Revisión Técnica */}
