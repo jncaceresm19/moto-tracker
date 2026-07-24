@@ -2214,7 +2214,7 @@ const styles = StyleSheet.create({
   datesCardCol: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
   },
   datesCardDivider: {
