@@ -7,6 +7,23 @@ import { authenticate } from '../middleware/auth';
 import { validateBody, validateParams } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
 import { createNotification } from './notifications';
+import { pdfBufferToJpeg } from './ocr';
+
+// Convert PDF data URI to JPEG by delegating to the shared pdfjs converter.
+async function maybeConvertPdf(dataUri: string | undefined | null): Promise<string | null> {
+  if (!dataUri || !dataUri.startsWith('data:application/pdf;base64,')) return null;
+  try {
+    const base64 = dataUri.replace(/^data:application\/pdf;base64,/, '');
+    const pdfBuffer = Buffer.from(base64, 'base64');
+    const jpegB64 = await pdfBufferToJpeg(pdfBuffer);
+    return `data:image/jpeg;base64,${jpegB64}`;
+  } catch (e) {
+    const err = e as any;
+    console.warn('[convertPdf] failed:', err?.message || err);
+    console.warn('[convertPdf] stack:', err?.stack?.split('\n')?.slice(0,5)?.join('\n'));
+    return null;
+  }
+}
 
 const router = Router({ mergeParams: true });
 
@@ -33,6 +50,8 @@ const createDocumentSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200),
   fileUrl: z.string().refine(imageRefine, 'Invalid image'),
   fileUrlBack: z.string().refine(imageRefine, 'Invalid image').optional(),
+  fileUrlGenerated: z.string().optional(),
+  fileUrlBackGenerated: z.string().optional(),
   issueDate: z.string().datetime().optional(),
   expiryDate: z.string().datetime().optional(),
   notes: z.string().max(1000).optional(),
@@ -46,12 +65,14 @@ const updateDocumentSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   fileUrl: z.string().refine(imageRefine, 'Invalid image').optional(),
   fileUrlBack: z.string().refine(imageRefine, 'Invalid image').nullable().optional(),
+  fileUrlGenerated: z.string().nullable().optional(),
+  fileUrlBackGenerated: z.string().nullable().optional(),
   issueDate: z.string().datetime().nullable().optional(),
   expiryDate: z.string().datetime().nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   imagePath: z.string().max(500).nullable().optional(),
   ocrConfidence: z.number().min(0).max(1).nullable().optional(),
-  status: z.enum(documentStatuses).nullable().optional(),
+  status: z.enum(documentStatuses).optional(),
 });
 
 const motorcycleIdParam = z.object({
@@ -127,8 +148,19 @@ router.post('/', validateBody(createDocumentSchema), async (req: Request, res: R
       return;
     }
 
-    const { type, title, fileUrl, fileUrlBack, issueDate, expiryDate, notes, imagePath, ocrConfidence, status } = req.body;
+    const { type, title, fileUrl, fileUrlBack, issueDate, expiryDate, notes, imagePath, ocrConfidence, status, fileUrlGenerated, fileUrlBackGenerated } = req.body;
     const now = new Date();
+
+    // Auto-convert PDF fileUrl to JPEG if not already provided as generated
+    let resolvedGenerated = fileUrlGenerated;
+    let resolvedBackGenerated = fileUrlBackGenerated;
+    if (!resolvedGenerated) {
+      resolvedGenerated = await maybeConvertPdf(fileUrl);
+    }
+    if (!resolvedBackGenerated) {
+      resolvedBackGenerated = await maybeConvertPdf(fileUrlBack);
+    }
+
     const docId = crypto.randomUUID();
 
     await db.insert(documents).values({
@@ -138,6 +170,8 @@ router.post('/', validateBody(createDocumentSchema), async (req: Request, res: R
       title,
       fileUrl,
       fileUrlBack: fileUrlBack ?? null,
+      fileUrlGenerated: resolvedGenerated,
+      fileUrlBackGenerated: resolvedBackGenerated,
       issueDate: issueDate ? new Date(issueDate) : null,
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       notes: notes ?? null,
@@ -301,8 +335,29 @@ router.put('/:docId', validateParams(docIdParam), validateBody(updateDocumentSch
 
     if (req.body.type !== undefined) updates.type = req.body.type;
     if (req.body.title !== undefined) updates.title = req.body.title;
-    if (req.body.fileUrl !== undefined) updates.fileUrl = req.body.fileUrl;
-    if (req.body.fileUrlBack !== undefined) updates.fileUrlBack = req.body.fileUrlBack;
+    if (req.body.fileUrl !== undefined) {
+      updates.fileUrl = req.body.fileUrl;
+      // Auto-convert new fileUrl to JPEG if it's a PDF (unless override provided)
+      if (req.body.fileUrlGenerated !== undefined) {
+        updates.fileUrlGenerated = req.body.fileUrlGenerated;
+      } else {
+        updates.fileUrlGenerated = await maybeConvertPdf(req.body.fileUrl);
+      }
+    }
+    if (req.body.fileUrlBack !== undefined) {
+      updates.fileUrlBack = req.body.fileUrlBack;
+      if (req.body.fileUrlBackGenerated !== undefined) {
+        updates.fileUrlBackGenerated = req.body.fileUrlBackGenerated;
+      } else {
+        updates.fileUrlBackGenerated = await maybeConvertPdf(req.body.fileUrlBack);
+      }
+    }
+    if (req.body.fileUrlGenerated !== undefined && req.body.fileUrl === undefined) {
+      updates.fileUrlGenerated = req.body.fileUrlGenerated;
+    }
+    if (req.body.fileUrlBackGenerated !== undefined && req.body.fileUrlBack === undefined) {
+      updates.fileUrlBackGenerated = req.body.fileUrlBackGenerated;
+    }
     if (req.body.issueDate !== undefined) updates.issueDate = req.body.issueDate ? new Date(req.body.issueDate) : null;
     if (req.body.expiryDate !== undefined) updates.expiryDate = req.body.expiryDate ? new Date(req.body.expiryDate) : null;
     if (req.body.notes !== undefined) updates.notes = req.body.notes;

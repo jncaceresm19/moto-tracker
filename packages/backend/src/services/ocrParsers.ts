@@ -282,6 +282,88 @@ function findDateNearKeyword(text: string, keywordPatterns: string[]): string | 
   return undefined;
 }
 
+// ── Helper: find the date NEAREST a keyword (either direction) ──────────────
+// Unlike findDateNearKeyword (backward-first) and findDateAfterKeyword
+// (forward-only), this measures the absolute character distance from the
+// keyword center to each candidate date and returns the closest one.
+// Critical for "FECHA ÚLTIMO CONTROL" where the issue date may appear before
+// or after the label depending on Tesseract reading order.
+function findDateNearestKeyword(text: string, keywordPatterns: string[]): string | undefined {
+  const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  for (const kw of keywordPatterns) {
+    const kwMatch = normalized.match(new RegExp(kw, 'i'));
+    if (!kwMatch) continue;
+
+    const kwStart = normalized.indexOf(kwMatch[0]);
+    if (kwStart < 0) continue;
+    const kwEnd = kwStart + kwMatch[0].length;
+    const kwCenter = Math.floor((kwStart + kwEnd) / 2);
+
+    // Search backward ±120 chars
+    const searchStart = Math.max(0, kwStart - 120);
+    const searchEnd = kwEnd + 120;
+    const searchRegion = text.substring(searchStart, searchEnd);
+    const regionOffset = searchStart;
+
+    let bestDate: string | undefined;
+    let bestDist = Infinity;
+
+    // Numeric dates: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+    const numRegex = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/g;
+    let m: RegExpExecArray | null;
+    while ((m = numRegex.exec(searchRegion)) !== null) {
+      const d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
+      if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2000 && y <= 2100) {
+        const dateCenter = regionOffset + m.index + Math.floor(m[0].length / 2);
+        const dist = Math.abs(dateCenter - kwCenter);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestDate = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        }
+      }
+    }
+
+    // Spanish text dates: "19 NOVIEMBRE 2025" or "19 de noviembre de 2025"
+    const spRegex = /(\d{1,2})\s+(?:de\s+)?([a-zA-Záéíóúñ]+)\s+(?:de\s+)?(\d{4})/gi;
+    while ((m = spRegex.exec(searchRegion)) !== null) {
+      const monthNum = spanishMonthToNum(m[2]);
+      if (monthNum) {
+        const d = parseInt(m[1], 10), y = parseInt(m[3], 10);
+        if (d >= 1 && d <= 31 && y >= 2000 && y <= 2100) {
+          const dateCenter = regionOffset + m.index + Math.floor(m[0].length / 2);
+          const dist = Math.abs(dateCenter - kwCenter);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestDate = `${y}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          }
+        }
+      }
+    }
+
+    // Garbled dates: "16ENE2020"
+    const garbledRegex = /(\d{1,2})([a-zA-Záéíóúñ]{3,10})(\d{4})/gi;
+    while ((m = garbledRegex.exec(searchRegion)) !== null) {
+      const monthNum = spanishMonthToNum(m[2]);
+      if (monthNum) {
+        const d = parseInt(m[1], 10), y = parseInt(m[3], 10);
+        if (d >= 1 && d <= 31 && y >= 2000 && y <= 2100) {
+          const dateCenter = regionOffset + m.index + Math.floor(m[0].length / 2);
+          const dist = Math.abs(dateCenter - kwCenter);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestDate = `${y}-${String(monthNum).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          }
+        }
+      }
+    }
+
+    if (bestDate) return bestDate;
+  }
+
+  return undefined;
+}
+
 // ── Helper: find a date ONLY AFTER a keyword in text ─────────────────────────
 // Unlike findDateNearKeyword, this does NOT search backward.
 // Critical for "FECHA DE CONTROL" where the date AFTER the label is the
@@ -343,34 +425,36 @@ export function parseTechnicalReview(text: string): OcrResult {
 }
 
 // ── Parser: Licencia de Conducir ────────────────────────────────────────────
-// Chilean license back has two date fields:
-//   - "FECHA ÚLTIMO CONTROL" → issueDate (when the license was last emitted)
-//   - "FECHA DE CONTROL"     → expiryDate (next control deadline)
+// Two license formats are supported:
 //
-// "CONTROL" in "FECHA ÚLTIMO CONTROL" is often partially hidden by the
-// document layout, so Tesseract may only read "FECHA ULTIMO" without it.
-// The PRIMARY pattern is "FECHA ULTIMO" — no "CONTROL" needed.
+// NEW FORMAT (municipalidad layout):
+//   "MUNICIPALIDAD DE SANTIAGO"
+//   "ÚLTIMO CONTROL: 05/04/2023    PRÓXIMO CONTROL: 19/04/2029"
+//   - "ÚLTIMO CONTROL" → issueDate (emission)
+//   - "PRÓXIMO CONTROL" → expiryDate (next control)
 //
-// CRITICAL: ALL keyword searches use forward-only (findDateAfterKeyword).
-// Bidirectional search (findDateNearKeyword) grabs the wrong date because
-// it searches backward first from either label.
+// OLD FORMAT (registro civil layout):
+//   "FECHA ÚLTIMO CONTROL" → issueDate
+//   "FECHA DE CONTROL"     → expiryDate
+//   OR the date under "DIRECCIÓN/DOMICILIO" is the issue date.
 //
-// When Tesseract fails to recognize "FECHA ÚLTIMO", we fall back to
-// extracting the date that appears BEFORE "FECHA DE CONTROL" as issueDate.
+// STRATEGY: Use findDateNearestKeyword (bidirectional-by-distance) for
+// "ÚLTIMO CONTROL" (both formats) and findDateAfterKeyword for
+// "PRÓXIMO CONTROL" and "FECHA DE CONTROL" (expiry). The nearest-date
+// search handles Tesseract reordering where the issue date appears before
+// the label in OCR output.
+//
+// For old licenses where "ÚLTIMO CONTROL" isn't recognized, fall back to
+// the date near "DIRECCIÓN/DOMICILIO" as issueDate.
 //
 // Tesseract often garbles accented chars and letters (1/i/l/0 confusion),
 // so we use fuzzy keyword patterns.
 export function parseDriversLicense(text: string): OcrResult {
   const normalized = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-  // ── 1. Keyword-based extraction — ALL forward-only ─────────────────────
-  // CRITICAL: Using forward-only search (findDateAfterKeyword) for BOTH labels.
-  // findDateNearKeyword searches backward first — root cause of date swapping.
-  //
-  // The actual label is "FECHA ÚLTIMO CONTROL", where "CONTROL" is often
-  // partially hidden by the document layout. Tesseract may only read
-  // "FECHA ULTIMO" without "CONTROL". So we search for "FECHA ULTIMO"
-  // as the PRIMARY pattern — it doesn't need "CONTROL" to match.
+  // ── 1. Keyword-based extraction ────────────────────────────────────────
+  // "ÚLTIMO CONTROL" → issueDate — nearest-date search (handles both
+  // date-before-label and date-after-label Tesseract output).
   const ultimoPatterns = [
     'fecha\\s+ult[1i0]?mo',            // "fecha ultimo" — PRIMARY: no "CONTROL" needed
     'fecha.*?ult[1i0]?mo',             // "fecha...ultimo" garbled between words
@@ -378,13 +462,26 @@ export function parseDriversLicense(text: string): OcrResult {
     'ult[1i0]?mo',                     // just "ultimo" nearby
     'u[1i0]?lt[1i0]?mo',              // "ultimo" with 1/i/0 confusion
   ];
-  let issueDate = findDateAfterKeyword(text, ultimoPatterns);
+  let issueDate = findDateNearestKeyword(text, ultimoPatterns);
 
-  // "FECHA DE CONTROL" → expiryDate, forward-only
-  let expiryDate = findDateAfterKeyword(text, ['fecha\\s+de\\s+control']);
+  // "PRÓXIMO CONTROL" → expiryDate (new format), forward-only.
+  const proximoPatterns = [
+    'prox[1i0]?mo\\s+control',         // "proximo control" — PRIMARY
+    'fecha\\s+de\\s+prox[1i0]?mo\\s+control', // "fecha de proximo control"
+    'prox[1i0]?mo',                    // just "proximo"
+    'p[1i0]?rox[1i0]?mo',             // "proximo" with 1/i/0 confusion
+  ];
+  let expiryDate = findDateAfterKeyword(text, proximoPatterns);
+
+  // Fallback: "FECHA DE CONTROL" → expiryDate (old format), forward-only.
+  if (!expiryDate) {
+    expiryDate = findDateAfterKeyword(text, ['fecha\\s+de\\s+control']);
+  }
+
   if (!expiryDate) {
     // Fallback: "control" standalone (exclude "ultimo control")
-    const standaloneControl = text.match(/(?<!ult[1i0]?mo\s)(control)/i);
+    // Also exclude "proximo control" to avoid matching the issue-date label
+    const standaloneControl = text.match(/(?<!ult[1i0]?mo\s)(?<!prox[1i0]?mo\s)(control)/i);
     if (standaloneControl) {
       const controlIdx = text.indexOf(standaloneControl[1], standaloneControl.index);
       const afterWindow = text.substring(controlIdx + 7, controlIdx + 7 + 120);
@@ -392,15 +489,42 @@ export function parseDriversLicense(text: string): OcrResult {
     }
   }
 
-  // ── 1b. Fallback: if "FECHA ÚLTIMO" label wasn't recognized,
+  // ── 1a. Deduplication: if expiryDate === issueDate, search further ahead ──
+  // This happens when both labels are consecutive without a date between them.
+  if (issueDate && expiryDate && expiryDate === issueDate) {
+    // Re-find the expiry keyword and skip past the issue date
+    const proxMatch = normalized.match(/prox[1i0]?mo\\s+control|fecha\\s+de\\s+control/i);
+    if (proxMatch) {
+      const kwEnd = normalized.indexOf(proxMatch[0]) + proxMatch[0].length;
+      const fwdText = text.substring(kwEnd, kwEnd + 120);
+      const dateStr = issueDate.split('-').reverse().join('/');
+      const dateStrAlt = issueDate.split('-').reverse().join('-');
+      const cleaned = fwdText.replace(new RegExp(escapeRegex(dateStr), 'g'), '')
+                             .replace(new RegExp(escapeRegex(dateStrAlt), 'g'), '');
+      const nextDate = tryParseDateInWindow(cleaned);
+      if (nextDate) expiryDate = nextDate;
+    }
+  }
+
+  // ── 1b. Fallback: if "ÚLTIMO CONTROL" label wasn't recognized,
   // extract the date BEFORE "FECHA DE CONTROL" as issueDate.
   if (!issueDate) {
     issueDate = findDateBeforeKeyword(text, ['fecha\\s+de\\s+control']);
   }
 
-  // ── 2. Labeled date extraction: find "ULTIMO" and "CONTROL" labels ─────
-  // Some licenses print labels on one line and dates on the next.
-  // Try to extract dates by their label position in the normalized text.
+  // ── 1c. Old license fallback: if issueDate still not found, check if
+  // there's an address (DIRECCIÓN/DOMICILIO) and take the date after it.
+  // On old Chilean licenses, the issue date sits below the address line.
+  if (!issueDate) {
+    const addressPatterns = [
+      'direcci[oó]n',                   // "dirección"
+      'domicilio',                      // "domicilio"
+      'dir',                            // "dir" abbreviated
+    ];
+    issueDate = findDateAfterKeyword(text, addressPatterns);
+  }
+
+  // ── 2. Labeled date extraction: find keyword positions in normalized text ─
   if (!issueDate || !expiryDate) {
     // Find all date positions in the normalized text
     const allDatesWithPos: { date: string; pos: number }[] = [];
@@ -425,7 +549,6 @@ export function parseDriversLicense(text: string): OcrResult {
         if (afterUltimo.length > 0) {
           issueDate = afterUltimo[0].date;
         } else {
-          // Date might be BEFORE the keyword (OCR reorder)
           const beforeUltimo = allDatesWithPos.filter(d => d.pos < ultimoKwPos);
           if (beforeUltimo.length > 0) {
             issueDate = beforeUltimo[beforeUltimo.length - 1].date;
@@ -434,41 +557,75 @@ export function parseDriversLicense(text: string): OcrResult {
       }
 
       // Strategy B: If "ultimo" not found, use the date BEFORE "fecha de control"
-      // The "ÚLTIMO CONTROL" date is always above/earlier than "FECHA DE CONTROL"
       if (!issueDate) {
-        const fcPos = normalized.search(/fecha\s+de\s+control/i);
+        const fcPos = normalized.search(/fecha\s+de\s+control|prox[1i0]?mo\s+control/i);
         if (fcPos >= 0) {
           const beforeControl = allDatesWithPos.filter(d => d.pos < fcPos);
           if (beforeControl.length > 0) {
-            // Take the date closest to (but before) "fecha de control"
             issueDate = beforeControl[beforeControl.length - 1].date;
+          }
+        }
+      }
+
+      // Strategy C: Date after "dirección/domicilio" (old license)
+      if (!issueDate) {
+        const dirPos = normalized.search(/direcci[oó]n|domicilio/i);
+        if (dirPos >= 0) {
+          const afterDir = allDatesWithPos.filter(d => d.pos > dirPos);
+          if (afterDir.length > 0) {
+            issueDate = afterDir[0].date;
           }
         }
       }
     }
 
     if (!expiryDate && allDatesWithPos.length > 0) {
-      // Find the "control" keyword position — the date nearest AFTER it is expiryDate
-      // But skip if it matches "ultimo control" (that's issueDate)
+      // Find the expiry keyword position (proximo control or fecha de control)
       const controlKwPos = (() => {
-        // Look for "fecha de control" specifically, not "ultimo control"
+        const proxPos = normalized.search(/prox[1i0]?mo\s+control/i);
+        if (proxPos >= 0) return proxPos;
         const fcPos = normalized.search(/fecha\s+de\s+control/i);
         if (fcPos >= 0) return fcPos;
-        // Fallback: find standalone "control" that is NOT preceded by "ultimo"
+        // Fallback: standalone "control" that is NOT preceded by "ultimo" or "proximo"
         let searchFrom = 0;
         while (searchFrom < normalized.length) {
           const pos = normalized.indexOf('control', searchFrom);
           if (pos < 0) break;
           const before = normalized.substring(Math.max(0, pos - 15), pos);
-          if (!/ult[1i]?mo/i.test(before)) return pos;
+          if (!/ult[1i]?mo|prox[1i]?mo/i.test(before)) return pos;
           searchFrom = pos + 7;
         }
         return -1;
       })();
       if (controlKwPos >= 0) {
-        const afterControl = allDatesWithPos.filter(d => d.pos > controlKwPos);
+        const afterControl = allDatesWithPos.filter(d => d.pos > controlKwPos && d.date !== issueDate);
         if (afterControl.length > 0) {
           expiryDate = afterControl[0].date;
+        }
+      }
+    }
+  }
+
+  // ── 2a. Cross-validation: ensure issueDate < expiryDate ────────────────
+  if (issueDate && expiryDate) {
+    if (new Date(expiryDate) <= new Date(issueDate)) {
+      const allDates = extractDates(text);
+      if (allDates.length >= 2) {
+        const sorted = [...allDates].sort();
+        const chronoIssue = sorted[0];
+        const chronoExpiry = sorted[sorted.length - 1];
+        if (new Date(chronoExpiry) > new Date(chronoIssue)) {
+          issueDate = chronoIssue;
+          expiryDate = chronoExpiry;
+        }
+      } else {
+        const earlier = issueDate < expiryDate ? issueDate : expiryDate;
+        const later = issueDate < expiryDate ? expiryDate : issueDate;
+        issueDate = earlier;
+        expiryDate = later;
+        if (issueDate === expiryDate) {
+          const [y, m] = issueDate.split('-').map(Number);
+          expiryDate = lastDayOfMonth(y + 6, m);
         }
       }
     }
@@ -485,14 +642,24 @@ export function parseDriversLicense(text: string): OcrResult {
         [issueDate, expiryDate] = [expiryDate, issueDate];
       }
     } else if (allDates.length === 1) {
-      const year = parseInt(allDates[0].split('-')[0], 10);
+      const singleDate = allDates[0];
+      const year = parseInt(singleDate.split('-')[0], 10);
       const nowYear = new Date().getFullYear();
-      if (year > nowYear + 4) {
-        expiryDate = allDates[0];
+      // Check if this single date is near an expiry keyword — likely expiry, not issue
+      const nearExpiryKeyword = findDateAfterKeyword(text, [
+        'prox[1i0]?mo\\s+control',
+        'fecha\\s+de\\s+control',
+      ]);
+      if (nearExpiryKeyword === singleDate) {
+        expiryDate = singleDate;
+        const [y, m] = expiryDate.split('-').map(Number);
+        issueDate = lastDayOfMonth(y - 6, m);
+      } else if (year > nowYear + 4) {
+        expiryDate = singleDate;
         const [y, m] = expiryDate.split('-').map(Number);
         issueDate = lastDayOfMonth(y - 6, m);
       } else {
-        issueDate = allDates[0];
+        issueDate = singleDate;
       }
     }
   }
@@ -509,6 +676,11 @@ export function parseDriversLicense(text: string): OcrResult {
   console.log(`[OCR-LICENSE] normalized (first 500):\n${normalized.substring(0, 500)}`);
 
   return { issueDate, expiryDate, rut };
+}
+
+// ── Helper: escape regex special characters ──────────────────────────────────
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // ── Common motorcycle brands (for lenient matching when labels are missing) ──
