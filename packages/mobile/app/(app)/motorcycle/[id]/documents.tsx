@@ -2204,10 +2204,11 @@ export default function DocumentsScreen() {
         onRetry={handleOcrRetry}
       />
 
-      {/* Municipality picker modal — shared by permit form and license appointment */}
-      <Modal visible={showMuniPicker} transparent animationType="fade">
-        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }}>
-          <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%' }]}> 
+      {/* Municipality picker — absolute overlay (no Modal to avoid nesting issues) */}
+      {showMuniPicker && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => { setShowMuniPicker(false); setMuniResults([]); }} />
+          <View style={[styles.docPortarModal, { backgroundColor: colors.surface, maxWidth: 400, maxHeight: '60%', zIndex: 10000 }]}> 
             <View style={[styles.docPortarModalHeader, { borderBottomColor: colors.border }]}>
               <Ionicons name="business-outline" size={18} color={colors.primary} />
               <Text style={[styles.docPortarModalTitle, { color: colors.text }]}>{muniPickerMode === 'license' ? 'Agendar hora — Buscar comuna' : 'Buscar comuna'}</Text>
@@ -2223,7 +2224,7 @@ export default function DocumentsScreen() {
               onChangeText={searchMunis}
               autoFocus
             />
-            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {muniResults.length === 0 && muniSearch.length >= 2 ? (
                 <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
               ) : muniSearch.length < 2 ? (
@@ -2242,8 +2243,8 @@ export default function DocumentsScreen() {
               )}
             </ScrollView>
           </View>
-        </TouchableOpacity>
-      </Modal>
+        </View>
+      )}
 
       {/* Modal: Licencia presencial */}
       <Modal visible={showLicensePresencialModal} transparent animationType="fade">
