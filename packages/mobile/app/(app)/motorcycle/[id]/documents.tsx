@@ -125,6 +125,7 @@ export default function DocumentsScreen() {
   const [showTechReviewInstructivo, setShowTechReviewInstructivo] = useState(false);
   const [showLicenseInstructivo, setShowLicenseInstructivo] = useState(false);
   const [showPadronDuplicado, setShowPadronDuplicado] = useState(false);
+  const [showLicensePresencialModal, setShowLicensePresencialModal] = useState(false);
   const [uploadMode, setUploadMode] = useState<'photo' | 'file'>('photo');
   const [pickedFile, setPickedFile] = useState<{ uri: string; name: string; mimeType: string } | null>(null);
   // OCR state
@@ -541,6 +542,24 @@ export default function DocumentsScreen() {
         return;
       }
       await Linking.openURL(result.url);
+    } catch {
+      showAlert('Error', 'No se pudo obtener el enlace.', [{ text: 'OK' }], 'close-circle', '#FF3B30');
+    }
+  };
+
+  const handleLicenseAppointment = async () => {
+    try {
+      const result = await getPermitAppointmentUrl(id);
+      if (result?.url) {
+        await Linking.openURL(result.url);
+        return;
+      }
+      // No municipality set or no appointment URL → mostrar modal presencial
+      if (!result?.municipality) {
+        showAlert('Sin municipalidad', 'Asigná una comuna en tu permiso de circulación para agendar hora.', [{ text: 'OK' }], 'information-circle', colors.accent);
+      } else {
+        setShowLicensePresencialModal(true);
+      }
     } catch {
       showAlert('Error', 'No se pudo obtener el enlace.', [{ text: 'OK' }], 'close-circle', '#FF3B30');
     }
@@ -1265,7 +1284,7 @@ export default function DocumentsScreen() {
                 <Text style={[styles.payHint2, { color: colors.textMuted }]}>¿Necesitas renovar tu licencia de conducir?</Text>
                 <TouchableOpacity
                   style={[styles.submitBtn, { backgroundColor: colors.success, marginTop: 12 }]} activeOpacity={0.8}
-                  onPress={() => { setMuniPickerMode('license'); setShowMuniPicker(true); }}>
+                  onPress={handleLicenseAppointment}>
                   <Ionicons name="calendar-outline" size={20} color="#fff" />
                   <Text style={[styles.submitBtnText, { color: '#fff' }]}>Agendar hora</Text>
                 </TouchableOpacity>
@@ -2198,6 +2217,28 @@ export default function DocumentsScreen() {
         onConfirm={handleCropConfirm}
         onCancel={() => setShowCropModal(false)}
       />
+
+      {/* Modal: Licencia presencial */}
+      <Modal visible={showLicensePresencialModal} transparent animationType="fade">
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={() => setShowLicensePresencialModal(false)}>
+          <View style={[styles.docPortarModal, { backgroundColor: colors.surface, alignItems: 'center', paddingTop: 28 }]}>
+            <TouchableOpacity style={{ position: 'absolute', top: 12, right: 12, zIndex: 1 }} onPress={() => setShowLicensePresencialModal(false)}>
+              <Ionicons name="close" size={22} color={colors.textMuted} />
+            </TouchableOpacity>
+            <Ionicons name="business-outline" size={48} color={colors.primary} style={{ marginBottom: 16 }} />
+            <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, marginBottom: 12, textAlign: 'center' }}>Trámite presencial</Text>
+            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', lineHeight: 20, paddingHorizontal: 16 }}>
+              Para renovar tu licencia de conducir en esta comuna debes ir de manera presencial a la Dirección de Tránsito. Consultá los horarios de atención en el sitio web de tu municipalidad.
+            </Text>
+            <TouchableOpacity
+              style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 20, width: '100%' }]}
+              onPress={() => setShowLicensePresencialModal(false)}
+            >
+              <Text style={[styles.submitBtnText, { color: '#fff' }]}>Entendido</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
