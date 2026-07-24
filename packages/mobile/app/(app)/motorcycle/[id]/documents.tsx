@@ -431,10 +431,13 @@ export default function DocumentsScreen() {
     // Store comuna for Google Maps actions and auto-fill municipality field
     if (ocrRawResult.comuna) {
       setOcrComuna(ocrRawResult.comuna);
-      // Auto-fill selMuni so the Comuna field shows the detected municipality
+      // Auto-fill selMuni and persist so "Paga tu permiso" works right away
       listMunicipalities(ocrRawResult.comuna).then((results) => {
         const exact = results.find((m) => m.commune.toLowerCase() === ocrRawResult.comuna!.toLowerCase());
-        if (exact) setSelMuni(exact);
+        if (exact) {
+          setSelMuni(exact);
+          updateMotorcycle(id!, { permitMunicipalityId: exact.id }).catch(() => {});
+        }
       }).catch(() => {});
     }
 
