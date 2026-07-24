@@ -66,16 +66,17 @@ export default function MyPublicationsScreen() {
 
   const handleConfirmRecover = async () => {
     if (!recoverAlertId) return;
-    console.log('[DEBUG] recoverLocation al confirmar:', JSON.stringify(recoverLocation));
     setRecoverSaving(true);
     try {
+      // Optimistic update: mark as recovered immediately in UI
+      setPublications(prev =>
+        prev.map(p => p.id === recoverAlertId ? { ...p, status: 'recovered' as const, closedAt: new Date().toISOString() } : p)
+      );
       await closeAlert(recoverAlertId, 'recovered', recoverLocation.trim() || undefined);
-      console.log('[DEBUG] closeAlert llamado OK');
       setRecoverModalVisible(false);
       setRecoverAlertId(null);
       setRecoverLocation('');
       await loadPublications();
-      console.log('[DEBUG] loadPublications recargado');
     } catch (e: any) {
       console.log('[PUBLICATIONS] Error closing:', e?.message);
       setAlertTitle('Error');
