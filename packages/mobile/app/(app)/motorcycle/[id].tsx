@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../src/theme-context';
-import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle, listDocuments, Document, listMaintenance, MaintenanceRecord, listKilometers, KilometerEntry } from '../../../src/api';
+import { getMotorcycle, updateMotorcycle, deleteMotorcycle, Motorcycle, listDocuments, Document, listMaintenance, MaintenanceRecord, listKilometers, KilometerEntry, listMunicipalities, getMunicipality, Municipality } from '../../../src/api';
 import { useLanguage } from '../../../src/language-context';
 import { CustomAlert } from '../../../src/components/CustomAlert';
 import { getDueRemindersByKm, getReminderMessage, dismissReminder, getOilInterval, OilType } from '../../../src/services/reminderService';
@@ -26,13 +26,17 @@ export default function MotorcycleDetailScreen() {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertButtons, setAlertButtons] = useState<{ text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[]>([]);
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
-  const [alertIconColor, setAlertIconColor] = useState('#007AFF');
+  const [alertIconColor, setAlertIconColor] = useState(colors.primary);
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
   const [kmEntries, setKmEntries] = useState<KilometerEntry[]>([]);
+  const [municipalitySearch, setMunicipalitySearch] = useState('');
+  const [municipalityResults, setMunicipalityResults] = useState<Municipality[]>([]);
+  const [showMunicipalityPicker, setShowMunicipalityPicker] = useState(false);
+  const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(null);
 
   const pickImage = async (fromCamera: boolean) => {
     const permission = fromCamera
@@ -66,7 +70,7 @@ export default function MotorcycleDetailScreen() {
     setShowPhotoModal(true);
   };
 
-  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = '#007AFF') => {
+  const showAlert = (title: string, message?: string, buttons: { text: string; onPress?: () => void; style?: 'default' | 'cancel' | 'destructive' }[] = [{ text: 'OK' }], icon: keyof typeof Ionicons.glyphMap = 'information-circle', iconColor = colors.primary) => {
     setAlertTitle(title);
     setAlertMessage(message || '');
     setAlertButtons(buttons);
@@ -109,6 +113,27 @@ export default function MotorcycleDetailScreen() {
     })();
   }, [id]);
 
+  const searchMunicipalities = async (query: string) => {
+    setMunicipalitySearch(query);
+    if (query.length < 2) {
+      setMunicipalityResults([]);
+      return;
+    }
+    try {
+      const results = await listMunicipalities(query);
+      setMunicipalityResults(results);
+    } catch {
+      setMunicipalityResults([]);
+    }
+  };
+
+  const selectMunicipality = (m: Municipality) => {
+    setSelectedMunicipality(m);
+    setMunicipalitySearch(m.commune);
+    setShowMunicipalityPicker(false);
+    setMunicipalityResults([]);
+  };
+
   const openEdit = () => {
     if (!motorcycle) return;
     setErrors({});
@@ -124,6 +149,11 @@ export default function MotorcycleDetailScreen() {
       chassisNumber: motorcycle.chassisNumber || '',
       serialNumber: motorcycle.serialNumber || '',
     });
+    if (motorcycle.permitMunicipalityId) {
+      getMunicipality(motorcycle.permitMunicipalityId).then(setSelectedMunicipality).catch(() => {});
+    } else {
+      setSelectedMunicipality(null);
+    }
     setEditing(true);
   };
 
@@ -148,6 +178,7 @@ export default function MotorcycleDetailScreen() {
         chassisNumber: form.chassisNumber || undefined,
         serialNumber: form.serialNumber || undefined,
         imageUrl: imageUri || undefined,
+        permitMunicipalityId: selectedMunicipality?.id || null,
       });
       setMotorcycle(updated);
       setEditing(false);
@@ -170,15 +201,15 @@ export default function MotorcycleDetailScreen() {
           catch { showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', '#FF3B30'); }
         },
       },
-    ], 'warning', '#FF9500');
+    ], 'warning', '#FF3B30');
   };
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#007AFF" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   if (!motorcycle) return (
-    <View style={styles.center}>
-      <Text style={{ fontSize: 16, marginBottom: 16 }}>{t('motorcycleNotFound')}</Text>
+    <View style={[styles.center, { backgroundColor: colors.background }]}>
+      <Text style={{ fontSize: 16, marginBottom: 16, color: colors.text }}>{t('motorcycleNotFound')}</Text>
       <TouchableOpacity
-        style={[styles.editBtnOld, { backgroundColor: '#007AFF' }]}
+        style={[styles.editBtnOld, { backgroundColor: colors.primary }]}
         onPress={() => router.push('/(app)/motos')}
       >
         <Text style={styles.editBtnOldText}>{t('goBack')}</Text>
@@ -292,7 +323,7 @@ export default function MotorcycleDetailScreen() {
   }
 
   alerts.sort((a, b) => a.priority - b.priority);
-  const topAlerts = alerts.slice(0, 3);
+  const topAlerts = alerts.slice(0, 1);
 
   const COLOR_MAP: Record<string, string> = {
     negro: '#1a1a1a',
@@ -326,7 +357,7 @@ export default function MotorcycleDetailScreen() {
   const heroSubTextColor = isLightColor(heroColor) ? '#3a3a3a' : '#cfe0f7';
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Hero card: brand/model/year + edit/delete + plate/odo */}
       <View style={[styles.heroCard, { backgroundColor: heroColor }]}>
         <View style={styles.heroTopRow}>
@@ -373,51 +404,63 @@ export default function MotorcycleDetailScreen() {
       </View>
 
       {/* Próximos vencimientos */}
-      {topAlerts.length > 0 && (
-        <View style={[styles.section, { paddingTop: 0 }]}>
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Próximos vencimientos</Text>
-          {topAlerts.map((a) => (
-            <TouchableOpacity
-              key={a.key}
-              activeOpacity={0.7}
-              style={[styles.alertBtn, { backgroundColor: a.bg, borderLeftColor: a.border }]}
-              onPress={() => router.push(a.route as any)}
-            >
-              <Ionicons name={a.icon} size={18} color={a.iconColor} />
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.alertTitle, { color: a.titleColor }]}>{a.title}</Text>
-                <Text style={[styles.alertSubtitle, { color: a.subColor }]}>{a.subtitle}</Text>
+      {topAlerts.length > 0 && (() => {
+        const a = topAlerts[0];
+        const isExpired = a.priority === 0;
+        return (
+          <View style={[styles.section, { paddingTop: 0 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Próximos vencimientos</Text>
+            {isExpired ? (
+              <TouchableOpacity
+                key={a.key}
+                activeOpacity={0.7}
+                style={[styles.alertBtn, { backgroundColor: a.bg, borderLeftColor: a.border }]}
+                onPress={() => router.push(a.route as any)}
+              >
+                <Ionicons name={a.icon} size={18} color={a.iconColor} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.alertTitle, { color: a.titleColor }]}>{a.title}</Text>
+                  <Text style={[styles.alertSubtitle, { color: a.subColor }]}>{a.subtitle}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={a.iconColor} />
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.alertBtn, { backgroundColor: a.bg, borderLeftColor: a.border }]}>
+                <Ionicons name={a.icon} size={18} color={a.iconColor} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.alertTitle, { color: a.titleColor }]}>{a.title}</Text>
+                  <Text style={[styles.alertSubtitle, { color: a.subColor }]}>{a.subtitle}</Text>
+                </View>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={a.iconColor} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+            )}
+          </View>
+        );
+      })()}
 
       {/* Sections */}
       <View style={[styles.section, { paddingTop: 4, paddingBottom: 8 }]}>
         <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>{t('sections')}</Text>
 
         {sections.map((s) => (
-          <TouchableOpacity key={s.route} style={styles.sectionBtn} activeOpacity={0.7} onPress={() => router.push(s.route as any)}>
+          <TouchableOpacity key={s.route} style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary }]} activeOpacity={0.7} onPress={() => router.push(s.route as any)}>
             <View style={[styles.sectionChip, { backgroundColor: s.chipBg }]}>
               <Ionicons name={s.icon} size={18} color={s.chipColor} />
             </View>
-            <Text style={styles.sectionText}>{s.title}</Text>
-            <Ionicons name="chevron-forward" size={18} color="#999" />
+            <Text style={[styles.sectionText, { color: colors.text }]}>{s.title}</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         ))}
 
         {/* GPS Tracking Toggle */}
         {motorcycle.gpsTracker ? (
           <>
-            <TouchableOpacity style={styles.sectionBtn} activeOpacity={0.7} onPress={() => setGpsEnabled(!gpsEnabled)}>
+            <TouchableOpacity style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary }]} activeOpacity={0.7} onPress={() => setGpsEnabled(!gpsEnabled)}>
               <View style={[styles.sectionChip, { backgroundColor: '#FAEEDA' }]}>
                 <Ionicons name="location-outline" size={18} color="#854F0B" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sectionText}>{t('gpsTracking')}</Text>
-                <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
+                <Text style={[styles.sectionText, { color: colors.text }]}>{t('gpsTracking')}</Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>{gpsEnabled ? t('gpsActive') : t('gpsInactive')}</Text>
               </View>
               <Switch
                 value={gpsEnabled}
@@ -427,20 +470,20 @@ export default function MotorcycleDetailScreen() {
               />
             </TouchableOpacity>
             {gpsEnabled && (
-              <TouchableOpacity style={styles.mapBtn} onPress={() => router.push(`/(app)/motorcycle/${id}/tracking`)}>
+              <TouchableOpacity style={[styles.mapBtn, { backgroundColor: colors.primary }]} onPress={() => router.push(`/(app)/motorcycle/${id}/tracking`)}>
                 <Ionicons name="map" size={18} color="#FFFFFF" />
                 <Text style={styles.mapBtnText}>{t('viewOnMap')}</Text>
               </TouchableOpacity>
             )}
           </>
         ) : (
-          <View style={[styles.sectionBtn, { opacity: 0.6 }]}>
+          <View style={[styles.sectionBtn, { backgroundColor: colors.surfaceSecondary, opacity: 0.6 }]}>
             <View style={[styles.sectionChip, { backgroundColor: '#F1EFE8' }]}>
               <Ionicons name="location-outline" size={18} color="#888780" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sectionText}>{t('gpsTracking')}</Text>
-              <Text style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{t('noGpsRegistered')}</Text>
+              <Text style={[styles.sectionText, { color: colors.text }]}>{t('gpsTracking')}</Text>
+              <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{t('noGpsRegistered')}</Text>
             </View>
             <Switch
               value={false}
@@ -468,7 +511,7 @@ export default function MotorcycleDetailScreen() {
                   style={styles.modalLogo}
                   resizeMode="contain"
                 />
-                <Text style={styles.modalSubtitle}>{t('editMotorcycle')}</Text>
+                <Text style={[styles.modalSubtitle, { color: colors.textSecondary }]}>{t('editMotorcycle')}</Text>
               </View>
 
               {motorcycle?.verificada && (
@@ -479,27 +522,79 @@ export default function MotorcycleDetailScreen() {
               )}
 
               {/* Photo — the ONLY editable field */}
-              <TouchableOpacity style={styles.photoBtn} onPress={showImageOptions}>
+              <TouchableOpacity style={[styles.photoBtn, { backgroundColor: colors.surfaceSecondary }]} onPress={showImageOptions}>
                 {imageUri ? (
                   <Image source={{ uri: imageUri }} style={styles.photoPreview} resizeMode="cover" />
                 ) : (
-                  <View style={styles.photoPlaceholder}>
+                  <View style={[styles.photoPlaceholder, { borderColor: colors.primary }]}>
                     <Text style={styles.photoPlaceholderIcon}>📷</Text>
-                    <Text style={styles.photoPlaceholderText}>{t('tapToAddMotoPhoto')}</Text>
+                    <Text style={[styles.photoPlaceholderText, { color: colors.textMuted }]}>{t('tapToAddMotoPhoto')}</Text>
                   </View>
                 )}
               </TouchableOpacity>
 
-              <TextInput style={styles.input} placeholder="Year" keyboardType="numeric" value={form.year} editable={false} />
-              <TextInput style={styles.input} placeholder="Brand" value={form.brand} editable={false} />
-              <TextInput style={styles.input} placeholder="Model" value={form.model} editable={false} />
-              <TextInput style={styles.input} placeholder="N° Motor" value={form.engineNumber} editable={false} />
-              <TextInput style={styles.input} placeholder="N° Chasis" value={form.chassisNumber} editable={false} />
-              <TextInput style={styles.input} placeholder="N° Serie" value={form.serialNumber} editable={false} />
-              <TextInput style={styles.input} placeholder="License Plate" value={form.licensePlate} editable={false} />
-              <TextInput style={styles.input} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} editable={false} />
-              <TextInput style={styles.input} placeholder="Color" value={form.color} editable={false} />
-              <TouchableOpacity style={styles.saveBtn} onPress={handleUpdate} disabled={saving}>
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="Year" keyboardType="numeric" value={form.year} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="Brand" value={form.brand} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="Model" value={form.model} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="N° Motor" value={form.engineNumber} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="N° Chasis" value={form.chassisNumber} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="N° Serie" value={form.serialNumber} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="License Plate" value={form.licensePlate} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="Current Kilometers" keyboardType="numeric" value={form.currentKilometers} editable={false} />
+              <TextInput style={[styles.input, { color: colors.textMuted, borderColor: colors.inputBorder }]} placeholder="Color" value={form.color} editable={false} />
+
+              {/* Municipality picker */}
+              <TouchableOpacity
+                style={[styles.input, { borderColor: colors.inputBorder, justifyContent: 'center', minHeight: 44 }]}
+                onPress={() => setShowMunicipalityPicker(true)}
+                activeOpacity={0.7}
+              >
+                <Text style={{ color: selectedMunicipality ? colors.text : colors.textMuted }}>
+                  {selectedMunicipality ? `${selectedMunicipality.commune} — ${selectedMunicipality.name}` : 'Municipalidad (permiso de circulación)'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Municipality Search Modal */}
+              <Modal visible={showMunicipalityPicker} transparent animationType="fade">
+                <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                  <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+                    <View style={styles.modalTopRowForMuni}>
+                      <Text style={[styles.modalDetailTitle, { color: colors.text }]}>Buscar municipalidad</Text>
+                      <TouchableOpacity onPress={() => { setShowMunicipalityPicker(false); setMunicipalityResults([]); }}>
+                        <Ionicons name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={[styles.muniSearchInput, { color: colors.text, borderColor: colors.inputBorder }]}
+                      placeholder="Escribe el nombre de la comuna..."
+                      placeholderTextColor={colors.textMuted}
+                      value={municipalitySearch}
+                      onChangeText={searchMunicipalities}
+                      autoFocus
+                    />
+                    <ScrollView style={{ maxHeight: 300 }}>
+                      {municipalityResults.length === 0 && municipalitySearch.length >= 2 ? (
+                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
+                      ) : municipalitySearch.length < 2 ? (
+                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
+                      ) : (
+                        municipalityResults.map((m) => (
+                          <TouchableOpacity
+                            key={m.id}
+                            style={[styles.muniItem, { borderBottomColor: colors.border }]}
+                            onPress={() => selectMunicipality(m)}
+                          >
+                            <Text style={{ color: colors.text, fontWeight: '500' }}>{m.commune}</Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.region}{m.paymentUrl ? ' · Portal disponible' : ''}</Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
+
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: colors.primary }]} onPress={handleUpdate} disabled={saving}>
                 {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>{t('save')}</Text>}
               </TouchableOpacity>
             </ScrollView>
@@ -541,11 +636,11 @@ export default function MotorcycleDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // Old button styles (kept for "motorcycle not found" state)
-  editBtnOld: { backgroundColor: '#007AFF', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  editBtnOld: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   editBtnOldText: { color: '#fff', fontWeight: '600' },
 
   // Hero card
@@ -659,7 +754,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 14,
-    backgroundColor: '#f8f8f8',
     borderRadius: 12,
     marginBottom: 8,
     gap: 12,
@@ -675,7 +769,6 @@ const styles = StyleSheet.create({
 
   // Kilometer History Preview
   kmEntry: {
-    backgroundColor: '#f8f8f8',
     borderRadius: 10,
     padding: 12,
     marginBottom: 6,
@@ -688,15 +781,12 @@ const styles = StyleSheet.create({
   kmEntryValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#007AFF',
   },
   kmEntryDate: {
     fontSize: 12,
-    color: '#666',
   },
   kmEntryNotes: {
     fontSize: 12,
-    color: '#999',
     marginTop: 4,
   },
 
@@ -720,14 +810,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 10,
-    backgroundColor: '#f0f0f0',
   },
   photoPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#007AFF',
     borderStyle: 'dashed',
     borderRadius: 10,
     gap: 10,
@@ -736,7 +824,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
   },
   photoPlaceholderText: {
-    color: '#666',
     fontSize: 12,
   },
   photoPreview: {
@@ -802,15 +889,22 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#666',
     marginTop: -60,
     marginBottom: 30,
   },
   cancel: { fontSize: 16 },
-  input: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
+  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15, marginBottom: 10 },
   errorText: { color: '#FF3B30', fontSize: 12, marginBottom: 8, marginTop: -6 },
   saveBtn: { backgroundColor: '#1F9D63', borderRadius: 30, padding: 14, alignItems: 'center', marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   mapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1F9D63', borderRadius: 10, padding: 12, marginTop: 4, marginBottom: 8 },
   mapBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
+  // Municipality picker
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalContent: { borderRadius: 14, padding: 20, width: '100%', maxWidth: 400 },
+  modalTopRowForMuni: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  modalDetailTitle: { fontSize: 18, fontWeight: '600' },
+  muniSearchInput: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 15, marginVertical: 12 },
+  muniItem: { paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1 },
 });
