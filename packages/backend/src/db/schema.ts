@@ -40,6 +40,7 @@ export const motorcycles = sqliteTable('motorcycles', {
   engineNumber: text('engine_number'),
   chassisNumber: text('chassis_number'),
   serialNumber: text('serial_number'),
+  permitMunicipalityId: text('permit_municipality_id').references(() => municipalities.id),
   // Verification fields
   verificada: integer('verificada', { mode: 'boolean' }).default(false),
   verificadaEn: integer('verificada_en', { mode: 'timestamp' }),
@@ -81,6 +82,8 @@ export const documents = sqliteTable('documents', {
   title: text('title').notNull(),
   fileUrl: text('file_url').notNull(),
   fileUrlBack: text('file_url_back'), // For driver's license back photo
+  fileUrlGenerated: text('file_url_generated'), // Pre-converted JPEG data URI (for PDF docs)
+  fileUrlBackGenerated: text('file_url_back_generated'), // Pre-converted JPEG for back side
   issueDate: integer('issue_date', { mode: 'timestamp' }),
   expiryDate: integer('expiry_date', { mode: 'timestamp' }),
   notes: text('notes'),
@@ -312,3 +315,21 @@ export const gpsTrackers = sqliteTable('gps_trackers', {
 
 export const idxGpsTrackersUserId = index('idx_gps_trackers_user_id').on(gpsTrackers.userId);
 export const idxGpsTrackersImei = index('idx_gps_trackers_imei').on(gpsTrackers.imei);
+
+// Municipalities table (for circulation permit payment portal routing)
+export const municipalities = sqliteTable('municipalities', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  commune: text('commune').notNull(),
+  region: text('region').notNull(),
+  paymentUrl: text('payment_url').notNull().default(''),
+  appointmentUrl: text('appointment_url').notNull().default(''),
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  order: integer('order').notNull().default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const idxMunicipalitiesCommune = index('idx_municipalities_commune').on(municipalities.commune);
+export const idxMunicipalitiesActive = index('idx_municipalities_active').on(municipalities.active);
+export const idxMotorcyclesPermitMunicipality = index('idx_motorcycles_permit_municipality').on(motorcycles.permitMunicipalityId);

@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystemLegacy from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Ionicons } from '@expo/vector-icons';
-import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle } from '../../src/api';
+import { listMotorcycles, createMotorcycle, deleteMotorcycle, Motorcycle, listMunicipalities, Municipality } from '../../src/api';
 import { useAuth } from '../../src/auth-context';
 import { useTheme } from '../../src/theme-context';
 import { useLanguage } from '../../src/language-context';
@@ -14,7 +14,7 @@ import { VerificationModal } from '../../src/components/VerificationModal';
 import { ImageCropModal } from '../../src/components/ImageCropModal';
 import { OcrReviewModal, buildOcrFields } from '../../src/components/OcrReviewModal';
 import { extractDocumentData } from '../../src/services/ocrService';
-import { getDisplayPlateParts } from '../../../backend/src/services/plateValidation';
+import { formatPlate } from '../../../backend/src/services/plateValidation';
 
 export default function MotorcycleListScreen() {
   const { user } = useAuth();
@@ -36,6 +36,10 @@ export default function MotorcycleListScreen() {
   const [alertIcon, setAlertIcon] = useState<keyof typeof Ionicons.glyphMap>('information-circle');
   const [alertIconColor, setAlertIconColor] = useState('#007AFF');
   const [verifyingMotorcycle, setVerifyingMotorcycle] = useState<Motorcycle | null>(null);
+  const [municipalitySearch, setMunicipalitySearch] = useState('');
+  const [municipalityResults, setMunicipalityResults] = useState<Municipality[]>([]);
+  const [showMunicipalityPicker, setShowMunicipalityPicker] = useState(false);
+  const [selectedMunicipality, setSelectedMunicipality] = useState<Municipality | null>(null);
 
   // Padrón scan flow
   const [padronScanPhase, setPadronScanPhase] = useState<'idle' | 'front' | 'back'>('idle');
@@ -241,6 +245,27 @@ export default function MotorcycleListScreen() {
     setShowPhotoModal(true);
   };
 
+  const searchMunicipalities = async (query: string) => {
+    setMunicipalitySearch(query);
+    if (query.length < 2) {
+      setMunicipalityResults([]);
+      return;
+    }
+    try {
+      const results = await listMunicipalities(query);
+      setMunicipalityResults(results);
+    } catch {
+      setMunicipalityResults([]);
+    }
+  };
+
+  const selectMunicipality = (m: Municipality) => {
+    setSelectedMunicipality(m);
+    setMunicipalitySearch(m.commune);
+    setShowMunicipalityPicker(false);
+    setMunicipalityResults([]);
+  };
+
   const handleCreate = async () => {
     const newErrors: Record<string, string> = {};
     if (!form.brand) newErrors.brand = t('required');
@@ -264,11 +289,15 @@ export default function MotorcycleListScreen() {
         chassisNumber: form.chassisNumber || undefined,
         serialNumber: form.serialNumber || undefined,
         imageUrl: imageUri || undefined,
+        permitMunicipalityId: selectedMunicipality?.id || undefined,
       });
       setMotorcycles((prev) => [created, ...prev]);
       setShowCreate(false);
       setForm({ brand: '', model: '', year: '', licensePlate: '', currentKilometers: '', color: '', engineNumber: '', chassisNumber: '', serialNumber: '' });
       setImageUri(null);
+      setSelectedMunicipality(null);
+      setMunicipalitySearch('');
+      setMunicipalityResults([]);
       showAlert(t('success'), t('motorcycleUpdated'), [{ text: 'OK' }], 'checkmark-circle', '#34C759');
     } catch {
       showAlert(t('error'), t('failedToCreate'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
@@ -290,9 +319,12 @@ export default function MotorcycleListScreen() {
           } catch {
             showAlert(t('error'), t('failedToDelete'), [{ text: 'OK' }], 'close-circle', '#FF3B30');
           }
+          },
         },
-      },
-    ]);
+      ],
+      'alert-circle',
+      '#FF3B30'
+    );
   };
 
   const dynamicStyles = StyleSheet.create({
@@ -470,16 +502,36 @@ export default function MotorcycleListScreen() {
     },
     photoRowThumb: { width: 40, height: 40, borderRadius: 6, color: colors.primary },
     photoRowText: { fontSize: 13, color: colors.primary, textAlign: 'center', },
+
+    // ── Municipality picker modal ────────────────────────────
+    modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 20,
+      width: '100%',
+      maxWidth: 400,
+    },
+    searchInput: {
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      borderRadius: 8,
+      padding: 10,
+      fontSize: 15,
+      marginVertical: 12,
+      backgroundColor: colors.inputBg,
+      color: colors.text,
+    },
+    muniItem: {
+      paddingVertical: 12,
+      paddingHorizontal: 4,
+      borderBottomWidth: 1,
+    },
   });
 
   if (loading) {
     return <View style={dynamicStyles.center}><ActivityIndicator size="large" color={colors.primary} /></View>;
   }
-
-  const formatPlate = (raw: string) => {
-    const { letters, numbers } = getDisplayPlateParts(raw);
-    return numbers ? `${letters}-${numbers}` : letters;
-  };
 
   const SafetyInfoBanner = () => (
     <View style={dynamicStyles.safetyCard}>
@@ -649,6 +701,59 @@ export default function MotorcycleListScreen() {
                 <View style={dynamicStyles.divider} />
                 <TextInput style={dynamicStyles.groupedInput} placeholder="Color" placeholderTextColor={colors.textMuted} value={form.color} onChangeText={(v) => setForm((p) => ({ ...p, color: v }))} />
               </View>
+
+              {/* Sección: Permiso de circulación */}
+              <Text style={dynamicStyles.sectionLabel}>Permiso de circulación</Text>
+              <View style={dynamicStyles.sectionCard}>
+                <TouchableOpacity style={dynamicStyles.groupedInput} onPress={() => setShowMunicipalityPicker(true)} activeOpacity={0.7}>
+                  <Text style={{ color: selectedMunicipality ? colors.text : colors.textMuted }}>
+                    {selectedMunicipality ? `${selectedMunicipality.commune} — ${selectedMunicipality.name}` : 'Buscar municipalidad...'}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 11, color: colors.textMuted, paddingHorizontal: 12, marginTop: 4, marginBottom: 6 }}>
+                  Municipalidad donde pagaste el último permiso de circulación
+                </Text>
+              </View>
+
+              {/* Municipality Search Modal */}
+              <Modal visible={showMunicipalityPicker} transparent animationType="fade">
+                <View style={[dynamicStyles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                  <View style={[dynamicStyles.modalContent, { backgroundColor: colors.surface, maxHeight: '60%' }]}>
+                    <View style={dynamicStyles.modalTopRow}>
+                      <Text style={[dynamicStyles.modalTitle, { color: colors.text }]}>Buscar municipalidad</Text>
+                      <TouchableOpacity onPress={() => { setShowMunicipalityPicker(false); setMunicipalityResults([]); }}>
+                        <Ionicons name="close" size={24} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+                    <TextInput
+                      style={[dynamicStyles.searchInput, { color: colors.text, borderColor: colors.inputBorder }]}
+                      placeholder="Escribe el nombre de la comuna..."
+                      placeholderTextColor={colors.textMuted}
+                      value={municipalitySearch}
+                      onChangeText={searchMunicipalities}
+                      autoFocus
+                    />
+                    <ScrollView style={{ maxHeight: 300 }}>
+                      {municipalityResults.length === 0 && municipalitySearch.length >= 2 ? (
+                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
+                      ) : municipalitySearch.length < 2 ? (
+                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
+                      ) : (
+                        municipalityResults.map((m) => (
+                          <TouchableOpacity
+                            key={m.id}
+                            style={[dynamicStyles.muniItem, { borderBottomColor: colors.border }]}
+                            onPress={() => selectMunicipality(m)}
+                          >
+                            <Text style={{ color: colors.text, fontWeight: '500' }}>{m.commune}</Text>
+                            <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.region}{m.paymentUrl ? ' · 💳 Portal disponible' : ''}</Text>
+                          </TouchableOpacity>
+                        ))
+                      )}
+                    </ScrollView>
+                  </View>
+                </View>
+              </Modal>
 
               <TouchableOpacity style={dynamicStyles.saveBtn} activeOpacity={0.8} onPress={handleCreate} disabled={saving}>
                 {saving ? <ActivityIndicator color={colors.successText} /> : <Text style={dynamicStyles.saveBtnText}>{t('save')}</Text>}

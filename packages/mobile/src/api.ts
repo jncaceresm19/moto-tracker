@@ -188,6 +188,7 @@ export interface Motorcycle {
   engineNumber?: string;
   chassisNumber?: string;
   serialNumber?: string;
+  permitMunicipalityId?: string;
   verificada?: boolean;
   verificadaEn?: string;
   verificadaPor?: string;
@@ -217,19 +218,62 @@ export async function createMotorcycle(data: {
   engineNumber?: string;
   chassisNumber?: string;
   serialNumber?: string;
+  permitMunicipalityId?: string | null;
 }): Promise<Motorcycle> {
   return api<Motorcycle>('/api/motorcycles', { method: 'POST', body: data });
 }
 
 export async function updateMotorcycle(
   id: string,
-  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string; color?: string; engineNumber?: string; chassisNumber?: string; serialNumber?: string }
+  data: { brand?: string; model?: string; year?: number; licensePlate?: string; currentKilometers?: number; imageUrl?: string; gpsTracker?: string; color?: string; engineNumber?: string; chassisNumber?: string; serialNumber?: string; permitMunicipalityId?: string | null }
 ): Promise<Motorcycle> {
   return api<Motorcycle>(`/api/motorcycles/${id}`, { method: 'PUT', body: data });
 }
 
 export async function deleteMotorcycle(id: string): Promise<void> {
   await api(`/api/motorcycles/${id}`, { method: 'DELETE' });
+}
+
+// Municipalities
+export interface Municipality {
+  id: string;
+  name: string;
+  commune: string;
+  region: string;
+  paymentUrl: string;
+  appointmentUrl: string;
+  active: boolean;
+}
+
+export async function listMunicipalities(search?: string): Promise<Municipality[]> {
+  const query = search ? `?search=${encodeURIComponent(search)}` : '';
+  return api<Municipality[]>(`/api/municipalities${query}`);
+}
+
+export async function getMunicipality(id: string): Promise<Municipality> {
+  return api<Municipality>(`/api/municipalities/${id}`);
+}
+
+export async function setPermitMunicipality(motorcycleId: string, municipalityId: string | null): Promise<Motorcycle> {
+  return api<Motorcycle>(`/api/motorcycles/${motorcycleId}/permit-municipality`, {
+    method: 'PUT',
+    body: { permitMunicipalityId: municipalityId },
+  });
+}
+
+export interface PermitPaymentResult {
+  url: string;
+  municipality: Municipality;
+}
+
+export async function getPermitPaymentUrl(motorcycleId: string): Promise<PermitPaymentResult | null> {
+  const result = await api<PermitPaymentResult | null>(`/api/motorcycles/${motorcycleId}/permit-payment-url`);
+  return result;
+}
+
+export async function getPermitAppointmentUrl(motorcycleId: string): Promise<PermitPaymentResult | null> {
+  const result = await api<PermitPaymentResult | null>(`/api/motorcycles/${motorcycleId}/permit-appointment-url`);
+  return result;
 }
 
 // Maintenance Records
@@ -276,6 +320,8 @@ export interface Document {
   title: string;
   fileUrl: string;
   fileUrlBack?: string;
+  fileUrlGenerated?: string; // Pre-converted JPEG data URI (for PDF docs)
+  fileUrlBackGenerated?: string; // Pre-converted JPEG for back side
   issueDate?: string;
   expiryDate?: string;
   status: string;
@@ -287,7 +333,7 @@ export async function listDocuments(motorcycleId: string): Promise<Document[]> {
 
 export async function createDocument(
   motorcycleId: string,
-  data: { type: string; title: string; fileUrl: string; fileUrlBack?: string; issueDate?: string; expiryDate?: string }
+  data: { type: string; title: string; fileUrl: string; fileUrlBack?: string; fileUrlGenerated?: string | null; fileUrlBackGenerated?: string | null; issueDate?: string; expiryDate?: string }
 ): Promise<Document> {
   return api<Document>(`/api/motorcycles/${motorcycleId}/documents`, { method: 'POST', body: data });
 }
@@ -295,13 +341,25 @@ export async function createDocument(
 export async function updateDocument(
   motorcycleId: string,
   docId: string,
-  data: { type?: string; title?: string; fileUrl?: string; fileUrlBack?: string | null; issueDate?: string | null; expiryDate?: string | null; notes?: string | null; status?: string | null }
+  data: { type?: string; title?: string; fileUrl?: string; fileUrlBack?: string | null; fileUrlGenerated?: string | null; fileUrlBackGenerated?: string | null; issueDate?: string | null; expiryDate?: string | null; notes?: string | null; status?: string | null }
 ): Promise<Document> {
   return api<Document>(`/api/motorcycles/${motorcycleId}/documents/${docId}`, { method: 'PUT', body: data });
 }
 
 export async function deleteDocument(motorcycleId: string, docId: string): Promise<void> {
   await api(`/api/motorcycles/${motorcycleId}/documents/${docId}`, { method: 'DELETE' });
+}
+
+// Convert PDF first page to JPEG image (via backend)
+export interface PdfToImageResponse {
+  imageBase64: string;
+}
+
+export async function pdfToImage(pdfBase64: string): Promise<PdfToImageResponse> {
+  return api<PdfToImageResponse>('/api/ocr/pdf-to-image', {
+    method: 'POST',
+    body: { pdfBase64 },
+  });
 }
 
 // Kilometer History

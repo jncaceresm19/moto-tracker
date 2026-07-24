@@ -17,6 +17,7 @@ import weatherRoutes from './routes/weather';
 import otpRoutes from './routes/otp';
 import gpsTrackerRoutes from './routes/gpsTrackers';
 import ocrRoutes from './routes/ocr';
+import municipalitiesRoutes from './routes/municipalities';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use('/api/weather', weatherRoutes);
 app.use('/api/otp', otpRoutes);
 app.use('/api/gps-trackers', gpsTrackerRoutes);
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/municipalities', municipalitiesRoutes);
 
 // Only listen when not in test environment
 if (process.env.NODE_ENV !== 'test') {
