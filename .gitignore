@@ -67,3 +67,7 @@ ios/*.xcworkspace/xcuserdata/
 
 # OCR training data (large binaries)
 *.traineddata
+
+# SQLite lock files
+*.db-shm
+*.db-wal
