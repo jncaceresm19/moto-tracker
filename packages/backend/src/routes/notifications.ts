@@ -309,13 +309,14 @@ export async function notifyAllUsers(
     .from(users);
 
   // Filter by proximity if location is provided
-  const targetUsers = data.latitude != null && data.longitude != null
+  const targetUsers = (data.latitude != null && data.longitude != null
     ? allUsers.filter(u => {
-        if (u.lastLatitude == null || u.lastLongitude == null) return false; // no location = no notification
+        if (u.lastLatitude == null || u.lastLongitude == null) return false;
         const dist = haversineDistance(data.latitude!, data.longitude!, u.lastLatitude, u.lastLongitude);
         return dist <= radiusKm;
       })
-    : allUsers; // fallback: notify all if no location
+    : allUsers)
+    .filter(u => u.id !== senderUserId); // exclude the sender
 
   const notificationsToCreate = targetUsers.map(u => ({
     id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,

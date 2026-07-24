@@ -341,6 +341,29 @@ router.post('/:id/respond', validateParams(alertIdParam), validateBody(respondSc
       }).catch(err => console.error('Error sending notification:', err));
     }
 
+    // When the alert owner replies, notify all previous unique commenters
+    if (alert.userId === userId) {
+      const prevResponses = await db
+        .select({ userId: theftAlertResponses.userId })
+        .from(theftAlertResponses)
+        .where(and(
+          eq(theftAlertResponses.theftAlertId, id),
+          sql`${theftAlertResponses.userId} != ${userId}`,
+        ));
+      const notified = new Set<string>();
+      for (const r of prevResponses) {
+        if (notified.has(r.userId)) continue;
+        notified.add(r.userId);
+        createNotification({
+          userId: r.userId,
+          motorcycleId: alert.motorcycleId,
+          type: 'alert_response',
+          title: 'El dueño respondió',
+          message: `El dueño de la alerta de robo respondió a los comentarios`,
+        }).catch(err => console.error('Error sending notification:', err));
+      }
+    }
+
     res.status(201).json({
       success: true,
       data: {
@@ -425,6 +448,45 @@ router.patch('/:id/close', validateParams(alertIdParam), validateBody(closeSchem
     console.error('Close theft alert error:', err);
     const error = createErrorResponse('INTERNAL_ERROR', 'Failed to close theft alert');
     res.status(500).json(error);
+  }
+});
+
+// --- POST /api/theft-alerts/:id/report ---
+router.post('/:id/report', validateParams(alertIdParam), async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const alert = await db
+      .select()
+      .from(theftAlerts)
+      .where(eq(theftAlerts.id, id))
+      .get();
+
+    if (!alert) {
+      res.status(404).json(createErrorResponse('NOT_FOUND', 'Alert not found'));
+      return;
+    }
+
+    // Notify admins (users with role 'admin')
+    const admins = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, 'admin'));
+
+    for (const admin of admins) {
+      createNotification({
+        userId: admin.id,
+        type: 'alert_reported',
+        title: 'Alerta reportada',
+        message: `La alerta de ${alert.brand} ${alert.model} (${alert.licensePlate}) fue reportada por un usuario`,
+      }).catch(() => {});
+    }
+
+    res.json({ success: true, message: 'Report received' });
+  } catch (err) {
+    console.error('Report theft alert error:', err);
+    res.status(500).json(createErrorResponse('INTERNAL_ERROR', 'Failed to report alert'));
   }
 });
 

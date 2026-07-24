@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions, Modal, TextInput, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, Image, Dimensions, Modal, TextInput, KeyboardAvoidingView, Platform, Keyboard, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,7 +13,7 @@ import { TheftAlertCard } from '../../src/components/TheftAlertCard';
 import { OfferCard } from '../../src/components/OfferCard';
 import { GasStation, getNearbyGasStations, getCurrentLocation, getCachedGasStations, getLastUpdateLabel } from '../../src/services/gasStations';
 import { detectCountry } from '../../src/services/countryDetection';
-import { TheftAlert, getTheftAlerts, getTheftAlertById, respondToAlert, closeAlert, createTheftAlert } from '../../src/services/theftAlertService';
+import { TheftAlert, getTheftAlerts, getTheftAlertById, respondToAlert, closeAlert, createTheftAlert, reportTheftAlert } from '../../src/services/theftAlertService';
 import { shareToSpecificPlatform } from '../../src/services/shareService';
 import { NearbyPlace, getNearbyPlaces } from '../../src/services/nearbyPlaces';
 import { PlaceCard } from '../../src/components/PlaceCard';
@@ -340,6 +340,15 @@ export default function HomeScreen() {
     }
   };
 
+  const handleReport = async (alertId: string) => {
+    try {
+      await reportTheftAlert(alertId);
+      Alert.alert('Listo', 'Reporte enviado. Gracias por ayudarnos a mantener la comunidad segura.');
+    } catch {
+      Alert.alert('Error', 'No se pudo enviar el reporte. Intenta de nuevo.');
+    }
+  };
+
   useEffect(() => {
     console.log('[NEARBY] useEffect fired');
     // Load cached gas stations immediately on mount (no await - runs in background)
@@ -628,6 +637,7 @@ export default function HomeScreen() {
                 onMarkAsFound={() => handleMarkAsFound(theftAlerts[0].id)}
                 onPress={() => navigateToPostDetail(theftAlerts[0])}
                 onComment={(text) => handleComment(theftAlerts[0].id, text)}
+                onReport={() => handleReport(theftAlerts[0].id)}
               />
             ) : (
               <ScrollView
@@ -659,6 +669,7 @@ export default function HomeScreen() {
                       onMarkAsFound={() => handleMarkAsFound(alert.id)}
                       onPress={() => navigateToPostDetail(alert)}
                       onComment={(text) => handleComment(alert.id, text)}
+                      onReport={() => handleReport(alert.id)}
                     />
                   </View>
                 ))}

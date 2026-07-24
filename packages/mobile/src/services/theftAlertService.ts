@@ -104,3 +104,8 @@ export async function closeAlert(
 export async function getMyPublications(): Promise<TheftAlert[]> {
   return api<TheftAlert[]>('/api/theft-alerts/my');
 }
+
+// Report a theft alert
+export async function reportTheftAlert(alertId: string): Promise<void> {
+  await api(`/api/theft-alerts/${alertId}/report`, { method: 'POST' });
+}

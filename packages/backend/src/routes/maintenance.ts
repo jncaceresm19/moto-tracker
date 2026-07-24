@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { db } from '../db';
-import { maintenanceRecords, motorcycles } from '../db/schema';
+import { maintenanceRecords, motorcycles, notifications } from '../db/schema';
 import { authenticate } from '../middleware/auth';
 import { validateBody, validateParams } from '../middleware/validate';
 import { createErrorResponse } from '@moto-tracker/shared';
+import { createNotification } from './notifications';
 
 const router = Router({ mergeParams: true });
 
@@ -64,6 +65,52 @@ const motorcycleIdParam = z.object({
 
 const recordIdParam = z.object({
   id: z.string().uuid('Invalid motorcycle ID'),
+
+// ── Notification helpers ───────────────────────────────────────────
+async function scheduleMaintenanceNotifications(
+  userId: string,
+  motorcycleId: string,
+  description: string,
+  nextDate: Date,
+) {
+  const now = new Date();
+  const intervals = [
+    { days: 14, label: '2 semanas' },
+    { days: 7, label: '1 semana' },
+    { days: 1, label: '1 día' },
+  ];
+
+  for (const interval of intervals) {
+    const showAt = new Date(nextDate);
+    showAt.setDate(showAt.getDate() - interval.days);
+    if (showAt > now) {
+      await createNotification({
+        userId,
+        motorcycleId,
+        type: 'maintenance_due',
+        title: `Mantención en ${interval.label}`,
+        message: `"${description}" — programada para el ${nextDate.toLocaleDateString('es-CL')}`,
+        showAt,
+      });
+    }
+  }
+}
+
+async function clearMaintenanceNotifications(
+  userId: string,
+  motorcycleId: string,
+  recordId: string,
+) {
+  // Delete existing scheduled notifications for this record
+  await db.delete(notifications).where(
+    and(
+      eq(notifications.userId, userId),
+      eq(notifications.motorcycleId, motorcycleId),
+      eq(notifications.type, 'maintenance_due'),
+      sql`${notifications.message} LIKE ${'%' + recordId + '%'}`,
+    )
+  );
+}
   recordId: z.string().uuid('Invalid record ID'),
 });
 
@@ -125,6 +172,12 @@ router.post('/', validateBody(createMaintenanceSchema), async (req: Request, res
       .from(maintenanceRecords)
       .where(eq(maintenanceRecords.id, recordId))
       .get();
+
+    // Schedule maintenance notifications
+    if (nextServiceDate) {
+      scheduleMaintenanceNotifications(userId, motorcycleId, description, new Date(nextServiceDate))
+        .catch(err => console.error('Error scheduling maintenance notifications:', err));
+    }
 
     res.status(201).json({
       success: true,
@@ -290,6 +343,17 @@ router.put('/:recordId', validateParams(recordIdParam), validateBody(updateMaint
       .from(maintenanceRecords)
       .where(eq(maintenanceRecords.id, recordId))
       .get();
+
+    // Re-schedule notifications if nextServiceDate changed
+    if (req.body.nextServiceDate !== undefined) {
+      clearMaintenanceNotifications(userId, motorcycleId, recordId)
+        .catch(() => {});
+      if (req.body.nextServiceDate) {
+        const desc = (updates.description as string) || existing.description;
+        scheduleMaintenanceNotifications(userId, motorcycleId, desc, new Date(req.body.nextServiceDate))
+          .catch(err => console.error('Error scheduling maintenance notifications:', err));
+      }
+    }
 
     res.json({
       success: true,

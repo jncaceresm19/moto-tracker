@@ -262,13 +262,15 @@ export function TheftAlertCard({
                 <Text style={[styles.menuItemText, { color: colors.ink }]}>Reportar</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => { setShowMenu(false); setShowProfileModal(true); }}
-              >
-                <Ionicons name="person-outline" size={16} color={colors.ink} />
-                <Text style={[styles.menuItemText, { color: colors.ink }]}>Ver perfil</Text>
-              </TouchableOpacity>
+              {!isOwner && (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => { setShowMenu(false); setShowProfileModal(true); }}
+                >
+                  <Ionicons name="person-outline" size={16} color={colors.ink} />
+                  <Text style={[styles.menuItemText, { color: colors.ink }]}>Ver perfil</Text>
+                </TouchableOpacity>
+              )}
 
               {isOwner && !isRecovered && onMarkAsFound && (
                 <TouchableOpacity
