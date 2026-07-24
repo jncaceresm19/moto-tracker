@@ -4,7 +4,6 @@ import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -16,6 +15,7 @@ import { useAuth } from '../../../../src/auth-context';
 import { CustomAlert } from '../../../../src/components/CustomAlert';
 import { extractPdfData, OcrResult } from '../../../../src/services/ocrService';
 import { OcrReviewModal, buildOcrFields, OcrField } from '../../../../src/components/OcrReviewModal';
+import { ImageCropModal } from '../../../../src/components/ImageCropModal';
 
 
 // Parse date as LOCAL (avoids UTC midnight shifting the day back)
@@ -137,6 +137,11 @@ export default function DocumentsScreen() {
   const [ocrRawResult, setOcrRawResult] = useState<Record<string, string | undefined>>({});
   const [ocrComuna, setOcrComuna] = useState<string | undefined>();
   const [ocrPhotoUri, setOcrPhotoUri] = useState<string | null>(null);
+  // Crop modal state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [cropImageUri, setCropImageUri] = useState('');
+  const [pendingOcrSide, setPendingOcrSide] = useState<'front' | 'back'>('front');
+  const [cropMode, setCropMode] = useState<'ocr' | 'photo'>('ocr');
   // Municipality picker state (for circulation_permit + license appointment)
   const [muniSearch, setMuniSearch] = useState('');
   const [muniResults, setMuniResults] = useState<Municipality[]>([]);
@@ -269,19 +274,19 @@ export default function DocumentsScreen() {
       : await ImagePicker.launchImageLibraryAsync({ quality: 1.0, allowsEditing: false });
 
     if (!result.canceled && result.assets[0]) {
-      const manipulated = await ImageManipulator.manipulateAsync(
-        result.assets[0].uri,
-        [{ resize: { width: 2400 } }],
-        { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG, base64: true }
-      );
-      if (!manipulated.base64) return;
-      const dataUri = `data:image/jpeg;base64,${manipulated.base64}`;
-      if (photoSide === 'back') {
-        setForm((p) => ({ ...p, fileUrlBack: dataUri }));
-      } else {
-        setForm((p) => ({ ...p, fileUrl: dataUri }));
-        setErrors((p) => ({ ...p, fileUrl: '' }));
-      }
+      setCropImageUri(result.assets[0].uri);
+      setShowCropModal(true);
+    }
+  };
+
+  const handleCropConfirm = (base64: string) => {
+    setShowCropModal(false);
+    const dataUri = `data:image/jpeg;base64,${base64}`;
+    if (photoSide === 'back') {
+      setForm((p) => ({ ...p, fileUrlBack: dataUri }));
+    } else {
+      setForm((p) => ({ ...p, fileUrl: dataUri }));
+      setErrors((p) => ({ ...p, fileUrl: '' }));
     }
   };
 
@@ -2183,6 +2188,13 @@ export default function DocumentsScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <ImageCropModal
+        visible={showCropModal}
+        imageUri={cropImageUri}
+        onConfirm={handleCropConfirm}
+        onCancel={() => setShowCropModal(false)}
+      />
     </View>
   );
 }
