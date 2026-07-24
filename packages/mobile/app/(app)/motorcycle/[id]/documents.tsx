@@ -1615,13 +1615,13 @@ export default function DocumentsScreen() {
                       onChangeText={searchMunis}
                       autoFocus
                     />
-                    <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                      {muniResults.length === 0 && muniSearch.length >= 2 ? (
-                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
-                      ) : muniSearch.length < 2 ? (
-                        <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
-                      ) : (
-                        muniResults.map((m) => (
+                    {muniResults.length === 0 && muniSearch.length >= 2 ? (
+                      <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Sin resultados</Text>
+                    ) : muniSearch.length < 2 ? (
+                      <Text style={{ padding: 16, color: colors.textMuted, textAlign: 'center' }}>Escribí al menos 2 caracteres</Text>
+                    ) : (
+                      <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                        {muniResults.map((m) => (
                           <TouchableOpacity
                             key={m.id}
                             style={{ paddingVertical: 12, paddingHorizontal: 4, borderBottomWidth: 1, borderBottomColor: colors.border }}
@@ -1630,9 +1630,9 @@ export default function DocumentsScreen() {
                             <Text style={{ color: colors.text, fontWeight: '500' }}>{m.commune}</Text>
                             <Text style={{ color: colors.textMuted, fontSize: 12 }}>{m.region}{m.paymentUrl ? ' · Portal disponible' : ''}</Text>
                           </TouchableOpacity>
-                        ))
-                      )}
-                    </ScrollView>
+                        ))}
+                      </ScrollView>
+                    )}
                   </View>
                 </View>
               )}
