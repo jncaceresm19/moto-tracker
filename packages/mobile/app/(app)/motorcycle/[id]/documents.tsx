@@ -472,11 +472,13 @@ export default function DocumentsScreen() {
     } catch { setMuniResults([]); }
   };
 
-  const selectMuni = (m: Municipality) => {
+  const selectMuni = async (m: Municipality) => {
     setSelMuni(m);
     setMuniSearch(m.commune);
     setShowMuniPicker(false);
     setMuniResults([]);
+    // Persist immediately so "Paga tu permiso" can find the payment URL
+    try { await updateMotorcycle(id!, { permitMunicipalityId: m.id }); } catch { /* silencioso */ }
   };
 
   // ── Municipal Portal Actions ─────────────────────────────────────────────
